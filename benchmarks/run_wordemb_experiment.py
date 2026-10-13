@@ -45,9 +45,10 @@ def main():
     testtext=root/"test.txt"
     testgold=load_labels(root/"test.fasttext")
     candidates=[
-       {"id":"tfidf40k","selection":"tfidf","cap":40000,"dim":16},
-       {"id":"confusion40k","selection":"confusion","cap":40000,"dim":16},
-       {"id":"confusion100k","selection":"confusion","cap":100000,"dim":16},
+       {"id":"tfidf40k-18ep","selection":"tfidf","cap":40000,"dim":16,"epochs":18,"lr":0.035},
+       {"id":"confusion40k-18ep","selection":"confusion","cap":40000,"dim":16,"epochs":18,"lr":0.035},
+       {"id":"confusion40k-d32","selection":"confusion","cap":40000,"dim":32,"epochs":15,"lr":0.035},
+       {"id":"confusion100k-d32","selection":"confusion","cap":100000,"dim":32,"epochs":15,"lr":0.035},
     ]
     print("EXPERIMENT_BASE",str(base),str(train),flush=True)
     rankings=[]
@@ -55,7 +56,7 @@ def main():
         model=root/("emb-"+candidate["id"]+".bin")
         cmd=["./bytefast-wordemb","train",str(base),str(train),str(model),
              "-vocab",str(candidate["cap"]),"-dim",str(candidate["dim"]),
-             "-minCount","3","-epoch","6","-lr","0.025",
+             "-minCount","3","-epoch",str(candidate["epochs"]),"-lr",str(candidate["lr"]),
              "-selection",candidate["selection"]]
         print("TRAINING_WORD_EMBEDDINGS",candidate["id"],flush=True)
         command(cmd)
