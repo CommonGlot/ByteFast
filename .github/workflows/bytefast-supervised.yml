@@ -1,0 +1,49 @@
+name: ByteFast end-to-end smoke
+on:
+  push:
+    branches: ["bytefast/**", "main"]
+  pull_request:
+
+jobs:
+  train-predict:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build standalone CPU classifier
+        run: c++ -std=c++17 -O3 -Wall -Wextra -Werror -Isrc src/bytefast_cli.cc -o /tmp/bytefast
+      - name: Make reproducible small multilingual data
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          samples = {
+            "eng": ["This is a simple English document with common words.",
+                    "The weather is nice and the city is beautiful."],
+            "fra": ["Bonjour, voici un petit document français.",
+                    "Le temps est beau et la ville est magnifique."],
+            "spa": ["Hola, este es un documento sencillo en español.",
+                    "El tiempo es bueno y la ciudad es muy hermosa."]
+          }
+          train = []
+          test = []
+          for label, texts in samples.items():
+            for j in range(40):
+              train.append(f"__label__{label} {texts[j % len(texts)]} Number {j % 8}\n")
+            for j in range(10):
+              test.append(f"__label__{label} {texts[j % len(texts)]} Example {j % 8}\n")
+          Path("/tmp/bytefast-train.txt").write_text("".join(train))
+          Path("/tmp/bytefast-test.txt").write_text("".join(test))
+          Path("/tmp/bytefast-unlabeled.txt").write_text(
+              "".join(s.split(" ", 1)[1] for s in test))
+          PY
+      - name: Train, reload, and evaluate the baseline
+        run: |
+          /tmp/bytefast train /tmp/bytefast-train.txt /tmp/bytefast-single.bin -bucket 4096 -dim 32 -epoch 15 -lr 0.3 -hashCount 1
+          /tmp/bytefast test /tmp/bytefast-single.bin /tmp/bytefast-test.txt
+          /tmp/bytefast predict /tmp/bytefast-single.bin /tmp/bytefast-unlabeled.txt | head -n 3
+          /tmp/bytefast bench /tmp/bytefast-single.bin /tmp/bytefast-unlabeled.txt
+      - name: Train and test Bloom hashes with position features
+        run: |
+          /tmp/bytefast train /tmp/bytefast-train.txt /tmp/bytefast-bloom.bin -bucket 4096 -dim 32 -epoch 15 -lr 0.3 -hashCount 2 -positionBins 4
+          /tmp/bytefast test /tmp/bytefast-bloom.bin /tmp/bytefast-test.txt
+          /tmp/bytefast bench /tmp/bytefast-bloom.bin /tmp/bytefast-unlabeled.txt
+          ls -lh /tmp/bytefast-*.bin
