@@ -66,15 +66,15 @@ A second experiment used 15 additional languages **only** as training examples f
 
 | Metric | No negative training | Trained und/zxx |
 |---|---:|---:|
-| Known-language acceptance | 89.83% | 90.81% |
-| Correct among accepted known | 98.39% | 97.91% |
-| Unseen false acceptance (20 unseen) | 51.50% | **47.80%** |
+| Known-language acceptance | 89.83% | 90.76% |
+| Correct among accepted known | 98.39% | 97.94% |
+| Unseen false acceptance (20 unseen) | 51.50% | **48.90%** |
 | Synthetic-noise false acceptance | 0.40% | **0.00%** |
 | Model file | 2,125,006 bytes | 2,125,284 bytes |
 
 These results are not directly comparable to the 35-language experiment above, because the unknown language inventory differs. This is only a partial improvement; real unseen-language rejection remains inadequate.
 
-Log: https://github.com/CommonGlot/ByteFast/actions/runs/38478122106
+Reproducible run: https://github.com/CommonGlot/ByteFast/actions/runs/38478506925
 
 ## Decisions
 
@@ -85,3 +85,20 @@ Log: https://github.com/CommonGlot/ByteFast/actions/runs/38478122106
 5. Before a release or full GlotLID training, run CommonLID **evaluation only**, more noisy-domain datasets, low-prevalence corpus precision simulations, multilingual/code-switch tests, seed variance, tuning-budget matched baselines, and 2,102-label CPU profiling.
 
 No user access tokens or CommonLID examples were used in these tests.
+
+## Combined rejection + ASCII case fold (deterministic rerun)
+
+After sorting the negative-training language list to eliminate dependence on Python hash randomization, we trained and compared all three models using the same 200 known languages, 15 `und`-training languages, and 20 entirely unseen evaluation languages.
+
+| Metric | ByteFast base | + und/zxx | + und/zxx and ASCII fold |
+|---|---:|---:|---:|
+| Known-language acceptance | 89.83% | 90.76% | **90.83%** |
+| Known-language accuracy among accepted | **98.39%** | 97.94% | 97.97% |
+| Completely unseen language false acceptance | 51.50% | 48.90% | **48.10%** |
+| Synthetic noise false acceptance | 0.40% | **0%** | **0%** |
+| Inference wall time for 10,000 known paragraphs | 0.21 s | 0.21 s | 0.21 s |
+| Model size | 2,125,006 bytes | 2,125,284 bytes | 2,125,284 bytes |
+
+Run: https://github.com/CommonGlot/ByteFast/actions/runs/38478506925
+
+**Interpretation:** Combined generic und/zxx training and case folding modestly reduce unseen-language false acceptance without slowing this small model, but about half the texts in fully unseen languages are *still* accepted as some known language. Do not ship generic rejection as a solved feature. Further tests need real OOD scripts, per-script unknown labels, low-prevalence FPR targets, and larger multilingual coverage. The earlier und/zxx run measured 47.8% false acceptance; that result is superseded by the deterministic negative-data generator (48.9%).
