@@ -184,9 +184,9 @@ struct Fusion {
     if(!f)throw std::runtime_error("Could not write learned fusion");
     Model::write(f,uint32_t{0x42464c58U});
     Model::write(f,uint32_t{1});
-    Model::write(f,uint32_t{nlabels()});
+    Model::write(f,static_cast<uint32_t>(nlabels()));
     for(const auto& s:labels) {
-      Model::write(f,uint32_t{s.size()});f.write(s.data(),s.size());
+      Model::write(f,static_cast<uint32_t>(s.size()));f.write(s.data(),s.size());
     }
     for(double w:theta) {
       const float f32=static_cast<float>(w);
