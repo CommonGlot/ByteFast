@@ -35,15 +35,21 @@ jobs:
           Path("/tmp/bytefast-unlabeled.txt").write_text(
               "".join(s.split(" ", 1)[1] for s in test))
           PY
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("/tmp/bytefast-unlabeled.txt")
+          s = p.read_text()
+          p.with_name("bytefast-bench.txt").write_text(s * 350)
+          PY
       - name: Train, reload, and evaluate the baseline
         run: |
           /tmp/bytefast train /tmp/bytefast-train.txt /tmp/bytefast-single.bin -bucket 4096 -dim 32 -epoch 15 -lr 0.3 -hashCount 1
           /tmp/bytefast test /tmp/bytefast-single.bin /tmp/bytefast-test.txt
           /tmp/bytefast predict /tmp/bytefast-single.bin /tmp/bytefast-unlabeled.txt | head -n 3
-          /tmp/bytefast bench /tmp/bytefast-single.bin /tmp/bytefast-unlabeled.txt
+          /tmp/bytefast bench /tmp/bytefast-single.bin /tmp/bytefast-bench.txt
       - name: Train and test Bloom hashes with position features
         run: |
           /tmp/bytefast train /tmp/bytefast-train.txt /tmp/bytefast-bloom.bin -bucket 4096 -dim 32 -epoch 15 -lr 0.3 -hashCount 2 -positionBins 4
           /tmp/bytefast test /tmp/bytefast-bloom.bin /tmp/bytefast-test.txt
-          /tmp/bytefast bench /tmp/bytefast-bloom.bin /tmp/bytefast-unlabeled.txt
+          /tmp/bytefast bench /tmp/bytefast-bloom.bin /tmp/bytefast-bench.txt
           ls -lh /tmp/bytefast-*.bin
