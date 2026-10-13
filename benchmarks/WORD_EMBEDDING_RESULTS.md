@@ -45,3 +45,35 @@ Full reproducible first run: https://github.com/CommonGlot/ByteFast/actions/runs
 - Vocabulary confusion scores come from *in-sample training errors*, and may overfit domain or imbalance. Domain-generalization tests remain necessary.
 - A test-set comparison on WiLI has already been observed. Further exploratory WiLI tuning should be confirmed on **another fully held-out corpus** before a publication/release claim.
 - Not evaluated against full GlotLID v3 with 2,102 labels, word-quantized fastText, true noisy web, per-language false-positive rates, or CommonLID held-out evaluation.
+
+## Longer-training follow-up: confusion-aware vocabulary works
+
+The six-epoch models above were undertrained. To determine whether that explained the negative results, we compared four new configurations, selecting **only on the official WiLI train-derived development split**. Note that the original WiLI test scores from the first run had already been viewed; thus the follow-up test should be regarded as exploratory until reproduced on a second external corpus.
+
+| Word encoder | Dev overall macro F1 | Dev BCMS F1 | Base + word model bytes |
+|---|---:|---:|---:|
+| TF-IDF 40k words, dim 16, 18 epochs | **0.943872** | 0.674164 | 5,153,026 |
+| Confusion-aware 40k, dim 16, 18 epochs | 0.943358 | **0.717271** | 5,177,993 |
+| Confusion-aware 40k, dim 32, 15 epochs | 0.943596 | 0.709358 | 7,753,033 |
+| Confusion-aware 100k, dim 32, 15 epochs | 0.943960 | 0.704217 | 16,182,646 |
+
+Confusion-aware ranking thus improved BCMS **dev F1 by 4.31 percentage points** compared to same-size TF-IDF ranking, at a slight cost to overall dev F1. More words or wider vectors did not reliably improve the dev objective.
+
+The dev selection objective was `macro_f1 + 0.12 * bcms_f1`; it selected **40k confusion-aware, dim 16, 18 epochs**.
+
+### Exploratory second test
+
+| Model | Overall F1 | BCMS F1 | Total bytes | Median CPU CLI wall seconds (11,750 examples, incl. loading) |
+|---|---:|---:|---:|---:|
+| Byte-only | 0.931137 | 0.445980 | 2,129,882 | 0.1346 |
+| **Trained word embeddings** | 0.943954 | **0.689364** | 5,177,993 | 0.1996 |
+| Statistical lexicon (gated) | **0.954319** | 0.688549 | 7,209,081 | 0.2003 |
+| Normal fastText, 40 epochs | 0.942806 | 0.677627 | 192,248,893 | 0.9368 |
+
+All models ran on the same job, but these timings are not portable across different GitHub Action runners. BCMS advantage of learned versus statistical is only 0.000815 F1, far too small to establish superiority. In contrast, the one-point loss in global F1 is material.
+
+The learned byte coefficient after 18 epochs was approximately **1.51** (versus 1.0 at initialization); each word vector and the language output matrix were trained with cross entropy. This is genuinely supervised word representation learning, not merely re-scaling the original statistical lexicon.
+
+**Decision:** keep statistical gated ByteFast as the global-accuracy incumbent; keep supervised word embeddings as a promising lighter BCMS-oriented alternative. Evaluate on genuinely external/non-Wikipedia text and at full GlotLID coverage before changing defaults.
+
+Successful longer-training run: https://github.com/CommonGlot/ByteFast/actions/runs/38483523780
