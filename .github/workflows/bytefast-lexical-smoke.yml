@@ -1,0 +1,37 @@
+name: ByteFast lexical sidecar smoke
+on:
+  push:
+    branches: ["bytefast/lexical-hybrid"]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  lexical-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile original ByteFast and lexical extension
+        run: make bytefast bytefast-lexical
+      - name: Construct tiny multilingual examples
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          a=["__label__eng Train ticket and week morning.",
+             "__label__eng The train leaves from the station.",
+             "__label__fra Le train part de la gare le matin.",
+             "__label__fra Un billet pour voyager pendant la semaine.",
+             "__label__hrv Vlak polazi danas ujutro iz grada.",
+             "__label__hrv Sljedeći tjedan imamo novi vlak."]
+          Path('/tmp/lex-train.txt').write_text('\n'.join(a*15)+'\n')
+          Path('/tmp/lex-test.txt').write_text("Train ticket and week morning.\nLe train part de la gare.\nVlak polazi danas ujutro.\n")
+          PY
+      - name: Train, build compact lexicon, reload and compare neutral weight
+        run: |
+          ./bytefast train /tmp/lex-train.txt /tmp/lex-base.bin -bucket 1024 -dim 32 -epoch 12 -lr 0.3
+          ./bytefast-lexical build /tmp/lex-base.bin /tmp/lex-train.txt /tmp/lex-words.bin 128 2
+          ./bytefast predict /tmp/lex-base.bin /tmp/lex-test.txt > /tmp/lex-neutral.expected
+          ./bytefast-lexical predict /tmp/lex-base.bin /tmp/lex-words.bin /tmp/lex-test.txt -weight 0 > /tmp/lex-neutral.actual
+          cut -d' ' -f1 /tmp/lex-neutral.expected > /tmp/lex-neutral.labels
+          diff /tmp/lex-neutral.labels /tmp/lex-neutral.actual
+          ./bytefast-lexical predict /tmp/lex-base.bin /tmp/lex-words.bin /tmp/lex-test.txt -weight 0.3
+          ./bytefast-lexical bench /tmp/lex-base.bin /tmp/lex-words.bin /tmp/lex-test.txt -weight 0.3
+          ls -lh /tmp/lex-*.bin
