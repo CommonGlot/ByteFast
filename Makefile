@@ -18,6 +18,9 @@ bytefast: src/bytefast_cli.cc src/bytefast_model.h src/byte_ngrams.h
 bytefast-lexical: src/bytefast_lexical.cc src/bytefast_model.h src/byte_ngrams.h
 	$(CXX) $(CXXFLAGS) -O3 -DNDEBUG -Isrc src/bytefast_lexical.cc -o bytefast-lexical
 
+bytefast-wordemb: src/bytefast_wordemb.cc src/bytefast_lexical.h src/bytefast_model.h src/byte_ngrams.h
+	$(CXX) $(CXXFLAGS) -O3 -DNDEBUG -Isrc src/bytefast_wordemb.cc -o bytefast-wordemb
+
 opt: CXXFLAGS += -O3 -funroll-loops -DNDEBUG
 opt: fasttext
 
@@ -76,7 +79,7 @@ fasttext: $(OBJS) src/fasttext.cc src/main.cc
 	$(CXX) $(CXXFLAGS) $(OBJS) src/main.cc -o fasttext
 
 clean:
-	rm -rf *.o *.gcno *.gcda fasttext bytefast bytefast-lexical *.bc webassembly/fasttext_wasm.js webassembly/fasttext_wasm.wasm
+	rm -rf *.o *.gcno *.gcda fasttext bytefast bytefast-lexical bytefast-wordemb *.bc webassembly/fasttext_wasm.js webassembly/fasttext_wasm.wasm
 
 
 EMCXX = em++
