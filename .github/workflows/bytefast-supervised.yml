@@ -53,6 +53,20 @@ jobs:
         run: |
           /tmp/bytefast train /tmp/bytefast-train.txt /tmp/bytefast-single.bin -bucket 4096 -dim 32 -epoch 15 -lr 0.3 -hashCount 1
           /tmp/bytefast test /tmp/bytefast-single.bin /tmp/bytefast-test.txt
+          /tmp/bytefast predict-scores /tmp/bytefast-single.bin /tmp/bytefast-unlabeled.txt > /tmp/bytefast-scores.txt
+          /tmp/bytefast predict /tmp/bytefast-single.bin /tmp/bytefast-unlabeled.txt -rejectThreshold 1.0 > /tmp/bytefast-rejected.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          rows=Path('/tmp/bytefast-scores.txt').read_text().splitlines()
+          assert len(rows)==30
+          for row in rows:
+              fields=row.split()
+              assert len(fields)==3, fields
+              assert 0 <= float(fields[2]) <= float(fields[1]) <= 1
+          rejections=Path('/tmp/bytefast-rejected.txt').read_text().splitlines()
+          assert len(rejections)==30
+          assert all(row.startswith('__label__und ') for row in rejections)
+          PY
           /tmp/bytefast predict /tmp/bytefast-single.bin /tmp/bytefast-unlabeled.txt | head -n 3
           /tmp/bytefast bench /tmp/bytefast-single.bin /tmp/bytefast-bench.txt
       - name: Train and test Bloom hashes with position features
