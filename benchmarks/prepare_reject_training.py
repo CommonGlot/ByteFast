@@ -30,7 +30,7 @@ def main():
     originals=(root/"open-train.txt").read_text(encoding="utf8").splitlines()
     und=[]
     rng=random.Random(4180)
-    for lab in training_set:
+    for lab in sorted(training_set):
         vals=list(all_train[lab])
         rng.shuffle(vals)
         und.extend(f"__label__und {text}" for text in vals[:150])
