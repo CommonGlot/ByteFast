@@ -124,41 +124,31 @@ class Lexicon {
   uint32_t predict(const Model& model,const std::string& txt,float weight) const {
     const auto base=model.probabilities(model.embedding(model.features(txt)));
     std::vector<float> combined(base.size());
-    for (size_t c=0;c<base.size();++c) combined[c]=
-        std::log(std::max(base[c],1e-20f));
-    const auto pieces=words(txt,model.opt.maxBytes);
-    // Repetitions in boilerplate should not swamp the classifier.
-    std::unordered_set<std::string> unique(pieces.begin(),pieces.end());
-    size_t matched=0;
-    for (const auto& w:unique) {
-      const auto it=entries.find(w);
-      if (it==entries.end()) continue;
-      ++matched;
-      for (const auto& s:it->second) {
-        if (s.language<combined.size()) combined[s.language]+=weight*s.logOdds;
-      }
-    }
-    if (matched>1) {
-      // Centre lexical scores to be an average, not dependent on document length.
-      // Base log probabilities were added separately, so adjust the total
-      // lexical contribution while preserving relative score differences.
-      // Implemented directly below for clarity using separate lexical values.
+    for (size_t c=0;c<base.size();++c)
+      combined[c]=std::log(std::max(base[c],1e-20f));
+    if(weight>0) {
+      const auto pieces=words(txt,model.opt.maxBytes);
+      // Repeating boilerplate must not swamp the classifier.
+      std::unordered_set<std::string> unique(pieces.begin(),pieces.end());
       std::vector<float> lexical(base.size(),0.0f);
+      size_t matched=0;
       for (const auto& w:unique) {
         const auto it=entries.find(w);
         if (it==entries.end()) continue;
+        ++matched;
         for (const auto& s:it->second) {
           if (s.language<lexical.size()) lexical[s.language]+=s.logOdds;
         }
       }
-      const float denom=std::sqrt(static_cast<float>(matched));
-      for (size_t c=0;c<base.size();++c) combined[c]=
-          std::log(std::max(base[c],1e-20f))+weight*lexical[c]/denom;
+      if(matched) {
+        const float scale=weight/std::sqrt(static_cast<float>(matched));
+        for (size_t c=0;c<base.size();++c)
+          combined[c]+=scale*lexical[c];
+      }
     }
     return static_cast<uint32_t>(
       std::max_element(combined.begin(),combined.end())-combined.begin());
   }
-
   void save(const std::string& path) const {
     std::ofstream f(path,std::ios::binary);
     if (!f) throw std::runtime_error("Could not save lexicon");
