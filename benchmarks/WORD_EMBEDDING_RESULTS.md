@@ -77,3 +77,40 @@ The learned byte coefficient after 18 epochs was approximately **1.51** (versus 
 **Decision:** keep statistical gated ByteFast as the global-accuracy incumbent; keep supervised word embeddings as a promising lighter BCMS-oriented alternative. Evaluate on genuinely external/non-Wikipedia text and at full GlotLID coverage before changing defaults.
 
 Successful longer-training run: https://github.com/CommonGlot/ByteFast/actions/runs/38483523780
+
+
+## Equal-epoch width sweep: 16, 32, 64, 128, 256, 512 (2026-10-14)
+
+Follow-up experiment: the same 40,000-word confusion-aware vocabulary budget, minimum document frequency=3, 18 supervised epochs, learning rate 0.035, identical WiLI train-derived development set, same byte model. Trainable word dimensions were the **only** architecture parameter changed. Model loading and training were extended from a 128-dimensional maximum to 512, retaining the 900 MB parameter guard.
+
+| Word dimensions | Dev overall macro F1 | Dev BCMS macro F1 | Serialized model total (bytes) | Median dev prediction wall seconds (23,500 texts, incl. load) |
+|---|---:|---:|---:|---:|
+| 16 | 0.943358 | 0.717271 | 5,177,993 | 0.6634 |
+| 32 | 0.944642 | **0.718026** | 7,753,033 | 0.7184 |
+| 64 | 0.945097 | 0.709734 | 12,903,113 | 0.8389 |
+| 128 | 0.945641 | 0.712707 | 23,203,273 | 1.0553 |
+| 256 | 0.946133 | 0.703580 | 43,803,593 | 1.7325 |
+| 512 | **0.947430** | 0.715496 | 85,004,233 | 3.1727 |
+
+The dev selection objective was unchanged: overall_macro_f1 + 0.12 * BCMS_macro_f1. It chose 512 dimensions even though 32 was best for BCMS-specific F1.
+
+The selected 512-d model was evaluated on the official WiLI-2018 test partition against three reference controls on the same CPU runner:
+
+| Model | Official test overall macro F1 | Official test BCMS F1 | Size (bytes) | Median CLI wall seconds (11,750 test inputs) |
+|---|---:|---:|---:|---:|
+| Byte-only ByteFast | 0.931137 | 0.445980 | 2,129,882 | 0.2389 |
+| **512-d learned word embeddings** | 0.947623 | 0.685498 | 85,004,233 | 1.5739 |
+| **Gated statistical lexical ByteFast** | **0.954319** | **0.688549** | 7,209,081 | **0.3231** |
+| Original fastText, 40 epochs | 0.942288 | 0.672240 | 192,248,893 | 1.4983 |
+
+Earlier 16-d experiments reported test overall F1 0.943954, BCMS F1 0.689364, and a 5.18 MB model. These were obtained on an earlier run, so CPU times across runs should not be compared directly. The 512-d model modestly improves global test F1 but does not improve BCMS test F1. At this scale it was slower than even the ordinary (unquantized) fastText CLI on the same runner, despite being smaller.
+
+**Decision:** Do not make 512 dimensions the default. The 16/32-d learned models are substantially more efficient; the 7.21 MB gated statistical lexical sidecar remains the best measured overall accuracy/size/latency tradeoff.
+
+### Critical caveats
+
+These results are **exploratory**: earlier official WiLI test results have already been inspected. Model selection here used the train-derived development partition, but an independent non-Wikipedia dataset is still required to validate the choice without repeated test-set exposure. The script evaluated the **selected** 512-d model on official WiLI test, not every dimension. No CommonLID training or GlotLID 2,102-class deployment evaluation was performed. The baseline fastText was not quantized or size-matched.
+
+- [Successful GitHub Actions width sweep and logs](https://github.com/CommonGlot/ByteFast/actions/runs/38484470076)
+- [Sweep script](../benchmarks/run_wordemb_widths.py)
+- [Sweep workflow](../.github/workflows/bytefast-wordemb-widths.yml)
