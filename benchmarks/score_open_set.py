@@ -34,7 +34,8 @@ def gold(path):
                 for line in stream if line.strip()]
 
 def accepts(rows,t,m):
-    return [(name if p>=t and margin>=m else "und") for name,p,margin in rows]
+    return [(name if p>=t and margin>=m and name not in {"und","zxx"}
+             else "und") for name,p,margin in rows]
 
 def fraction(n,d):
     return n/d if d else 0.0
@@ -52,7 +53,7 @@ def main():
     dk,du,dn=read("dev","known"),read("dev","unknown"),read("dev","noise")
     tk,tu,tn=read("test","known"),read("test","unknown"),read("test","noise")
     def seen(rows,t,m):
-        return sum(p>=t and gap>=m for _,p,gap in rows)
+        return sum(p>=t and gap>=m and name not in {"und","zxx"} for name,p,gap in rows)
     # At least 90% validation coverage on known languages; minimize
     # open-set false acceptance. Selection only sees train-dev data.
     candidates=[]
