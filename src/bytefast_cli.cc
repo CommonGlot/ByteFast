@@ -96,8 +96,13 @@ class Model {
       labels.push_back(r.label);
     }
     const uint64_t cells=uint64_t(opt.bucket)*opt.dim;
-    if (cells > 500000000ULL || uint64_t(labels.size())*opt.dim > 50000000ULL)
-      throw std::runtime_error("Model would exceed allowed memory guard");
+    const uint64_t outputCells=uint64_t(labels.size())*opt.dim;
+    uint64_t labelBytes=0;
+    for (const auto& s:labels) labelBytes+=s.size()+sizeof(uint32_t);
+    const uint64_t estimatedFileBytes=64+labelBytes+sizeof(float)*
+        (cells+outputCells+labels.size());
+    if (estimatedFileBytes>=1000000000ULL)
+      throw std::runtime_error("ByteFast saved model would exceed 1 GB limit");
     input.resize(static_cast<size_t>(cells));
     output.resize(labels.size()*opt.dim);
     bias.assign(labels.size(),0);
@@ -224,7 +229,8 @@ class Model {
     if (!opt.bucket || !opt.dim || !opt.minN || opt.minN>opt.maxN ||
         opt.maxN>16 || !opt.maxBytes || !opt.hashes || opt.hashes>4 ||
         opt.positions>1 || !count || count>10000 ||
-        uint64_t(opt.bucket)*opt.dim>500000000ULL)
+        64ULL+4ULL*(uint64_t(opt.bucket)*opt.dim+
+          uint64_t(count)*opt.dim+count)>=1000000000ULL)
       throw std::runtime_error("Invalid model dimensions");
     labels.clear();
     for (uint32_t i=0;i<count;++i) {
