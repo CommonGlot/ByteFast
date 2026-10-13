@@ -243,9 +243,9 @@ int main(int argc,char** argv) {
       fusion.load(base,lex,argv[4]);
       double gate=2.;
       if(argc>6) {
-        if(argc!=9||std::string(argv[7])!="-gate")
+        if(argc!=8||std::string(argv[6])!="-gate")
           throw std::runtime_error("Expected -gate VALUE");
-        gate=std::stod(argv[8]);
+        gate=std::stod(argv[7]);
       }
       if(!std::isfinite(gate)||gate<0||gate>2)
         throw std::runtime_error("Gate must be between 0 and 2");
