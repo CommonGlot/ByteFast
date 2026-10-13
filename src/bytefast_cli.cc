@@ -97,8 +97,9 @@ class Model {
     output.resize(labels.size()*opt.dim);
     bias.assign(labels.size(),0);
     std::mt19937 gen(17);
-    std::uniform_real_distribution<float> d(-0.05f/opt.dim,0.05f/opt.dim);
+    std::uniform_real_distribution<float> d(-0.1f,0.1f);
     for (float& w:input) w=d(gen);
+    for (float& w:output) w=d(gen);
   }
   std::vector<float> embedding(const std::vector<uint32_t>& ids) const {
     std::vector<float> h(opt.dim,0.0f);
