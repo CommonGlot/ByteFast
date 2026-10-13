@@ -121,11 +121,18 @@ class Lexicon {
               << " documents=" << documents << '\n';
   }
 
-  uint32_t predict(const Model& model,const std::string& txt,float weight) const {
+  uint32_t predict(const Model& model,const std::string& txt,float weight,
+                   float gateMargin=2.0f) const {
     const auto base=model.probabilities(model.embedding(model.features(txt)));
     std::vector<float> combined(base.size());
-    for (size_t c=0;c<base.size();++c)
+    uint32_t top=0;
+    float largest=-1,second=-1;
+    for(uint32_t c=0;c<base.size();++c) {
+      if(base[c]>largest) {second=largest;largest=base[c];top=c;}
+      else if(base[c]>second) second=base[c];
       combined[c]=std::log(std::max(base[c],1e-20f));
+    }
+    if(weight<=0 || largest-second>=gateMargin) return top;
     if(weight>0) {
       const auto pieces=words(txt,model.opt.maxBytes);
       // Repeating boilerplate must not swamp the classifier.
@@ -212,7 +219,7 @@ class Lexicon {
 void help() {
   std::cerr<<"Usage:\n"
     <<" bytefast-lexical build BASE_MODEL TRAIN_DATA OUTPUT.lex [maxWords] [minCount]\n"
-    <<" bytefast-lexical predict BASE_MODEL LEXICON INPUT [-weight FLOAT]\n"
+    <<" bytefast-lexical predict BASE_MODEL LEXICON INPUT [-weight FLOAT] [-gateMargin 0..2]\n"
     <<" bytefast-lexical bench BASE_MODEL LEXICON INPUT [-weight FLOAT]\n";
 }
 } // namespace
@@ -232,21 +239,24 @@ int main(int argc,char** argv) {
     } else if(cmd=="predict" || cmd=="bench") {
       if(argc<5) {help();return 2;}
       lex.load(model,argv[3]);
-      float weight=1.0f;
-      if(argc>5) {
-        if(argc!=7 || std::string(argv[5])!="-weight")
-          throw std::runtime_error("Expected -weight FLOAT");
-        weight=std::stof(argv[6]);
+      float weight=1.0f,gateMargin=2.0f;
+      for(int i=5;i<argc;i+=2) {
+        if(i+1>=argc) throw std::runtime_error("Missing lexical option value");
+        const std::string option=argv[i];
+        if(option=="-weight") weight=std::stof(argv[i+1]);
+        else if(option=="-gateMargin") gateMargin=std::stof(argv[i+1]);
+        else throw std::runtime_error("Unknown option: "+option);
       }
-      if(!std::isfinite(weight) || weight<0 || weight>10)
-        throw std::runtime_error("Invalid lexical weight");
+      if(!std::isfinite(weight) || weight<0 || weight>10 ||
+         !std::isfinite(gateMargin) || gateMargin<0 || gateMargin>2)
+        throw std::runtime_error("Invalid lexical weight/gate");
       std::ifstream f(argv[4]);
       if(!f) throw std::runtime_error("Missing input file");
       std::string line;size_t total=0;
       const auto start=std::chrono::steady_clock::now();
       while(std::getline(f,line)) {
         if(!line.empty() && line.back()=='\r') line.pop_back();
-        const auto prediction=lex.predict(model,line,weight);
+        const auto prediction=lex.predict(model,line,weight,gateMargin);
         if(cmd=="predict") std::cout<<"__label__"<<model.labels[prediction]<<'\n';
         ++total;
       }
