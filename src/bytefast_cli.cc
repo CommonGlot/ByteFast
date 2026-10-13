@@ -21,7 +21,7 @@
 namespace {
 struct Options {
   uint32_t bucket = 65536, dim = 64, minN = 2, maxN = 5, hashes = 1, positions = 0;
-  uint32_t maxBytes = 512, epochs = 5;
+  uint32_t maxBytes = 512, epochs = 5, asciiFold = 0;
   float lr = 0.15f;
 };
 struct Record { std::string label, text; };
@@ -71,7 +71,9 @@ class Model {
     for (size_t pos=0; pos<length; ++pos) {
       uint32_t rolling=2166136261u;
       for (uint32_t n=1; n<=opt.maxN && n<=length-pos; ++n) {
-        rolling ^= static_cast<uint8_t>(s[pos+n-1]);
+        uint8_t byte=static_cast<uint8_t>(s[pos+n-1]);
+        if (opt.asciiFold && byte >= 'A' && byte <= 'Z') byte += 32;
+        rolling ^= byte;
         rolling *= 16777619u;
         if (n<opt.minN) continue;
         // Match hashByteNgram: finalize by incorporating the n-gram length.
@@ -203,10 +205,11 @@ class Model {
   void save(const std::string& path) const {
     std::ofstream f(path,std::ios::binary);
     if (!f) throw std::runtime_error("Cannot write model");
-    const uint32_t magic=0x42594654U, version=1;
+    const uint32_t magic=0x42594654U, version=2;
     write(f,magic);write(f,version);
     write(f,opt.bucket);write(f,opt.dim);write(f,opt.minN);write(f,opt.maxN);
     write(f,opt.hashes);write(f,opt.positions);write(f,opt.maxBytes);
+    write(f,opt.asciiFold);
     uint32_t count=static_cast<uint32_t>(labels.size());
     write(f,count);
     for (const auto& s:labels) {
@@ -223,12 +226,14 @@ class Model {
     if (!f) throw std::runtime_error("Cannot read model");
     uint32_t magic,version,count;
     read(f,magic);read(f,version);
-    if (magic!=0x42594654U || version!=1) throw std::runtime_error("Invalid ByteFast model");
+    if (magic!=0x42594654U || (version!=1 && version!=2)) throw std::runtime_error("Invalid ByteFast model");
     read(f,opt.bucket);read(f,opt.dim);read(f,opt.minN);read(f,opt.maxN);
-    read(f,opt.hashes);read(f,opt.positions);read(f,opt.maxBytes);read(f,count);
+    read(f,opt.hashes);read(f,opt.positions);read(f,opt.maxBytes);
+    if (version>=2) read(f,opt.asciiFold);
+    read(f,count);
     if (!opt.bucket || !opt.dim || !opt.minN || opt.minN>opt.maxN ||
         opt.maxN>16 || !opt.maxBytes || !opt.hashes || opt.hashes>4 ||
-        opt.positions>1 || !count || count>10000 ||
+        (opt.positions>1 || opt.asciiFold>1) || !count || count>10000 ||
         64ULL+4ULL*(uint64_t(opt.bucket)*opt.dim+
           uint64_t(count)*opt.dim+count)>=1000000000ULL)
       throw std::runtime_error("Invalid model dimensions");
@@ -282,12 +287,13 @@ int main(int argc,char** argv) {
         model.opt.positions=bins?1:0;
       }
       else if(flag=="-maxBytes") model.opt.maxBytes=numeric(argv[i+1]);
+      else if(flag=="-asciiFold") model.opt.asciiFold=numeric(argv[i+1]);
       else throw std::runtime_error("Unknown option: "+flag);
     }
     if (!model.opt.bucket || !model.opt.dim || !model.opt.minN ||
         model.opt.maxN>16 || model.opt.minN>model.opt.maxN ||
         !model.opt.hashes || model.opt.hashes>4 || !model.opt.maxBytes ||
-        !model.opt.epochs || !(model.opt.lr>0))
+        !model.opt.epochs || model.opt.asciiFold>1 || !(model.opt.lr>0))
       throw std::runtime_error("Invalid hyperparameters");
     const auto records=readRecords(argv[2]);
     model.train(records);
