@@ -220,7 +220,7 @@ struct Fusion {
     }
   }
 };
-void usage() {
+void calibratedUsage() {
   std::cerr<<"Usage:\n"
     <<"  bytefast-calibrated fit BASE WORDS CALIBRATION.fasttext VALIDATION.fasttext OUTPUT.fuse\n"
     <<"  bytefast-calibrated predict BASE WORDS FUSION MODEL_INPUT.txt [-gate 0..2]\n"
@@ -230,13 +230,13 @@ void usage() {
 
 int main(int argc,char** argv) {
   try {
-    if(argc<6){usage();return 2;}
+    if(argc<6){calibratedUsage();return 2;}
     const std::string command=argv[1];
     Model base;base.load(argv[2]);
     Lexicon lex;lex.load(base,argv[3]);
     Fusion fusion;
     if(command=="fit") {
-      if(argc!=7) {usage();return 2;}
+      if(argc!=7) {calibratedUsage();return 2;}
       fusion.fit(base,lex,readRecords(argv[4]),readRecords(argv[5]));
       fusion.save(argv[6]);
     }else if(command=="predict"||command=="bench") {
@@ -266,7 +266,7 @@ int main(int argc,char** argv) {
         std::cout<<"documents="<<n<<" seconds="<<seconds
                  <<" docs_per_second="<<n/seconds<<'\n';
       }
-    }else{usage();return 2;}
+    }else{calibratedUsage();return 2;}
     return 0;
   }catch(const std::exception& e){
     std::cerr<<"Calibrated lexical error: "<<e.what()<<'\n';return 1;
