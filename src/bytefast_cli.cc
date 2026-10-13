@@ -132,11 +132,24 @@ class Model {
     for (float& x:p) x/=sum;
     return p;
   }
-  uint32_t predict(const std::string& s, float* confidence=nullptr) const {
-    const auto p=probabilities(embedding(features(s)));
-    const uint32_t best=static_cast<uint32_t>(
-        std::max_element(p.begin(),p.end())-p.begin());
-    if (confidence) *confidence=p[best];
+  uint32_t predict(const std::string& s, float* confidence=nullptr,
+                   float* margin=nullptr) const {
+    const auto ids=features(s);
+    if (ids.empty()) {
+      if (confidence) *confidence=0.0f;
+      if (margin) *margin=0.0f;
+      return 0;
+    }
+    const auto p=probabilities(embedding(ids));
+    uint32_t best=0;
+    float largest=-1.0f, second=-1.0f;
+    for (uint32_t i=0;i<p.size();++i) {
+      if (p[i]>largest) {
+        second=largest; largest=p[i]; best=i;
+      } else if (p[i]>second) second=p[i];
+    }
+    if (confidence) *confidence=largest;
+    if (margin) *margin=largest-std::max(second,0.0f);
     return best;
   }
   void train(const std::vector<Record>& records) {
@@ -237,7 +250,7 @@ void usage() {
                " [-lr FLOAT] [-minn N] [-maxn N] [-hashCount 1..4]"
                " [-positionBins 0|4] [-maxBytes N]\n"
             << "  bytefast test MODEL LABELED_FILE\n"
-            << "  bytefast predict MODEL TEXT_FILE\n"
+            << "  bytefast predict MODEL TEXT_FILE [-rejectThreshold 0..1] [-marginThreshold 0..1]\\n"
             << "  bytefast bench MODEL TEXT_FILE\n";
 }
 }
@@ -281,7 +294,18 @@ int main(int argc,char** argv) {
     for (const auto& r:records) correct+=(model.labels[model.predict(r.text)]==r.label);
     std::cout << "accuracy=" << double(correct)/records.size()
               << " correct=" << correct << " total=" << records.size() << '\n';
-  } else if(cmd=="predict" || cmd=="bench") {
+  } else if(cmd=="predict" || cmd=="predict-scores" || cmd=="bench") {
+    float threshold=0.0f, minMargin=0.0f;
+    for (int i=4;i<argc;i+=2) {
+      if (i+1>=argc) throw std::runtime_error("Missing inference option");
+      const std::string flag=argv[i];
+      if(flag=="-rejectThreshold") threshold=std::stof(argv[i+1]);
+      else if(flag=="-marginThreshold") minMargin=std::stof(argv[i+1]);
+      else throw std::runtime_error("Unknown inference option: "+flag);
+    }
+    if(!std::isfinite(threshold) || threshold<0 || threshold>1 ||
+       !std::isfinite(minMargin) || minMargin<0 || minMargin>1)
+      throw std::runtime_error("Rejection thresholds must be in [0,1]");
     model.load(argv[2]);
     std::ifstream f(argv[3]);
     if (!f) throw std::runtime_error("Cannot open input");
@@ -290,12 +314,16 @@ int main(int argc,char** argv) {
     const auto start=std::chrono::steady_clock::now();
     while (std::getline(f,s)) {
       if (!s.empty() && s.back()=='\r') s.pop_back();
-      float confidence;
-      const auto pred=model.predict(s,&confidence);
+      float confidence=0, margin=0;
+      const auto pred=model.predict(s,&confidence,&margin);
       ++total;
-      if(cmd=="predict")
-        std::cout << "__label__" << model.labels[pred] << " "
-                  << std::setprecision(6) << confidence << '\n';
+      if(cmd=="predict" || cmd=="predict-scores") {
+        const bool reject=confidence<threshold || margin<minMargin || s.empty();
+        std::cout << "__label__" << (reject ? "und" : model.labels[pred])
+                  << " " << std::setprecision(6) << confidence;
+        if(cmd=="predict-scores") std::cout << " " << margin;
+        std::cout << '\n';
+      }
     }
     const auto seconds=std::chrono::duration<double>(
         std::chrono::steady_clock::now()-start).count();
