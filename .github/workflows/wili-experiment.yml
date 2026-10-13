@@ -1,0 +1,43 @@
+name: WiLI-2018 harder language-ID experiment
+on:
+  workflow_dispatch:
+  push:
+    branches: ["bytefast/**"]
+    paths:
+      - "benchmarks/prepare_wili.py"
+      - "benchmarks/score_lid.py"
+      - ".github/workflows/wili-experiment.yml"
+
+jobs:
+  wili:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          make -j2 opt
+          make bytefast
+      - name: Download and prepare WiLI-2018
+        run: |
+          python3 benchmarks/prepare_wili.py --workdir /tmp/wili --train-per-language 50 --test-per-language 50 --max-bytes 512
+          python3 - <<'PY'
+          from pathlib import Path
+          lines=Path('/tmp/wili/test.fasttext').read_text().splitlines()
+          Path('/tmp/wili/test.txt').write_text(''.join(s.split(' ',1)[1]+'\n' for s in lines))
+          PY
+      - name: Train original fastText
+        run: |
+          ./fasttext supervised -input /tmp/wili/train.fasttext -output /tmp/wili/ft -dim 32 -epoch 5 -lr 0.3 -minn 2 -maxn 5 -bucket 16384 -thread 2 -verbose 0
+          ./fasttext predict /tmp/wili/ft.bin /tmp/wili/test.txt > /tmp/wili/ft.pred
+          python3 benchmarks/score_lid.py /tmp/wili/test.fasttext /tmp/wili/ft.pred
+      - name: Train ByteFast single-hash
+        run: |
+          ./bytefast train /tmp/wili/train.fasttext /tmp/wili/bf.bin -bucket 16384 -dim 32 -epoch 5 -lr 0.3 -hashCount 1
+          ./bytefast predict /tmp/wili/bf.bin /tmp/wili/test.txt > /tmp/wili/bf.pred
+          python3 benchmarks/score_lid.py /tmp/wili/test.fasttext /tmp/wili/bf.pred
+      - name: Compare download sizes and CPU speeds
+        run: |
+          ls -lh /tmp/wili/{ft,bf}.bin
+          /usr/bin/time -f 'fastText wall seconds=%e peak_rss_kb=%M' sh -c './fasttext predict /tmp/wili/ft.bin /tmp/wili/test.txt > /dev/null'
+          /usr/bin/time -f 'ByteFast wall seconds=%e peak_rss_kb=%M' sh -c './bytefast predict /tmp/wili/bf.bin /tmp/wili/test.txt > /dev/null'
