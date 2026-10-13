@@ -303,7 +303,7 @@ class WordBranch {
     Model::read(f,magic);Model::read(f,version);
     Model::read(f,nlang);Model::read(f,nwords);
     Model::read(f,dim);Model::read(f,maxBytes);Model::read(f,byteWeight);
-    if(magic!=0x42455744u||version!=1||!dim||dim>128||nwords>500000||
+    if(magic!=0x42455744u||version!=1||!dim||dim>512||nwords>500000||
        nlang!=base.labels.size()||maxBytes!=base.opt.maxBytes ||
        !std::isfinite(byteWeight)||byteWeight<0.1f||byteWeight>3.f||
        4ULL*(uint64_t(nwords)*dim+uint64_t(nlang)*dim+nlang)>900000000ULL)
@@ -363,7 +363,7 @@ int main(int argc,char** argv) {
         else if(flag=="-selection")ranking=argv[i+1];
         else throw std::runtime_error("Unknown word-embedding option: "+flag);
       }
-      if(cap<1||cap>300000||dim<1||dim>128||minCount<1||epochs<1||
+      if(cap<1||cap>300000||dim<1||dim>512||minCount<1||epochs<1||
          epochs>40||!std::isfinite(lr)||lr<=0||lr>0.3f||
          (ranking!="tfidf"&&ranking!="confusion"))
         throw std::runtime_error("Invalid word embedding hyperparameters");
