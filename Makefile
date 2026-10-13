@@ -12,8 +12,11 @@ OBJS = args.o autotune.o matrix.o dictionary.o loss.o productquantizer.o densema
 INCLUDES = -I.
 
 # Standalone byte-mode supervised classifier, preserving legacy fasttext.
-bytefast: src/bytefast_cli.cc src/byte_ngrams.h
+bytefast: src/bytefast_cli.cc src/bytefast_model.h src/byte_ngrams.h
 	$(CXX) $(CXXFLAGS) -O3 -DNDEBUG -Isrc src/bytefast_cli.cc -o bytefast
+
+bytefast-lexical: src/bytefast_lexical.cc src/bytefast_model.h src/byte_ngrams.h
+	$(CXX) $(CXXFLAGS) -O3 -DNDEBUG -Isrc src/bytefast_lexical.cc -o bytefast-lexical
 
 opt: CXXFLAGS += -O3 -funroll-loops -DNDEBUG
 opt: fasttext
@@ -73,7 +76,7 @@ fasttext: $(OBJS) src/fasttext.cc src/main.cc
 	$(CXX) $(CXXFLAGS) $(OBJS) src/main.cc -o fasttext
 
 clean:
-	rm -rf *.o *.gcno *.gcda fasttext bytefast *.bc webassembly/fasttext_wasm.js webassembly/fasttext_wasm.wasm
+	rm -rf *.o *.gcno *.gcda fasttext bytefast bytefast-lexical *.bc webassembly/fasttext_wasm.js webassembly/fasttext_wasm.wasm
 
 
 EMCXX = em++
