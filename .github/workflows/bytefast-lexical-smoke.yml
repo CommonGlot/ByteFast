@@ -32,6 +32,8 @@ jobs:
           ./bytefast-lexical predict /tmp/lex-base.bin /tmp/lex-words.bin /tmp/lex-test.txt -weight 0 > /tmp/lex-neutral.actual
           cut -d' ' -f1 /tmp/lex-neutral.expected > /tmp/lex-neutral.labels
           diff /tmp/lex-neutral.labels /tmp/lex-neutral.actual
+          ./bytefast-lexical predict /tmp/lex-base.bin /tmp/lex-words.bin /tmp/lex-test.txt -weight 1 -gateMargin 0 > /tmp/lex-gated.labels
+          diff /tmp/lex-neutral.labels /tmp/lex-gated.labels
           ./bytefast-lexical predict /tmp/lex-base.bin /tmp/lex-words.bin /tmp/lex-test.txt -weight 0.3
           ./bytefast-lexical bench /tmp/lex-base.bin /tmp/lex-words.bin /tmp/lex-test.txt -weight 0.3
           ls -lh /tmp/lex-*.bin
