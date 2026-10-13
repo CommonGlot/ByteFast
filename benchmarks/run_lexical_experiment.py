@@ -70,11 +70,11 @@ def main():
     baseline=scores(golddev,load_labels(base_dev))
     print("DEV baseline",json.dumps(baseline,sort_keys=True),flush=True)
     chosen={"name":"base","cap":0,"alpha":0.0,"metrics":baseline}
-    for cap in (10000,50000):
+    for cap in (50000,100000,200000):
         lex=root/f"lex-{cap}.bin"
         subprocess.run([exe,"build",str(model),str(root/"lex-train.fasttext"),
                         str(lex),str(cap),"3"],check=True)
-        for weight in (0.05,0.15,0.30,0.60,1.0):
+        for weight in (0.60,1.0,1.5,2.0,3.0):
             candidate=f"words{cap}-a{weight}"
             devpred=root/f"lex-{candidate}-dev.pred"
             run([exe,"predict",str(model),str(lex),
