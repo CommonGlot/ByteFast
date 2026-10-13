@@ -41,6 +41,14 @@ jobs:
           s = p.read_text()
           p.with_name("bytefast-bench.txt").write_text(s * 350)
           PY
+      - name: Build original fastText for control comparison
+        run: make -j2 opt
+      - name: Run original fastText control on same samples
+        run: |
+          ./fasttext supervised -input /tmp/bytefast-train.txt -output /tmp/legacy-lid -dim 32 -epoch 15 -lr 0.3 -bucket 4096 -minn 2 -maxn 5 -thread 1 -verbose 0
+          ./fasttext test /tmp/legacy-lid.bin /tmp/bytefast-test.txt
+          /usr/bin/time -f 'legacy_fasttext_seconds=%e' sh -c './fasttext predict /tmp/legacy-lid.bin /tmp/bytefast-bench.txt >/dev/null'
+          ls -lh /tmp/legacy-lid.bin
       - name: Train, reload, and evaluate the baseline
         run: |
           /tmp/bytefast train /tmp/bytefast-train.txt /tmp/bytefast-single.bin -bucket 4096 -dim 32 -epoch 15 -lr 0.3 -hashCount 1
