@@ -69,8 +69,13 @@ class Model {
     // Hash the actual bytes first; independently mix each hash before modulo.
     // Spaces and punctuation are never split or discarded.
     for (size_t pos=0; pos<length; ++pos) {
-      for (uint32_t n=opt.minN; n<=opt.maxN && n<=length-pos; ++n) {
-        const uint32_t base=fasttext::bytefast::hashByteNgram(s,pos,n);
+      uint32_t rolling=2166136261u;
+      for (uint32_t n=1; n<=opt.maxN && n<=length-pos; ++n) {
+        rolling ^= static_cast<uint8_t>(s[pos+n-1]);
+        rolling *= 16777619u;
+        if (n<opt.minN) continue;
+        // Match hashByteNgram: finalize by incorporating the n-gram length.
+        const uint32_t base=(rolling ^ n)*16777619u;
         for (uint32_t k=0; k<opt.hashes; ++k) {
           const uint32_t seed=mix(base ^ (0x9e3779b9U*k));
           ids.push_back(seed % opt.bucket);
