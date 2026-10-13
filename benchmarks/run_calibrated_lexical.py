@@ -93,8 +93,15 @@ def main():
             records.append(record)
             print("LEARNED_FUSION_DEV",json.dumps(record,sort_keys=True),
                   flush=True)
-    selected=max(records,key=lambda r:(r["selection_score"],
-                        -r["wall_seconds_median_3"]))
+    # Select the cheapest inference route among statistically near-equal
+    # development configurations. Both tolerances use development metrics,
+    # not the official test partition.
+    top=max(records,key=lambda r:r["selection_score"])
+    eligible=[r for r in records if
+        r["selection_score"]>=top["selection_score"]-0.0015 and
+        r["quality"]["bcms_f1"]>=top["quality"]["bcms_f1"]-0.002]
+    selected=min(eligible,key=lambda r:(r["wall_seconds_median_3"],
+                                         -r["selection_score"]))
     print("LEARNED_FUSION_SELECTED_ON_DEV",
           json.dumps(selected,sort_keys=True),flush=True)
 
