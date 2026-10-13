@@ -26,14 +26,16 @@ jobs:
           python3 benchmarks/prepare_reject_training.py --workdir /tmp/wili --und-languages 15
       - name: Train with and without explicit und/zxx
         run: |
-          for variant in control explicit; do
+          for variant in control explicit explicitfold; do
             if [[ $variant == control ]]; then
               f=/tmp/wili/reject/open-control-train.txt
             else
               f=/tmp/wili/reject/open-reject-train.txt
             fi
+            fold=0
+            if [[ $variant == explicitfold ]]; then fold=1; fi
             ./bytefast train "$f" /tmp/wili/reject/$variant.bin \
-              -bucket 16384 -dim 32 -epoch 10 -lr 0.3 -hashCount 1
+              -bucket 16384 -dim 32 -epoch 10 -lr 0.3 -hashCount 1 -asciiFold "$fold"
           done
       - name: Estimate validation-only thresholds and test on 20 fully unseen languages
         run: |
