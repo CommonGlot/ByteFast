@@ -1,43 +1,93 @@
-name: WiLI-2018 harder language-ID experiment
+name: WiLI-2018 variable-sample language-ID experiment
 on:
   workflow_dispatch:
   push:
     branches: ["bytefast/**"]
     paths:
       - "benchmarks/prepare_wili.py"
+      - "benchmarks/prepare_budgets.py"
       - "benchmarks/score_lid.py"
       - ".github/workflows/wili-experiment.yml"
 
 jobs:
   wili:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
-      - name: Build
+      - name: Host hardware details
+        run: |
+          lscpu | grep -E 'Model name|CPU\(s\)|Architecture'
+          free -h
+      - name: Build original fastText and ByteFast
         run: |
           make -j2 opt
           make bytefast
-      - name: Download and prepare WiLI-2018
+      - name: Cache official WiLI archive
+        uses: actions/cache@v4
+        with:
+          path: /tmp/wili/wili-2018.zip
+          key: wili2018-original-zenodo-v1
+      - name: Prepare official WiLI splits
         run: |
-          python3 benchmarks/prepare_wili.py --workdir /tmp/wili --train-per-language 50 --test-per-language 50 --max-bytes 512
+          python3 benchmarks/prepare_wili.py \
+            --workdir /tmp/wili --train-per-language 500 \
+            --test-per-language 50 --max-bytes 512
           python3 - <<'PY'
           from pathlib import Path
-          lines=Path('/tmp/wili/test.fasttext').read_text().splitlines()
-          Path('/tmp/wili/test.txt').write_text(''.join(s.split(' ',1)[1]+'\n' for s in lines))
+          lines = Path('/tmp/wili/test.fasttext').read_text(encoding='utf8').splitlines()
+          Path('/tmp/wili/test.txt').write_text(
+              ''.join(s.split(' ', 1)[1] + '\n' for s in lines),encoding='utf8')
+          print('test_lines=',len(lines),flush=True)
           PY
-      - name: Train original fastText
+      - name: Train and evaluate four sample budgets plus an imbalanced run
         run: |
-          ./fasttext supervised -input /tmp/wili/train.fasttext -output /tmp/wili/ft -dim 32 -epoch 5 -lr 0.3 -minn 2 -maxn 5 -bucket 16384 -thread 2 -verbose 0
-          ./fasttext predict /tmp/wili/ft.bin /tmp/wili/test.txt > /tmp/wili/ft.pred
-          python3 benchmarks/score_lid.py /tmp/wili/test.fasttext /tmp/wili/ft.pred
-      - name: Train ByteFast single-hash
+          set -euo pipefail
+          for variant in balanced5 balanced25 balanced100 balanced500 skew500; do
+            if [[ $variant == skew500 ]]; then
+              cap=500
+              skew="--skew"
+            else
+              cap=$(echo "$variant" | sed 's/balanced//')
+              skew=""
+            fi
+            echo "::group::RESULT $variant"
+            python3 benchmarks/prepare_budgets.py /tmp/wili/train.fasttext \
+              /tmp/wili/train-$variant.txt --per-language "$cap" --seed 1729 $skew
+
+            ./fasttext supervised -input /tmp/wili/train-$variant.txt \
+              -output /tmp/wili/ft-$variant -dim 32 -epoch 5 -lr 0.3 \
+              -minn 2 -maxn 5 -bucket 16384 -thread 1 -verbose 0
+            ./fasttext predict /tmp/wili/ft-$variant.bin /tmp/wili/test.txt > /tmp/wili/ft-$variant.pred
+            echo "RESULT $variant fasttext:"
+            python3 benchmarks/score_lid.py /tmp/wili/test.fasttext /tmp/wili/ft-$variant.pred
+
+            ./bytefast train /tmp/wili/train-$variant.txt \
+              /tmp/wili/bf-$variant.bin -bucket 16384 -dim 32 \
+              -epoch 5 -lr 0.3 -hashCount 1
+            ./bytefast predict /tmp/wili/bf-$variant.bin /tmp/wili/test.txt > /tmp/wili/bf-$variant.pred
+            echo "RESULT $variant bytefast:"
+            python3 benchmarks/score_lid.py /tmp/wili/test.fasttext /tmp/wili/bf-$variant.pred
+
+            echo "RESULT $variant sizes:"
+            stat -c '%n %s bytes' /tmp/wili/ft-$variant.bin /tmp/wili/bf-$variant.bin
+            echo "::endgroup::"
+          done
+      - name: Sustained CPU prediction and memory comparison
         run: |
-          ./bytefast train /tmp/wili/train.fasttext /tmp/wili/bf.bin -bucket 16384 -dim 32 -epoch 5 -lr 0.3 -hashCount 1
-          ./bytefast predict /tmp/wili/bf.bin /tmp/wili/test.txt > /tmp/wili/bf.pred
-          python3 benchmarks/score_lid.py /tmp/wili/test.fasttext /tmp/wili/bf.pred
-      - name: Compare download sizes and CPU speeds
-        run: |
-          ls -lh /tmp/wili/{ft,bf}.bin
-          /usr/bin/time -f 'fastText wall seconds=%e peak_rss_kb=%M' sh -c './fasttext predict /tmp/wili/ft.bin /tmp/wili/test.txt > /dev/null'
-          /usr/bin/time -f 'ByteFast wall seconds=%e peak_rss_kb=%M' sh -c './bytefast predict /tmp/wili/bf.bin /tmp/wili/test.txt > /dev/null'
+          set -euo pipefail
+          for variant in balanced100 balanced500 skew500; do
+            echo "::group::PERF $variant"
+            for model in ft bf; do
+              for trial in 1 2 3; do
+                if [[ $model == ft ]]; then
+                  /usr/bin/time -f "PERF $variant fasttext trial=$trial wall=%e rss_kb=%M" \
+                    sh -c "./fasttext predict /tmp/wili/ft-$variant.bin /tmp/wili/test.txt >/dev/null"
+                else
+                  /usr/bin/time -f "PERF $variant bytefast trial=$trial wall=%e rss_kb=%M" \
+                    sh -c "./bytefast predict /tmp/wili/bf-$variant.bin /tmp/wili/test.txt >/dev/null"
+                fi
+              done
+            done
+            echo "::endgroup::"
+          done
