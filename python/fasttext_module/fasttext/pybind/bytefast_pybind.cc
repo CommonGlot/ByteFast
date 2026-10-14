@@ -111,7 +111,7 @@ class CalibratedBinding {
 };
 
 PYBIND11_MODULE(_byte_pybind,m) {
-  m.doc()="ByteFast native UTF-8 byte LID models with optional learned lexical fusion";
+  m.doc()="ByteFast UTF-8 byte-based text classifiers with optional learned lexical fusion";
   py::class_<ByteModelBinding>(m,"ByteFastModel")
     .def(py::init<>())
     .def("load_model",&ByteModelBinding::load_model)

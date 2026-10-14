@@ -1,29 +1,63 @@
-# ByteFast byte-mode design
+# ByteFast byte-level classifier design
 
-ByteFast extends fastText with an optional raw UTF-8 byte feature mode for CPU-first supervised language identification.
+ByteFast extends the original fastText implementation with byte-level
+features for supervised text classification. The input label names and their
+meanings are determined by the training dataset.
 
-## Requirements
+## Input handling
 
-- **No whitespace tokenization in byte mode.** Treat spaces, punctuation, tabs, and multibyte UTF-8 bytes as part of the text. A newline separates training examples.
-- Parse the supervised `__label__...` prefix **separately**; labels must never become text features.
-- Initial byte n-gram lengths: 2–5, with hashed embeddings and fastText's mean pooling and linear classifier.
-- Preserve legacy fastText training, prediction, and existing model loading by default.
-- Add floret-style multiple hashes and optional position-aware features only as independently switchable, measured follow-up changes.
-- No attention or convolution. Native CPU inference. Downloadable models must remain below 1 GB.
+- Every labeled training line starts with a `__label__CLASS` prefix.
+- The label is parsed as metadata and is excluded from model input features.
+- Newlines delimit training records; byte n-grams may cross spaces, tabs,
+  punctuation and UTF-8 character boundaries **within** a record.
+- Input is truncated at a configurable maximum byte length (default: 512).
+  Larger records may require a different value.
+- Byte mode does not require a whitespace tokenizer.
 
-## Implementation order
+## Model structure
 
-1. Add a byte feature extractor with tests that show n-grams crossing spaces and UTF-8 code-point boundaries.
-2. Wire byte mode into both supervised training and prediction, with identical feature extraction and explicit model-version compatibility.
-3. Add tiny multilingual train/save/load/predict smoke tests and original-mode regression tests.
-4. Benchmark CPU samples per second, macro F1 on held-out data/CommonLID, memory use, and model size.
-5. Test multi-hash embeddings and position features as separate ablations.
+- Contiguous UTF-8 byte n-grams, length 2–5 by default.
+- Deterministic hashing into an embedding table.
+- Mean pooling over input byte features.
+- Linear output classifier over the labels present in training data.
+- Single-hash features by default; multi-hash and positional features remain
+  optional experiments.
 
-## Initial hyperparameters to test
+This architecture applies to any labeled classification dataset. Label names
+may represent topics, sentiment categories, document types, languages, or other
+classes.
 
-- Embedding dimension: 128
-- Buckets: 524,288
-- Maximum input bytes: 512 (to be ablated; inference should avoid unnecessary padding)
-- Byte n-grams: 2–5
+## Optional lexical features
 
-These are starting experiment settings, not validated optima.
+Whole-word features are an additional input source. They do not replace the
+byte-level encoder.
+
+A separate lexical table stores associations between words and classes. Its
+selected vocabulary can be capped by size. A learned fusion layer combines
+byte classifier scores and class-specific lexical evidence, using coefficients
+fitted on separate calibration data and selected using validation data.
+
+## Existing fastText components
+
+ByteFast retains the original fastText training algorithms, word
+representations, and binary-model reader. The `./fasttext` command remains
+available alongside the `./bytefast` commands.
+
+The Python `bytefast.load_model()` function detects original fastText models
+and ByteFast models by their file headers. Native ByteFast models cannot be
+loaded with the upstream `fasttext.load_model()`.
+
+## Implementation and evaluation constraints
+
+- CPU-based C++ training and prediction.
+- Versioned, validated model files.
+- A maximum downloadable model budget of approximately 1 GB.
+- Model size and prediction time must be measured alongside quality.
+- Training quality must be measured on a disjoint test partition. When tuning
+  or comparing model configurations, keep a separate development partition.
+- Include a comparison with the original fastText implementation when
+  evaluating a new feature.
+
+See [ByteFast command reference](bytefast-prototype.md),
+[Python compatibility](python-compatibility.md), and
+[the original fastText README](original-fasttext.md).
