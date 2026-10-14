@@ -119,6 +119,41 @@ jobs:
               pass
           print('BYTEFAST_SINGLE_FILE_BUNDLE_PASS')
           PY
+      - name: Train a generic text classifier with arbitrary class names
+        run: |
+          python - <<'PY'
+          import bytefast
+          from pathlib import Path
+          categories = {
+              'sports': ['The player scored a goal in the match.',
+                         'The tournament ended with a championship.'],
+              'finance': ['The company published its quarterly earnings.',
+                          'Investors reviewed the stock market report.'],
+              'technology': ['The processor has a new chip architecture.',
+                             'Developers fixed the software release issue.'],
+          }
+          samples = [
+              '__label__{} {} Article {}'.format(label, examples[i % len(examples)], i)
+              for label, examples in categories.items()
+              for i in range(40)
+          ]
+          Path('/tmp/generic-classification.txt').write_text(
+              '\\n'.join(samples) + '\\n', encoding='utf-8')
+          model = bytefast.train_supervised(
+              '/tmp/generic-classification.txt',
+              output='/tmp/generic-classification.bin',
+              dim=16, bucket=4096, epoch=6, lr=0.2)
+          expected = {'__label__sports', '__label__finance',
+                      '__label__technology'}
+          assert set(model.get_labels()) == expected
+          reloaded = bytefast.load_model('/tmp/generic-classification.bin')
+          assert set(reloaded.get_labels()) == expected
+          prediction, probabilities = reloaded.predict(
+              'The tournament player scored', k=2)
+          assert len(prediction) == len(probabilities) == 2
+          assert all(label in expected for label in prediction)
+          print('BYTEFAST_GENERIC_CLASSIFICATION_PASS')
+          PY
       - name: Confirm that public original fasttext Python package can coexist
         run: |
           python -m pip install 'fasttext==0.9.3'
