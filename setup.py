@@ -60,9 +60,14 @@ else:
 fasttext_src_files = map(str, os.listdir(FASTTEXT_SRC))
 fasttext_src_cc = list(filter(lambda x: x.endswith(".cc"), fasttext_src_files))
 
-fasttext_src_cc = list(
-    map(lambda x: str(os.path.join(FASTTEXT_SRC, x)), fasttext_src_cc)
-)
+# ByteFast keeps extra standalone C++ executables in src/. They each
+# define main() and must NOT be linked into the legacy fasttext_pybind module.
+# Preserve the upstream fastText sources and Python API unchanged.
+fasttext_src_cc = [
+    os.path.join(FASTTEXT_SRC, filename)
+    for filename in fasttext_src_cc
+    if not filename.startswith("bytefast_")
+]
 
 ext_modules = [
     Extension(
