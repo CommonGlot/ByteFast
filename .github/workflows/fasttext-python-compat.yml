@@ -45,8 +45,8 @@ jobs:
               train.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
               model = fasttext.train_supervised(
-                  input=str(train), epoch=8, lr=0.5, dim=16,
-                  minn=2, maxn=5, bucket=2000, thread=1)
+                  input=str(train), epoch=4, lr=0.025, dim=16,
+                  minn=0, maxn=0, wordNgrams=1, bucket=2000, thread=1)
               assert len(model.get_labels()) == 3
               labels, scores = model.predict("bonjour le monde", k=2)
               assert len(labels) == 2 and len(scores) == 2, (labels, scores)
