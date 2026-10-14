@@ -1,3 +1,92 @@
+# ByteFast
+
+**CPU-first multilingual language identification**, built on the original
+[fastText](https://github.com/facebookresearch/fastText) C++ implementation.
+
+ByteFast preserves the legacy fastText learning algorithms and model reader
+while offering native raw-UTF-8 byte 2–5-gram classifiers, compact word
+evidence, and optionally learned language-sensitive lexical fusion.
+
+## Two model formats, one Python loader
+
+Install this development branch from source (not yet a public PyPI release):
+
+```bash
+git clone https://github.com/CommonGlot/ByteFast.git
+cd ByteFast
+git switch bytefast/consolidated-package
+python -m pip install .
+```
+
+The installed distribution and Python import name are **bytefast**, not
+**fasttext**. It can coexist with the original `pip install fasttext` package.
+All original fastText source files retain their copyright and license terms.
+
+```python
+import bytefast
+
+# Train the new byte classifier (no whitespace tokenizer in the byte branch)
+model = bytefast.train_supervised(
+    "train.fasttext", output="new-bytefast.bin",
+    dim=32, ascii_fold=True,
+)
+print(model.predict("Hello world"))
+
+# Auto-detect ByteFast or original Facebook fastText model headers.
+new = bytefast.load_model("new-bytefast.bin")
+classic = bytefast.load_model("original-fasttext.bin")
+print(new.predict("Bonjour le monde"))
+print(classic.predict("Bonjour le monde"))
+
+# The original fastText training and word embedding algorithms remain available:
+legacy = bytefast.train_fasttext_supervised(input="train.fasttext", epoch=5)
+# Or: bytefast.legacy.train_supervised(...)
+```
+
+The ByteFast native CLI and legacy original executable build separately:
+
+```bash
+make bytefast
+make fasttext
+make bytefast-lexical bytefast-calibrated
+```
+
+`./bytefast` trains and predicts native ByteFast models;
+`./fasttext` retains its original supervised, unsupervised and quantization
+commands. Do not pass a ByteFast native model to the original `fasttext`
+executable: its model format is different.
+
+### Complete learned-lexical models in one file
+
+Trained calibrated ByteFast models currently consist of a base ByteFast model,
+a sparse lexical table, and a small learned-fusion model. Bundle them into
+**one portable .bin**:
+
+```python
+bytefast.bundle_model(
+    "base.bin", "words.lex", "weights.fuse", "complete.bytefast.bin"
+)
+model = bytefast.load_model("complete.bytefast.bin")
+print(model.predict("Vlak polazi sljedeći tjedan"))
+```
+
+The loader recognizes (by magic number, not file extension): native ByteFast
+`.bin`, combined ByteFast lexical bundles, and legacy fastText
+`.bin`/`.ftz`. Legacy fastText remains inside a separate native backend.
+See [ByteFast model formats and compatibility](docs/python-compatibility.md).
+
+**Development status:** experimental; the WiLI-2018 evaluations do not establish
+superiority over full GlotLID or optimized and quantized fastText. No code has
+yet been merged into `main` from the experimental branches.
+
+---
+
+## Original fastText documentation
+
+The following documentation describes the original fastText implementation
+included in this fork. Commands using `./fasttext` still refer to that
+original implementation.
+
 # fastText
 [fastText](https://fasttext.cc/) is a library for efficient learning of word representations and sentence classification.
 
