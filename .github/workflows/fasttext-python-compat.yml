@@ -1,0 +1,80 @@
+name: Preserve original fastText Python API
+on:
+  push:
+    branches: ["bytefast/python-compatibility"]
+    paths:
+      - "setup.py"
+      - "src/bytefast_*.cc"
+      - "src/bytefast_*.h"
+      - "docs/python-compatibility.md"
+      - ".github/workflows/fasttext-python-compat.yml"
+  workflow_dispatch:
+
+jobs:
+  python-backwards-compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install the fork with the unchanged fasttext distribution name
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .
+          python -m pip check
+      - name: Exercise legacy fasttext Python APIs
+        run: |
+          python - <<'PY'
+          import pathlib
+          import tempfile
+          import fasttext
+
+          with tempfile.TemporaryDirectory() as path:
+              root = pathlib.Path(path)
+              train = root / "labeled.txt"
+              lines = [
+                  "__label__eng hello welcome to this little world",
+                  "__label__eng today is a pleasant day",
+                  "__label__fra bonjour le monde bienvenue ici",
+                  "__label__fra aujourd'hui est une belle journée",
+                  "__label__deu guten tag willkommen in dieser welt",
+                  "__label__deu heute ist ein guter tag",
+              ] * 40
+              train.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+              model = fasttext.train_supervised(
+                  input=str(train), epoch=8, lr=0.5, dim=16,
+                  minn=2, maxn=5, bucket=2000, thread=1)
+              assert len(model.get_labels()) == 3
+              labels, scores = model.predict("bonjour le monde", k=2)
+              assert len(labels) == 2 and len(scores) == 2, (labels, scores)
+              assert all(label.startswith("__label__") for label in labels)
+              file = root / "classic.bin"
+              model.save_model(str(file))
+              reloaded = fasttext.load_model(str(file))
+              assert reloaded.get_labels() == model.get_labels()
+              assert reloaded.predict("bonjour le monde")[0][0] == labels[0]
+
+              # Ensure unsupervised word representation API still works too.
+              corpus = root / "plain.txt"
+              corpus.write_text(
+                  ("we continue training ordinary fasttext word vectors here\n" * 100),
+                  encoding="utf-8")
+              vectors = fasttext.train_unsupervised(
+                  input=str(corpus), model="skipgram", dim=8,
+                  epoch=2, minCount=1, thread=1)
+              assert vectors.get_dimension() == 8
+              assert len(vectors.get_word_vector("fasttext")) == 8
+
+          print("LEGACY_FASTTEXT_PYTHON_COMPATIBILITY_PASS")
+          PY
+      - name: Build old fasttext executable and optional ByteFast executables
+        run: |
+          make -j2 opt
+          make bytefast bytefast-lexical bytefast-wordemb bytefast-calibrated
+          test -x ./fasttext
+          test -x ./bytefast
+          test -x ./bytefast-calibrated
+          echo LEGACY_FASTTEXT_CLI_COMPATIBILITY_PASS
