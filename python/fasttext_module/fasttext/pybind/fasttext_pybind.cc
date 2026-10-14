@@ -85,7 +85,7 @@ std::pair<std::vector<py::str>, std::vector<py::str>> getLineText(
   return std::pair<std::vector<py::str>, std::vector<py::str>>(words, labels);
 }
 
-PYBIND11_MODULE(fasttext_pybind, m) {
+PYBIND11_MODULE(_legacy_pybind, m) {
   py::class_<fasttext::Args>(m, "args")
       .def(py::init<>())
       .def_readwrite("input", &fasttext::Args::input)
