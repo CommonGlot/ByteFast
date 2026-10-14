@@ -9,7 +9,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-import fasttext_pybind as fasttext
+from . import _legacy_pybind as fasttext
 import numpy as np
 import multiprocessing
 from itertools import chain
