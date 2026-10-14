@@ -138,7 +138,7 @@ jobs:
               for i in range(40)
           ]
           Path('/tmp/generic-classification.txt').write_text(
-              '\\n'.join(samples) + '\\n', encoding='utf-8')
+              '\n'.join(samples) + '\n', encoding='utf-8')
           model = bytefast.train_supervised(
               '/tmp/generic-classification.txt',
               output='/tmp/generic-classification.bin',
