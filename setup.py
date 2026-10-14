@@ -101,7 +101,7 @@ ext_modules = [
         language="c++",
         extra_compile_args=["-O3", "-pthread"],
     ),
-];
+]
 
 # As of Python 3.6, CCompiler has a `has_flag` method.
 # cf http://bugs.python.org/issue26689
