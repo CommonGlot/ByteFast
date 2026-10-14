@@ -34,19 +34,24 @@ jobs:
           with tempfile.TemporaryDirectory() as path:
               root = pathlib.Path(path)
               train = root / "labeled.txt"
+              samples = {
+                  "eng": ["This is a simple English document with common words.",
+                          "The weather is nice and the city is beautiful."],
+                  "fra": ["Bonjour, voici un petit document français.",
+                          "Le temps est beau et la ville est magnifique."],
+                  "spa": ["Hola, este es un documento sencillo en español.",
+                          "El tiempo es bueno y la ciudad es muy hermosa."],
+              }
               lines = [
-                  "__label__eng hello welcome to this little world",
-                  "__label__eng today is a pleasant day",
-                  "__label__fra bonjour le monde bienvenue ici",
-                  "__label__fra aujourd'hui est une belle journée",
-                  "__label__deu guten tag willkommen in dieser welt",
-                  "__label__deu heute ist ein guter tag",
-              ] * 40
+                  "__label__{} {} Number {}".format(
+                      label, texts[j % len(texts)], j % 8)
+                  for label, texts in samples.items() for j in range(40)
+              ]
               train.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
               model = fasttext.train_supervised(
-                  input=str(train), epoch=4, lr=0.025, dim=16,
-                  minn=0, maxn=0, wordNgrams=1, bucket=2000, thread=1)
+                  input=str(train), epoch=15, lr=0.3, dim=32,
+                  minn=2, maxn=5, bucket=4096, thread=1, verbose=0)
               assert len(model.get_labels()) == 3
               labels, scores = model.predict("bonjour le monde", k=2)
               assert len(labels) == 2 and len(scores) == 2, (labels, scores)
