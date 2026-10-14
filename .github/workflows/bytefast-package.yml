@@ -60,6 +60,12 @@ jobs:
           assert loaded.get_labels()==model.get_labels()
           assert loaded.predict('Bonjour le monde')[0][0].startswith('__label__')
           assert bytefast.legacy.load_model(legacy_file).get_labels()==model.get_labels()
+          # Quantized original fastText files use the same legacy reader.
+          model.quantize(qout=False, retrain=False, dsub=2)
+          model.save_model('/tmp/original-fasttext.ftz')
+          quantized=bytefast.load_model('/tmp/original-fasttext.ftz')
+          assert len(quantized.get_labels())==3
+          assert quantized.predict('Bonjour le monde')[0]
 
           model=bytefast.train_supervised(
              '/tmp/bytefast-train.txt',output='/tmp/native-bytefast.bin',
