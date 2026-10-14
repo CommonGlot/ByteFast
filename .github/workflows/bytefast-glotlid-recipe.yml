@@ -1,0 +1,39 @@
+name: WiLI GlotLID-original fastText recipe versus ByteFast
+on:
+  push:
+    branches: ["benchmarks/glotlid-fasttext-recipe"]
+    paths:
+      - "benchmarks/run_glotlid_recipe.py"
+      - ".github/workflows/bytefast-glotlid-recipe.yml"
+  workflow_dispatch:
+
+jobs:
+  wili-original-glotlid-hparams:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build original fastText and native ByteFast
+        run: |
+          make -j2 opt
+          make bytefast bytefast-lexical bytefast-calibrated
+      - name: Cache official WiLI-2018 archive
+        uses: actions/cache@v4
+        with:
+          path: /tmp/wili/wili-2018.zip
+          key: wili2018-original-zenodo-v1
+      - name: Prepare official WiLI train and test without leakage
+        run: |
+          python3 benchmarks/prepare_wili.py --workdir /tmp/wili \
+            --train-per-language 500 --test-per-language 50 --max-bytes 512
+          python3 benchmarks/prepare_lexical_dev.py \
+            --workdir /tmp/wili --train-count 400 --seed 97234
+      - name: Train exact reported GlotLID hyperparameters and controls, evaluate short segments
+        run: |
+          python3 benchmarks/run_glotlid_recipe.py
+      - name: Store all metrics, model bytes and inference timings
+        uses: actions/upload-artifact@v4
+        with:
+          name: wili-original-glotlid-fasttext-hyperparameters
+          path: /tmp/wili/glotlid-fasttext-recipe-results.json
+          retention-days: 30
