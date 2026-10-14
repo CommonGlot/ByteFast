@@ -1,82 +1,115 @@
-# Python compatibility: existing fastText stays usable
+# ByteFast Python package and model-file compatibility
 
-ByteFast is a fork of the original fastText repository. **The Python package
-continues to be named `fasttext`** and the existing `fasttext` C++ executable
-is unchanged. All experimental ByteFast C++ programs are separate, optional
-executables, and are deliberately excluded from the upstream Python extension's
-source list in `setup.py`.
+ByteFast is a CPU-first multilingual language identification library derived
+from the original MIT-licensed Facebook fastText. Its **Python distribution
+and import namespace are bytefast**, not fasttext.
 
-## For existing fastText users
+## Installation
 
-Installing upstream **`pip install fasttext`** from PyPI still obtains the
-regular fastText distribution, not ByteFast. Installing this fork from source
-will continue to expose the **same** `import fasttext` API:
+This is a **development branch**, not yet a public PyPI release:
 
-```sh
-git clone https://github.com/CommonGlot/ByteFast.git
-cd ByteFast
-# On the compatibility development branch, until these changes are merged:
-git switch bytefast/python-compatibility
-python -m pip install .
-```
+    git clone https://github.com/CommonGlot/ByteFast.git
+    cd ByteFast
+    git switch bytefast/consolidated-package
+    python -m pip install .
 
-```python
-import fasttext
+The original upstream fastText package may be installed in the same Python
+environment:
 
-model = fasttext.train_supervised(input="train.txt", epoch=5)
-model.save_model("classic_fasttext.bin")
+    python -m pip install fasttext
 
-reloaded = fasttext.load_model("classic_fasttext.bin")
-print(reloaded.predict("Example text"))
+The original upstream package still uses import fasttext; our fork exports
+import bytefast. The original native C++ implementation and its license
+notices remain in the repository for source compatibility.
 
-# These remain available as before:
-# fasttext.train_unsupervised(...)
-# fasttext.tokenize(...)
-```
+## Automatically detect model formats
 
-Legacy `.bin`/quantized `.ftz` fastText model formats are handled by
-the original binding implementation; ByteFast has **not** changed or
-extended that binary reader.
+    import bytefast
+    native = bytefast.load_model("native-bytefast.bin")
+    upstream = bytefast.load_model("my-previous-fasttext.bin")
+    compact = bytefast.load_model("full-bytefast-bundle.bin")
+    for model in (native, upstream, compact):
+        print(model.predict("Bonjour le monde"))
 
-## For ByteFast experiments in the *same checkout*
+The four-byte magic header determines the model type, regardless of filename
+extension. The supported types are:
 
-```sh
-make fasttext
-make bytefast bytefast-lexical bytefast-calibrated
-```
+- Original fastText .bin and .ftz: fastText's original format, including
+  quantized models, via the bundled legacy reader
+- ByteFast byte model: ByteFast-specific format version 1 or 2, using raw
+  UTF-8 2–5-gram hashing
+- ByteFast lexical bundle: one portable file that contains the byte model,
+  sparse lexical evidence and trained fusion parameters
 
-The experimental ByteFast commands are separate and use a versioned,
-incompatible `bytefast` model format:
+Do not give ByteFast files to upstream fasttext.load_model(); they are not
+upstream fastText binaries.
 
-```sh
-./bytefast train train.txt byte.bin -dim 32 -bucket 16384 -asciiFold 1
-./bytefast-lexical build byte.bin train.txt words.lex 200000 1
-./bytefast-calibrated fit byte.bin words.lex calib.txt validation.txt weights.fuse
-./bytefast-calibrated predict byte.bin words.lex weights.fuse inputs.txt -gate 0.75
-```
+## ByteFast training
 
-Do **not** pass `byte.bin` into `fasttext.load_model()`; the file format
-is different. The legacy and experimental model loaders have not been
-silently interchanged.
+    model = bytefast.train_supervised(
+        "train.fasttext", output="base.bin",
+        dim=32, bucket=16384, minn=2, maxn=5,
+        epoch=10, ascii_fold=True,
+    )
 
-## What this does *not* provide (yet)
+ByteFast's byte n-grams **cross whitespace boundaries**. The optional word
+lexicon is an additional learned lexical scorer, not a mandatory tokenizer.
 
-- Installing the public PyPI `fasttext` package does **not** automatically
-  install ByteFast functionality. We don't control upstream's distribution.
-- The ByteFast-specific models cannot yet be loaded using the legacy
-  `fasttext.load_model()` call. A separate `bytefast` Python package
-  and native extension would be the clean way to expose that functionality.
-- Installing the fork and the upstream fastText package into the *same*
-  Python environment as separate distributions is not supported because both
-  use the distribution/import name `fasttext`. Use virtual environments
-  to switch versions.
+For the more elaborate learned lexical pipeline, the native tools currently
+provide:
 
-## Regression tests
+    make bytefast bytefast-lexical bytefast-calibrated
 
-The workflow `.github/workflows/fasttext-python-compat.yml`
-installs this fork into a clean Python environment, checks supervised
-training, save/load and prediction, verifies that an unsupervised word model
-still trains, and builds the separate ByteFast executables.
+    ./bytefast train train.fasttext base.bin -dim 32 -bucket 16384 -epoch 10 -asciiFold 1
+    ./bytefast-lexical build base.bin train.fasttext words.lex 200000 1
+    ./bytefast-calibrated fit base.bin words.lex calib.fasttext validation.fasttext weights.fuse
 
-We intentionally keep `fasttext.train_supervised`, `train_unsupervised`
-and `load_model` unchanged rather than inserting an implicit new mode.
+Produce a self-contained single-file model:
+
+    import bytefast
+    bytefast.bundle_model("base.bin", "words.lex",
+                          "weights.fuse", "complete.bin")
+    model = bytefast.load_model("complete.bin")
+    print(model.predict("Vlak dolazi sljedeći tjedan"))
+
+The bundle is versioned, length checked and bounded to 1 GB. Loading the
+combined model extracts its three parts to a temporary directory, which is
+retained as long as the model object is alive.
+
+## Access original fastText training/embedding algorithms
+
+Use the original fastText from the installed upstream distribution:
+
+    import fasttext
+    ft = fasttext.train_supervised(input="train.fasttext")
+    ft.save_model("classic.bin")
+
+Or use the original fastText algorithm included in ByteFast, with the native
+backend loaded in an isolated Python namespace:
+
+    import bytefast
+    ft = bytefast.train_fasttext_supervised(
+        input="train.fasttext", epoch=10
+    )
+    # alternatively: bytefast.legacy.train_supervised(...)
+
+Unsupervised word embeddings remain available through
+bytefast.train_unsupervised(...) and bytefast.legacy.train_unsupervised(...).
+
+## Backward compatibility and limits
+
+- Installing the upstream fasttext PyPI package remains unaffected and
+  does not implicitly install ByteFast.
+- The new bytefast package is separate, so both can be installed in the
+  same environment and imported in one Python process.
+- ByteFast does not pretend that its native .bin is an upstream fastText
+  .bin; it dispatches based on file signatures.
+- The native C++ programs (./fasttext, ./bytefast, ./bytefast-calibrated)
+  remain distinct. The bytefast Python wrapper is **not** a drop-in replacement
+  for every fastText training parameter.
+- ByteFast models have not yet been shown to outperform full GlotLID on
+  an independent external noisy-web benchmark.
+
+CI: .github/workflows/bytefast-package.yml proves both model readers, native
+ByteFast training, original fastText training, combined model bundling and
+coexistence with the PyPI fasttext package.
