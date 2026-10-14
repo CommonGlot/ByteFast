@@ -188,7 +188,7 @@ setup(
     version=__version__,
     author="CommonGlot contributors and original fastText authors",
     author_email="commonglot@gmail.com",
-    description="ByteFast native CPU language identification with legacy fastText model loading",
+    description="ByteFast byte-level text classification with support for original fastText models",
     long_description=_get_readme(),
     long_description_content_type="text/markdown",
     ext_modules=ext_modules,
