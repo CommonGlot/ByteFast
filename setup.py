@@ -179,7 +179,7 @@ def _get_readme():
     Use pandoc to generate rst from md.
     pandoc --from=markdown --to=rst --output=python/README.rst python/README.md
     """
-    with io.open("python/README.rst", encoding="utf-8") as fid:
+    with io.open("README.md", encoding="utf-8") as fid:
         return fid.read()
 
 
@@ -190,6 +190,7 @@ setup(
     author_email="commonglot@gmail.com",
     description="ByteFast native CPU language identification with legacy fastText model loading",
     long_description=_get_readme(),
+    long_description_content_type="text/markdown",
     ext_modules=ext_modules,
     url="https://github.com/CommonGlot/ByteFast",
     license="MIT",
