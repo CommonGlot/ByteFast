@@ -1,49 +1,107 @@
-# ByteFast experimental CPU classifier
+# ByteFast C++ classification commands
 
-This prototype is **not yet a replacement for GlotLID**. It is a standalone supervised C++ executable built in the fastText fork. The legacy `fasttext` binary remains unchanged.
+ByteFast contains standalone C++ executables for byte-level supervised text
+classification. The original `fasttext` executable remains available and
+accepts its original commands and model files.
 
 ## Build
 
 ```bash
-make bytefast
+make -j2 opt
+make bytefast bytefast-lexical bytefast-calibrated
 ```
 
-Requires a C++17 compiler. To build upstream fastText separately: `make opt`.
+A C++17 compiler is required.
 
-## Labeled file format
+## Training input
 
 One labeled example per line:
 
 ```text
-__label__eng The quick brown fox.
-__label__fra Bonjour le monde.
-__label__spa Hola, ¿qué tal?
+__label__sports The tournament begins tomorrow.
+__label__finance The company published its financial report.
+__label__technology The device uses a new processor.
 ```
 
-The prefix is parsed as metadata, **not tokenized or hashed**. After the first label delimiter, the remaining bytes (including spaces, punctuation, UTF-8 continuation bytes and tabs) are the text. Newlines delimit examples. This version supports one label per line.
+The `__label__` prefix is parsed separately from text features. Byte
+n-grams are extracted from the remainder of the line, including its spaces,
+punctuation and UTF-8 bytes. Newlines delimit examples. The implementation
+accepts one label per training line.
 
-## Train, evaluate, predict, benchmark
+## Byte classifier commands
 
 ```bash
-./bytefast train train.txt lid.bin -dim 64 -bucket 65536 -epoch 10 -lr 0.15 -minn 2 -maxn 5 -hashCount 1
-./bytefast test lid.bin heldout-labeled.txt
-./bytefast predict lid.bin heldout-unlabeled.txt
-./bytefast bench lid.bin heldout-unlabeled.txt
+./bytefast train train.txt classifier.bin \
+    -dim 32 -bucket 16384 -epoch 10 -lr 0.15 \
+    -minn 2 -maxn 5 -hashCount 1
+
+./bytefast test classifier.bin test-labeled.txt
+./bytefast predict classifier.bin inputs.txt
+./bytefast bench classifier.bin inputs.txt
 ```
 
-Experiments: `-hashCount 2` for two hashes per byte n-gram, or `-positionBins 4` for an additional position-dependent feature per hashed n-gram. Either can be enabled independently. Both increase computation; neither is assumed to improve accuracy.
+The optional `-asciiFold 1` setting folds ASCII uppercase letters to
+lowercase when hashing features. The default maximum input length is
+512 bytes; change it with `-maxBytes N`. The optional
+`-hashCount 2` and `-positionBins 4` settings are experimental.
 
-`-maxBytes 512` controls the maximum raw bytes consumed per input, with no fixed padding.
+The saved model uses ByteFast's own versioned binary format. It is not
+an original fastText `.bin` file.
 
-The saved `.bin` has its own versioned **ByteFast** format, not the upstream fastText `.bin` format.
+## Lexical classifier and fitted weights
 
-## Current limitations
+Whole-word evidence can improve classification when similar classes differ
+in a small number of characteristic words:
 
-- Prototype uses a direct softmax over the full label set, so training cost grows with the number of languages.
-- All labeled lines are loaded in memory for prototype training. GlotLID-scale data will need streaming/shuffling.
-- Training uses straightforward SGD and float32 matrices, with no quantization or SIMD optimization yet.
-- `bench` reports end-to-end per-line prediction including feature hashing and the output head, but its timing does not include model load. Run sufficiently long input files, compare identical hardware, and repeat measurements.
-- The toy CI data has only three languages and repeated templates. Passing it is not evidence of CommonLID accuracy or improvements over GlotLID.
-- ByteFast code is experimental, and functionality has not been merged into fastText's main training CLI.
+```bash
+./bytefast-lexical build classifier.bin train.txt words.lex 200000 1
+./bytefast-calibrated fit classifier.bin words.lex \
+    calibration.txt validation.txt weights.fuse
 
-See [draft PR #1](https://github.com/CommonGlot/ByteFast/pull/1) for ongoing development.
+./bytefast-calibrated predict classifier.bin words.lex \
+    weights.fuse inputs.txt -gate 0.75
+```
+
+The number `200000` specifies the maximum word vocabulary size;
+`1` specifies the minimum number of training documents in which a
+candidate word must appear. These are configurable parameters rather than
+mandatory constants.
+
+The fusion model learns the relative importance of byte and lexical evidence
+using labeled calibration examples and separate validation examples.
+
+For distribution as a single file, use the Python package:
+
+```python
+import bytefast
+
+bytefast.bundle_model(
+    "classifier.bin", "words.lex", "weights.fuse", "complete.bin"
+)
+model = bytefast.load_model("complete.bin")
+```
+
+## Model loading
+
+Use `bytefast.load_model()` from Python to load an original fastText
+`.bin`/`.ftz` file or a ByteFast model. It checks the header and selects
+the corresponding reader.
+
+The `./fasttext` executable continues to read original fastText models;
+the `./bytefast` executable reads ByteFast byte models.
+
+## Limitations
+
+- Training currently loads labeled examples into memory rather than streaming
+  arbitrarily large datasets.
+- The output uses a multiclass linear classifier; training work increases
+  with the number of labels.
+- Classifiers and lexical models are stored in separate native formats.
+- The default maximum byte length is intentionally configurable and may be
+  too short for long-document tasks.
+- Model quality and CPU performance depend on the classification dataset and
+  should be validated for the intended application.
+
+The [original fastText README](original-fasttext.md) documents the original
+algorithms and commands. The [Python compatibility documentation](python-compatibility.md)
+describes automatic model-format detection.
