@@ -1,0 +1,39 @@
+name: WiLI held-out short-segment ByteFast vs fastText
+on:
+  push:
+    branches: ["benchmarks/short-text-evaluation"]
+    paths:
+      - "benchmarks/run_short_segments.py"
+      - ".github/workflows/bytefast-short-segments.yml"
+  workflow_dispatch:
+
+jobs:
+  test-short-segments:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile original fastText and ByteFast CPU models
+        run: |
+          make -j2 opt
+          make bytefast bytefast-lexical bytefast-calibrated
+      - name: Cache official WiLI dataset
+        uses: actions/cache@v4
+        with:
+          path: /tmp/wili/wili-2018.zip
+          key: wili2018-original-zenodo-v1
+      - name: Prepare disjoint official WiLI train and test partitions
+        run: |
+          python3 benchmarks/prepare_wili.py --workdir /tmp/wili \
+            --train-per-language 500 --test-per-language 50 --max-bytes 512
+          python3 benchmarks/prepare_lexical_dev.py \
+            --workdir /tmp/wili --train-count 400 --seed 97234
+      - name: Train models with and without 20-character augmentation and compare crops
+        run: |
+          python3 benchmarks/run_short_segments.py --workdir /tmp/wili
+      - name: Upload complete accuracy and timing results
+        uses: actions/upload-artifact@v4
+        with:
+          name: bytefast-wili-short-segments
+          path: /tmp/wili/short-segment-results.json
+          retention-days: 30
