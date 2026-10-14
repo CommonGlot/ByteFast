@@ -21,7 +21,7 @@ import subprocess
 import platform
 import io
 
-__version__ = "0.9.2"
+__version__ = "0.1.0"
 FASTTEXT_SRC = "src"
 
 # Based on https://github.com/pybind/python_example
@@ -60,13 +60,18 @@ else:
 fasttext_src_files = map(str, os.listdir(FASTTEXT_SRC))
 fasttext_src_cc = list(filter(lambda x: x.endswith(".cc"), fasttext_src_files))
 
-fasttext_src_cc = list(
-    map(lambda x: str(os.path.join(FASTTEXT_SRC, x)), fasttext_src_cc)
-)
+# ByteFast keeps extra standalone C++ executables in src/. They each
+# define main() and must NOT be linked into the legacy fasttext_pybind module.
+# Preserve the upstream fastText sources and Python API unchanged.
+fasttext_src_cc = [
+    os.path.join(FASTTEXT_SRC, filename)
+    for filename in fasttext_src_cc
+    if not filename.startswith("bytefast_")
+]
 
 ext_modules = [
     Extension(
-        str("fasttext_pybind"),
+        str("bytefast._legacy_pybind"),
         [
             str("python/fasttext_module/fasttext/pybind/fasttext_pybind.cc"),
         ]
@@ -85,8 +90,18 @@ ext_modules = [
             else "-O3 -funroll-loops -pthread -march=native"
         ],
     ),
+    Extension(
+        "bytefast._byte_pybind",
+        ["python/fasttext_module/fasttext/pybind/bytefast_pybind.cc"],
+        include_dirs=[
+            get_pybind_include(),
+            get_pybind_include(user=True),
+            FASTTEXT_SRC,
+        ],
+        language="c++",
+        extra_compile_args=["-O3", "-pthread"],
+    ),
 ]
-
 
 # As of Python 3.6, CCompiler has a `has_flag` method.
 # cf http://bugs.python.org/issue26689
@@ -164,19 +179,20 @@ def _get_readme():
     Use pandoc to generate rst from md.
     pandoc --from=markdown --to=rst --output=python/README.rst python/README.md
     """
-    with io.open("python/README.rst", encoding="utf-8") as fid:
+    with io.open("README.md", encoding="utf-8") as fid:
         return fid.read()
 
 
 setup(
-    name="fasttext",
+    name="bytefast",
     version=__version__,
-    author="Onur Celebi",
-    author_email="celebio@fb.com",
-    description="fasttext Python bindings",
+    author="CommonGlot contributors and original fastText authors",
+    author_email="commonglot@gmail.com",
+    description="ByteFast native CPU language identification with legacy fastText model loading",
     long_description=_get_readme(),
+    long_description_content_type="text/markdown",
     ext_modules=ext_modules,
-    url="https://github.com/facebookresearch/fastText",
+    url="https://github.com/CommonGlot/ByteFast",
     license="MIT",
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -196,11 +212,7 @@ setup(
     ],
     install_requires=["pybind11>=2.2", "setuptools >= 0.7.0", "numpy"],
     cmdclass={"build_ext": BuildExt},
-    packages=[
-        str("fasttext"),
-        str("fasttext.util"),
-        str("fasttext.tests"),
-    ],
-    package_dir={str(""): str("python/fasttext_module")},
+    packages=["bytefast", "bytefast.util"],
+    package_dir={"bytefast": "python/fasttext_module/fasttext"},
     zip_safe=False,
 )

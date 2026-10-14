@@ -1,0 +1,52 @@
+name: ByteFast trained word embeddings smoke test
+on:
+  push:
+    branches: ["bytefast/trainable-word-branch"]
+    paths:
+      - "src/bytefast_wordemb.cc"
+      - "src/bytefast_lexical.h"
+      - "src/bytefast_lexical.cc"
+      - "Makefile"
+      - ".github/workflows/bytefast-wordemb-smoke.yml"
+  workflow_dispatch:
+jobs:
+  wordemb-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile CPU byte and word classifiers
+        run: make bytefast bytefast-wordemb bytefast-lexical
+      - name: Train test model, learn word vectors, save and reload
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          examples=[
+           "__label__hrv Sljedeći tjedan vlak ide iz grada.",
+           "__label__hrv Ovaj vlak danas dolazi na kolodvor.",
+           "__label__hrv Svaki tjedan iz grada polazi vlak.",
+           "__label__bos Voz sada polazi sa stanice u gradu.",
+           "__label__bos Sljedeće sedmice imam voz za grad.",
+           "__label__bos Voz staje u blizini glavne stanice.",
+           "__label__srp Voz polazi sa glavne železničke stanice.",
+           "__label__srp Ove nedelje idem vozom za Beograd.",
+           "__label__srp Novi voz stiže na stanicu sutra."]
+          Path('/tmp/word-train.txt').write_text('\n'.join(examples*12)+'\n',encoding='utf8')
+          Path('/tmp/word-text.txt').write_text(
+             "Sljedeći tjedan ide vlak.\nVoz sada polazi sa stanice.\nOve nedelje voz polazi.\n",encoding='utf8')
+          PY
+          ./bytefast train /tmp/word-train.txt /tmp/word-byte.bin -bucket 2048 -dim 16 -epoch 5 -lr 0.3 -asciiFold 1
+          ./bytefast-wordemb train /tmp/word-byte.bin /tmp/word-train.txt /tmp/word-learned.bin \
+            -vocab 80 -dim 8 -minCount 2 -epoch 4 -lr 0.025 -selection confusion
+          ./bytefast-wordemb predict /tmp/word-byte.bin /tmp/word-learned.bin /tmp/word-text.txt > /tmp/word-pred.txt
+          ./bytefast-wordemb bench /tmp/word-byte.bin /tmp/word-learned.bin /tmp/word-text.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          lines=Path('/tmp/word-pred.txt').read_text().splitlines()
+          assert len(lines)==3,lines
+          assert all(x in ['__label__hrv','__label__bos','__label__srp'] for x in lines),lines
+          PY
+          ./bytefast-wordemb train /tmp/word-byte.bin /tmp/word-train.txt /tmp/word-tfidf.bin \
+            -vocab 80 -dim 8 -minCount 2 -epoch 3 -lr 0.025 -selection tfidf
+          stat -c 'SMOKE_SIZE %n %s' /tmp/word-learned.bin /tmp/word-tfidf.bin

@@ -1,0 +1,51 @@
+name: ByteFast explicit und and zxx open-set experiment
+on:
+  push:
+    branches: ["bytefast/**"]
+    paths:
+      - "benchmarks/prepare_reject_training.py"
+      - ".github/workflows/bytefast-negative-training.yml"
+  workflow_dispatch:
+
+jobs:
+  unknown:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: make bytefast
+      - uses: actions/cache@v4
+        with:
+          path: /tmp/wili/wili-2018.zip
+          key: wili2018-original-zenodo-v1
+      - name: Prepare known, held-out and explicit negative examples
+        run: |
+          python3 benchmarks/prepare_wili.py --workdir /tmp/wili --train-per-language 500 --test-per-language 50 --max-bytes 512
+          python3 benchmarks/prepare_open_set.py --workdir /tmp/wili --known 200 --train-per-language 400 --dev-per-language 50 --seed 731
+          python3 benchmarks/prepare_reject_training.py --workdir /tmp/wili --und-languages 15
+      - name: Train with and without explicit und/zxx
+        run: |
+          for variant in control explicit explicitfold; do
+            if [[ $variant == control ]]; then
+              f=/tmp/wili/reject/open-control-train.txt
+            else
+              f=/tmp/wili/reject/open-reject-train.txt
+            fi
+            fold=0
+            if [[ $variant == explicitfold ]]; then fold=1; fi
+            ./bytefast train "$f" /tmp/wili/reject/$variant.bin \
+              -bucket 16384 -dim 32 -epoch 10 -lr 0.3 -hashCount 1 -asciiFold "$fold"
+          done
+      - name: Estimate validation-only thresholds and test on 20 fully unseen languages
+        run: |
+          set -euo pipefail
+          for model in control explicit explicitfold; do
+            for sample in dev-known dev-unknown dev-noise test-known test-unknown test-noise; do
+              ./bytefast predict-scores /tmp/wili/reject/$model.bin /tmp/wili/reject/open-$sample-text.txt > /tmp/wili/reject/$model-$sample.scores
+            done
+            python3 benchmarks/score_open_set.py "$model" --workdir /tmp/wili/reject
+            stat -c "NEGATIVE_MODEL_SIZE variant=$model bytes=%s" /tmp/wili/reject/$model.bin
+            /usr/bin/time -f "NEGATIVE_SPEED variant=$model seconds=%e rss_kb=%M" \
+              sh -c "./bytefast predict /tmp/wili/reject/$model.bin /tmp/wili/reject/open-test-known-text.txt >/dev/null"
+          done
