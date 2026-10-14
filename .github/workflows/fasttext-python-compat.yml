@@ -4,6 +4,7 @@ on:
     branches: ["bytefast/python-compatibility"]
     paths:
       - "setup.py"
+      - "python/fasttext_module/fasttext/FastText.py"
       - "src/bytefast_*.cc"
       - "src/bytefast_*.h"
       - "docs/python-compatibility.md"
