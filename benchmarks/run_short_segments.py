@@ -89,7 +89,8 @@ def augment_short(root):
     for label,text in original:
         output.append((label,text))
         output.append((label,crop(text,20,"seeded")))
-    random.Random(581).shuffle(output)
+    # Preserve label initialization order shared with the lexical sidecar.
+    # ByteFast shuffles training examples internally each epoch.
     write_labeled(root/"short-mixed-train.fasttext",output)
     for part in ("calibration","validation"):
         original=records(root/f"fusion-{part}.fasttext")
