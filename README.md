@@ -119,6 +119,49 @@ For classification tasks where whole words help distinguish similar classes,
 ByteFast supports a compact word-to-class association table and learned
 fusion coefficients. The base classifier remains byte-based.
 
+Configure lexical selection in the same Python training call:
+
+```python
+import bytefast
+
+model = bytefast.train_supervised(
+    "train.txt",
+    output="classifier.bin",
+    dim=32,
+    bucket=16384,
+    minn=2,
+    maxn=5,
+    epoch=10,
+    lexical=True,
+    lexical_vocab=200000,
+    lexical_min_df=1,
+    lexical_selection="global",
+)
+
+labels, scores = model.predict("The team won the tournament", k=2)
+```
+
+The `lexical=True` option automatically makes class-stratified 80/10/10
+training, calibration and validation partitions from `train.txt`. The
+byte classifier and lexical vocabulary are fitted to the training partition;
+the remaining partitions are used to fit and validate learned fusion weights.
+The output is a single versioned ByteFast model file that loads through
+`bytefast.load_model()`. Every class needs at least ten examples for the
+automatic split.
+
+For explicitly disjoint files, pass `lexical_calibration_data="calibration.txt"`
+and `lexical_validation_data="validation.txt"`. In that case the full
+`train.txt` file is used for the byte classifier and vocabulary. The caller
+must ensure the datasets do not share examples.
+
+Currently, `lexical_selection="global"` uses document frequency multiplied
+by the strongest positive word-to-class evidence. Class-balanced and
+confusion-aware selection are not implemented in this API yet. The number of
+stored class associations per word remains fixed at four. Without
+`lexical=True`, the original byte-only training behavior is unchanged.
+
+The equivalent native tools remain available:
+
 ```bash
 ./bytefast-lexical build byte-model.bin train.txt words.lex 200000 1
 ./bytefast-calibrated fit byte-model.bin words.lex \
