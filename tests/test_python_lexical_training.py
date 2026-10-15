@@ -93,6 +93,12 @@ def main():
         assert memory_model.model_type == "bytefast-calibrated"
         assert memory_model.predict("The coach and team scored")[0]
 
+        saved_again = root / "saved-from-memory.bin"
+        memory_model.save_model(saved_again)
+        assert saved_again.read_bytes().startswith(b"BFBN")
+        assert bytefast.load_model(saved_again).get_labels() == (
+            memory_model.get_labels())
+
         external = bytefast.train_supervised(
             fit, lexical=True, lexical_calibration_data=cal,
             lexical_validation_data=dev,
