@@ -1,7 +1,7 @@
 name: ByteFast Python lexical training API
 on:
   push:
-    branches: ["feature/python-lexical-training"]
+    branches: ["feature/python-lexical-training", "main"]
     paths:
       - "python/fasttext_module/fasttext/api.py"
       - "python/fasttext_module/fasttext/pybind/bytefast_pybind.cc"
