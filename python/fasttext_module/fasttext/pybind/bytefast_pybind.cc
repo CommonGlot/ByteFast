@@ -110,8 +110,36 @@ class CalibratedBinding {
   }
 };
 
+// Train lexical evidence and its supervised fusion parameters after the
+// base byte model has been fitted on a disjoint training partition.
+void fitLexicalSidecars(
+    const std::string& baseFile, const std::string& trainFile,
+    const std::string& calibrationFile, const std::string& validationFile,
+    const std::string& lexiconOutput, const std::string& fusionOutput,
+    uint32_t vocabLimit, uint32_t minDocumentFrequency) {
+  if(vocabLimit<1||vocabLimit>1000000||minDocumentFrequency<1)
+    throw std::invalid_argument("Invalid lexical vocabulary settings");
+  Model base;
+  base.load(baseFile);
+  Lexicon lexicon;
+  lexicon.train(base,readRecords(trainFile),vocabLimit,minDocumentFrequency);
+  if(lexicon.entries.empty())
+    throw std::runtime_error("Lexical selection produced an empty vocabulary");
+  lexicon.save(lexiconOutput);
+  Fusion fusion;
+  fusion.fit(base,lexicon,readRecords(calibrationFile),
+             readRecords(validationFile));
+  fusion.save(fusionOutput);
+}
+
 PYBIND11_MODULE(_byte_pybind,m) {
   m.doc()="ByteFast UTF-8 byte-based text classifiers with optional learned lexical fusion";
+  m.def("fit_lexical_sidecars",&fitLexicalSidecars,
+        py::arg("base_model"),py::arg("train_data"),
+        py::arg("calibration_data"),py::arg("validation_data"),
+        py::arg("lexicon_output"),py::arg("fusion_output"),
+        py::arg("lexical_vocab"),py::arg("lexical_min_df"),
+        py::call_guard<py::gil_scoped_release>());
   py::class_<ByteModelBinding>(m,"ByteFastModel")
     .def(py::init<>())
     .def("load_model",&ByteModelBinding::load_model)
