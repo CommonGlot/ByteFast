@@ -29,11 +29,13 @@ MAX_BUNDLE_BYTES = 1_000_000_000
 class ByteFastModel:
     """Adapter exposing fastText-style predict/get_labels for native ByteFast."""
 
-    def __init__(self, native, model_type="bytefast", backing=None):
+    def __init__(self, native, model_type="bytefast", backing=None,
+                 parts=None):
         self._native = native
         self.model_type = model_type
         # Retain extracted bundle until this model object is discarded.
         self._backing = backing
+        self._parts = parts
 
     def predict(self, text, k=1, threshold=0.0, gate=0.75):
         """Return (labels, scores) or a list of such pairs for text batches."""
@@ -60,11 +62,12 @@ class ByteFastModel:
         raise TypeError("predict expects a string or list of strings")
 
     def save_model(self, path):
-        if self.model_type != "bytefast":
-            raise ValueError(
-                "A calibrated model consists of base, lexicon and fusion; "
-                "use bundle_model() to create a single portable .bin file")
-        self._native.save_model(os.fspath(path))
+        if self.model_type == "bytefast-calibrated":
+            if self._parts is None:
+                raise ValueError("No lexical components available to save")
+            bundle_model(*self._parts, path)
+        else:
+            self._native.save_model(os.fspath(path))
 
     def get_labels(self):
         return self._native.get_labels()
@@ -87,7 +90,8 @@ def _calibrated_model(base_path, words_path, fusion_path, backing=None):
         os.fspath(base_path), os.fspath(words_path),
         os.fspath(fusion_path))
     return ByteFastModel(native, model_type="bytefast-calibrated",
-                         backing=backing)
+                         backing=backing,
+                         parts=(base_path, words_path, fusion_path))
 
 
 def load_model(path, *, lexicon=None, fusion=None):
