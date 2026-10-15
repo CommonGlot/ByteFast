@@ -1,0 +1,132 @@
+#!/usr/bin/env python3
+"""Regression tests for opt-in lexical training via the ByteFast Python API."""
+from pathlib import Path
+import tempfile
+
+import bytefast
+from bytefast.api import _split_lexical_training
+
+
+def make_input(root):
+    path = root / "classes.fasttext"
+    examples = {
+        "sports": (
+            "The tournament team won with a late goal in the match.",
+            "A defender stopped the player before the championship.",
+            "The coach watched the team practice for the game.",
+        ),
+        "finance": (
+            "The stock market earnings report increased investor interest.",
+            "Banks raised the interest rate on new loans.",
+            "The quarterly financial results affected share prices.",
+        ),
+        "technology": (
+            "The computer processor supports the new software.",
+            "An engineer designed a semiconductor with new transistors.",
+            "The developer fixed the program using a faster algorithm.",
+        ),
+    }
+    rows = [
+        "__label__%s %s Example %d" % (label, texts[i % len(texts)], i)
+        for label, texts in examples.items()
+        for i in range(40)
+    ]
+    path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+    return path
+
+
+def main():
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        source = make_input(root)
+        split = root / "split"
+        split.mkdir()
+        fit, cal, dev = _split_lexical_training(source, split, seed=42)
+        assert all(p.exists() for p in (fit, cal, dev))
+        lines = [set(p.read_text().splitlines()) for p in (fit, cal, dev)]
+        assert not lines[0].intersection(lines[1])
+        assert not lines[0].intersection(lines[2])
+        assert not lines[1].intersection(lines[2])
+        assert tuple(map(len, lines)) == (96, 12, 12)
+        assert len(set.union(*lines)) == 120
+
+        bare = bytefast.train_supervised(
+            source, dim=16, bucket=2048, epoch=5, lr=0.2)
+        assert bare.model_type == "bytefast"
+
+        output = root / "combined.bin"
+        trained = bytefast.train_supervised(
+            source,
+            output=output,
+            dim=16,
+            bucket=2048,
+            epoch=5,
+            lr=0.2,
+            lexical=True,
+            lexical_vocab=100,
+            lexical_min_df=1,
+            lexical_selection="global",
+            lexical_seed=42,
+        )
+        assert output.read_bytes().startswith(b"BFBN")
+        assert trained.model_type == "bytefast-calibrated"
+        assert set(trained.get_labels()) == {
+            "__label__sports", "__label__finance",
+            "__label__technology",
+        }
+        loaded = bytefast.load_model(output)
+        for text in (
+            "The match ended in a championship goal",
+            "Banks announced increased stock market earnings",
+            "The software developer designed a processor",
+        ):
+            a = trained.predict(text, k=2)
+            b = loaded.predict(text, k=2)
+            assert a[0] == b[0], (a, b)
+            assert len(a[0]) == len(a[1]) == 2
+
+        # With no output file, the returned model owns its backing directory
+        # and remains usable after training exits.
+        memory_model = bytefast.train_supervised(
+            source, dim=16, bucket=2048, epoch=3, lr=0.2,
+            lexical=True, lexical_vocab=80, lexical_min_df=1)
+        assert memory_model.model_type == "bytefast-calibrated"
+        assert memory_model.predict("The coach and team scored")[0]
+
+        external = bytefast.train_supervised(
+            fit, lexical=True, lexical_calibration_data=cal,
+            lexical_validation_data=dev,
+            lexical_vocab=100, lexical_min_df=1,
+            dim=16, bucket=2048, epoch=3, lr=0.2,
+        )
+        assert external.model_type == "bytefast-calibrated"
+        assert external.predict("A computer processor")[0]
+
+        for bad_params in (
+            {"lexical_selection": "confusion"},
+            {"lexical_selection": "balanced"},
+            {"lexical_vocab": 0},
+            {"lexical_min_df": 0},
+            {"lexical_calibration_data": cal},
+        ):
+            try:
+                bytefast.train_supervised(source, lexical=True, **bad_params)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError("Invalid lexical option accepted: %r" %
+                                     bad_params)
+
+        try:
+            bytefast.train_supervised(source, lexical=False,
+                                     lexical_validation_data=dev)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Accepted calibration data with lexical=False")
+
+    print("BYTEFAST_PYTHON_LEXICAL_TRAINING_PASS")
+
+
+if __name__ == "__main__":
+    main()
