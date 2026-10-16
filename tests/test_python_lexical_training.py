@@ -108,12 +108,35 @@ def main():
         assert external.model_type == "bytefast-calibrated"
         assert external.predict("A computer processor")[0]
 
+        # Every training setting is passed through, including the byte
+        # encoder ablations, the automatic split and the fusion optimizer.
+        custom_split = root / "custom-split"
+        custom_split.mkdir()
+        sizes = tuple(
+            len(p.read_text().splitlines()) for p in _split_lexical_training(
+                source, custom_split, seed=7, split=(0.6, 0.2, 0.2)))
+        assert sizes == (72, 24, 24), sizes
+        configured = bytefast.train_supervised(
+            source, dim=16, bucket=2048, epoch=3, lr=0.2,
+            hash_count=2, position_bins=4,
+            lexical=True, lexical_vocab=80, lexical_min_df=1,
+            lexical_split=(0.6, 0.2, 0.2), lexical_fusion_epochs=5,
+            lexical_fusion_lr=0.05, lexical_fusion_l2=0.0,
+            lexical_fusion_patience=2,
+        )
+        assert configured.model_type == "bytefast-calibrated"
+        assert configured.predict("Banks and the stock market")[0]
+
         for bad_params in (
             {"lexical_selection": "confusion"},
             {"lexical_selection": "balanced"},
             {"lexical_vocab": 0},
             {"lexical_min_df": 0},
             {"lexical_calibration_data": cal},
+            {"lexical_split": (0.8, 0.2)},
+            {"lexical_split": (0.9, 0.1, 0.0)},
+            {"lexical_split": (0.5, 0.1, 0.1)},
+            {"lexical_fusion_epochs": 0},
         ):
             try:
                 bytefast.train_supervised(source, lexical=True, **bad_params)

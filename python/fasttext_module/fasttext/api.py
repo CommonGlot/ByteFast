@@ -191,8 +191,9 @@ def bundle_model(base, lexicon, fusion, output):
     return destination
 
 
-def _split_lexical_training(source, directory, seed):
-    """Make class-stratified, mutually disjoint 80/10/10 partitions.
+def _split_lexical_training(source, directory, seed, split=(0.8, 0.1, 0.1)):
+    """Make class-stratified, mutually disjoint fit/calibration/validation
+    partitions (80/10/10 by default).
 
     Base training and word statistics use the 80% fit partition; the
     other partitions are reserved for supervised fusion and early stopping.
@@ -219,7 +220,7 @@ def _split_lexical_training(source, directory, seed):
         if len(indices) < 10:
             raise ValueError(
                 "lexical=True requires at least 10 documents per class "
-                "for the automatic 80/10/10 split; class %s has %d"
+                "for the automatic lexical_split; class %s has %d"
                 % (label, len(indices)))
         # Avoid Python's process-dependent string hash.
         label_seed = int.from_bytes(
@@ -227,8 +228,8 @@ def _split_lexical_training(source, directory, seed):
                             digest_size=8).digest(), "little")
         shuffled = list(indices)
         random.Random(int(seed) ^ label_seed).shuffle(shuffled)
-        n_cal = max(1, round(len(indices) * 0.1))
-        n_val = max(1, round(len(indices) * 0.1))
+        n_cal = max(1, round(len(indices) * split[1]))
+        n_val = max(1, round(len(indices) * split[2]))
         calibration_indices.update(shuffled[:n_cal])
         validation_indices.update(shuffled[n_cal:n_cal + n_val])
         fit_indices.update(shuffled[n_cal + n_val:])
@@ -252,9 +253,13 @@ def _split_lexical_training(source, directory, seed):
 def train_supervised(
     input, *, output=None, dim=64, bucket=65536, minn=2, maxn=5,
     epoch=5, lr=0.15, ascii_fold=False, max_bytes=512,
+    hash_count=1, position_bins=0,
     lexical=False, lexical_vocab=200000, lexical_min_df=1,
     lexical_selection="global", lexical_seed=1337,
     lexical_calibration_data=None, lexical_validation_data=None,
+    lexical_split=(0.8, 0.1, 0.1), lexical_fusion_epochs=90,
+    lexical_fusion_lr=0.07, lexical_fusion_l2=0.01,
+    lexical_fusion_patience=16,
 ):
     """Train a native ByteFast text classifier.
 
@@ -269,6 +274,13 @@ def train_supervised(
     lexical_selection="global" is the current supported word-ranking method.
     Class-balanced and confusion-aware selection are not implemented yet.
 
+    Every training setting is an argument: the byte encoder (dim, bucket,
+    minn, maxn, epoch, lr, ascii_fold, max_bytes, hash_count,
+    position_bins), the word table (lexical_vocab, lexical_min_df), the
+    automatic split (lexical_split, lexical_seed) and the fusion optimizer
+    (lexical_fusion_epochs, lexical_fusion_lr, lexical_fusion_l2,
+    lexical_fusion_patience).
+
     For the original fastText algorithm, use
     bytefast.train_fasttext_supervised(...) or bytefast.legacy.
     """
@@ -278,7 +290,7 @@ def train_supervised(
             raise ValueError("lexical=True is required for calibration data")
         native = _byte_pybind.ByteFastModel()
         native.train(os.fspath(input), dim, bucket, minn, maxn, epoch, lr,
-                     bool(ascii_fold), max_bytes)
+                     bool(ascii_fold), max_bytes, hash_count, position_bins)
         model = ByteFastModel(native)
         if output is not None:
             model.save_model(output)
@@ -308,11 +320,18 @@ def train_supervised(
         raise ValueError(
             "Training, calibration and validation paths must be distinct")
 
+    split = tuple(float(x) for x in lexical_split)
+    if (len(split) != 3 or min(split) <= 0 or
+            abs(sum(split) - 1.0) > 1e-6):
+        raise ValueError(
+            "lexical_split must be three positive fractions summing to 1")
+
     workdir = tempfile.TemporaryDirectory(prefix="bytefast-train-")
     try:
         if lexical_calibration_data is None:
             fit_path, calibration_path, validation_path = (
-                _split_lexical_training(input, workdir.name, lexical_seed))
+                _split_lexical_training(input, workdir.name, lexical_seed,
+                                        split))
         else:
             fit_path = Path(input)
             calibration_path = Path(lexical_calibration_data)
@@ -323,12 +342,15 @@ def train_supervised(
         fusion = Path(workdir.name) / "weights.fuse"
         native = _byte_pybind.ByteFastModel()
         native.train(os.fspath(fit_path), dim, bucket, minn, maxn,
-                     epoch, lr, bool(ascii_fold), max_bytes)
+                     epoch, lr, bool(ascii_fold), max_bytes,
+                     hash_count, position_bins)
         native.save_model(str(base))
         _byte_pybind.fit_lexical_sidecars(
             str(base), os.fspath(fit_path),
             os.fspath(calibration_path), os.fspath(validation_path),
-            str(lexicon), str(fusion), lexical_vocab, lexical_min_df)
+            str(lexicon), str(fusion), lexical_vocab, lexical_min_df,
+            lexical_fusion_epochs, lexical_fusion_lr, lexical_fusion_l2,
+            lexical_fusion_patience)
 
         if output is None:
             return _calibrated_model(

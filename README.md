@@ -136,13 +136,19 @@ model = bytefast.train_supervised(
     lexical_vocab=200000,
     lexical_min_df=1,
     lexical_selection="global",
+    lexical_split=(0.8, 0.1, 0.1),
+    lexical_fusion_epochs=90,
+    lexical_fusion_lr=0.07,
+    lexical_fusion_l2=0.01,
+    lexical_fusion_patience=16,
 )
 
 labels, scores = model.predict("The team won the tournament", k=2)
 ```
 
-The `lexical=True` option automatically makes class-stratified 80/10/10
-training, calibration and validation partitions from `train.txt`. The
+The `lexical=True` option automatically makes class-stratified training,
+calibration and validation partitions from `train.txt` (`lexical_split`,
+80/10/10 by default). The
 byte classifier and lexical vocabulary are fitted to the training partition;
 the remaining partitions are used to fit and validate learned fusion weights.
 The output is a single versioned ByteFast model file that loads through
@@ -160,12 +166,20 @@ confusion-aware selection are not implemented in this API yet. The number of
 stored class associations per word remains fixed at four. Without
 `lexical=True`, the original byte-only training behavior is unchanged.
 
+The fusion layer is fitted with full-batch Adam: `lexical_fusion_epochs` is
+the epoch limit, `lexical_fusion_patience` the number of epochs without a
+validation improvement before stopping, `lexical_fusion_lr` the step size and
+`lexical_fusion_l2` the penalty on per-class offsets. The byte encoder's
+`hash_count` (1–4) and `position_bins` (0 or 4) ablations are also arguments of
+`train_supervised`.
+
 The equivalent native tools remain available:
 
 ```bash
 ./bytefast-lexical build byte-model.bin train.txt words.lex 200000 1
 ./bytefast-calibrated fit byte-model.bin words.lex \
-    calibration.txt validation.txt weights.fuse
+    calibration.txt validation.txt weights.fuse \
+    -epochs 90 -lr 0.07 -l2 0.01 -patience 16
 ```
 
 The lexical and fusion parameters can be bundled with the byte model:

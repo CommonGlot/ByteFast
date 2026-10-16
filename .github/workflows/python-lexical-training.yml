@@ -5,6 +5,8 @@ on:
     paths:
       - "python/fasttext_module/fasttext/api.py"
       - "python/fasttext_module/fasttext/pybind/bytefast_pybind.cc"
+      - "src/bytefast_calibrated.h"
+      - "src/bytefast_lexical.h"
       - "tests/test_python_lexical_training.py"
       - ".github/workflows/python-lexical-training.yml"
   pull_request:

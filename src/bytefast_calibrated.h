@@ -11,6 +11,19 @@ struct Observation {
   uint32_t gold;
 };
 
+// Optimizer settings for fitting the fusion coefficients (Adam, full batch).
+struct FusionOptions {
+  unsigned maxEpochs = 90;  // upper bound on full-batch epochs
+  unsigned patience = 16;   // stop after this many epochs without improvement
+  double step = 0.07;       // Adam step size
+  double l2 = 0.01;         // L2 penalty on per-label offsets and biases
+  void validate() const {
+    if (!maxEpochs || !patience || !std::isfinite(step) || step <= 0 ||
+        !std::isfinite(l2) || l2 < 0)
+      throw std::invalid_argument("Invalid fusion training settings");
+  }
+};
+
 struct Fusion {
   std::vector<std::string> labels;
   // byte scale, global lexical scale, per-label lexical offsets, per-label bias
@@ -81,7 +94,8 @@ struct Fusion {
   void fit(const Model& base,const Lexicon& lex,
            const std::vector<Record>& train,
            const std::vector<Record>& dev,
-           unsigned maxEpochs=90) {
+           const FusionOptions& options = FusionOptions()) {
+    options.validate();
     init(base);
     const auto fitted=encodeFile(base,lex,train);
     const auto validation=encodeFile(base,lex,dev);
@@ -90,10 +104,10 @@ struct Fusion {
              <<" labels="<<labels.size()<<'\n';
     std::vector<double> first(theta.size(),0),second(theta.size(),0);
     auto best=theta;
-    double bestLoss=evaluateCE(validation),trainAccuracy;
+    double bestLoss=evaluateCE(validation);
     unsigned bestEpoch=0,noImprove=0;
     std::vector<double> v,gradient(theta.size());
-    for(unsigned epoch=1;epoch<=maxEpochs;++epoch) {
+    for(unsigned epoch=1;epoch<=options.maxEpochs;++epoch) {
       std::fill(gradient.begin(),gradient.end(),0.);
       const size_t C=nlabels();
       for(const auto& e:fitted) {
@@ -110,10 +124,10 @@ struct Fusion {
       for(double& g:gradient)g/=fitted.size();
       // Keep rare-label corrections from overfitting tiny calibration sets.
       for(size_t c=0;c<C;++c) {
-        gradient[2+c]+=0.01*theta[2+c]/C;
-        gradient[2+C+c]+=0.01*theta[2+C+c]/C;
+        gradient[2+c]+=options.l2*theta[2+c]/C;
+        gradient[2+C+c]+=options.l2*theta[2+C+c]/C;
       }
-      const double step=0.07;
+      const double step=options.step;
       for(size_t i=0;i<theta.size();++i) {
         first[i]=.9*first[i]+.1*gradient[i];
         second[i]=.999*second[i]+.001*gradient[i]*gradient[i];
@@ -135,14 +149,14 @@ struct Fusion {
         bestEpoch=epoch;
         noImprove=0;
       }else ++noImprove;
-      if(epoch==1||epoch%10==0||noImprove>=16) {
+      if(epoch==1||epoch%10==0||noImprove>=options.patience) {
         std::cerr<<"CALIBRATION_EPOCH epoch="<<epoch
                  <<" validation_ce="<<validationLoss
                  <<" validation_accuracy="<<valAccuracy
                  <<" byte_coefficient="<<theta[0]
                  <<" word_coefficient="<<theta[1]<<'\n';
       }
-      if(noImprove>=16)break;
+      if(noImprove>=options.patience)break;
     }
     theta=std::move(best);
     double minWord=1e50,maxWord=-1e50;

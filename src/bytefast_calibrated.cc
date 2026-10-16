@@ -2,7 +2,8 @@
 namespace {
 void calibratedUsage() {
   std::cerr<<"Usage:\n"
-    <<"  bytefast-calibrated fit BASE WORDS CALIBRATION.fasttext VALIDATION.fasttext OUTPUT.fuse\n"
+    <<"  bytefast-calibrated fit BASE WORDS CALIBRATION.fasttext VALIDATION.fasttext OUTPUT.fuse"
+      " [-epochs N] [-lr FLOAT] [-l2 FLOAT] [-patience N]\n"
     <<"  bytefast-calibrated predict BASE WORDS FUSION MODEL_INPUT.txt [-gate 0..2]\n"
     <<"  bytefast-calibrated bench BASE WORDS FUSION MODEL_INPUT.txt [-gate 0..2]\n";
 }
@@ -16,8 +17,17 @@ int main(int argc,char** argv) {
     Lexicon lex;lex.load(base,argv[3]);
     Fusion fusion;
     if(command=="fit") {
-      if(argc!=7) {calibratedUsage();return 2;}
-      fusion.fit(base,lex,readRecords(argv[4]),readRecords(argv[5]));
+      if(argc<7||(argc-7)%2!=0) {calibratedUsage();return 2;}
+      FusionOptions options;
+      for(int i=7;i<argc;i+=2) {
+        const std::string flag=argv[i];
+        if(flag=="-epochs")options.maxEpochs=static_cast<unsigned>(std::stoul(argv[i+1]));
+        else if(flag=="-lr")options.step=std::stod(argv[i+1]);
+        else if(flag=="-l2")options.l2=std::stod(argv[i+1]);
+        else if(flag=="-patience")options.patience=static_cast<unsigned>(std::stoul(argv[i+1]));
+        else throw std::runtime_error("Unknown fit option: "+flag);
+      }
+      fusion.fit(base,lex,readRecords(argv[4]),readRecords(argv[5]),options);
       fusion.save(argv[6]);
     }else if(command=="predict"||command=="bench") {
       fusion.load(base,lex,argv[4]);
