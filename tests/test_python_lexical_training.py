@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Regression tests for opt-in lexical training via the ByteFast Python API."""
+"""Regression tests for the prototype lexical training API (bytefast.proto)."""
 from pathlib import Path
 import tempfile
 
 import bytefast
-from bytefast.api import _split_lexical_training
+from bytefast.proto import _split_lexical_training
 
 
 def make_input(root):
@@ -50,12 +50,12 @@ def main():
         assert tuple(map(len, lines)) == (96, 12, 12)
         assert len(set.union(*lines)) == 120
 
-        bare = bytefast.train_supervised(
+        bare = bytefast.proto.train_supervised(
             source, dim=16, bucket=2048, epoch=5, lr=0.2)
         assert bare.model_type == "bytefast"
 
         output = root / "combined.bin"
-        trained = bytefast.train_supervised(
+        trained = bytefast.proto.train_supervised(
             source,
             output=output,
             dim=16,
@@ -87,7 +87,7 @@ def main():
 
         # With no output file, the returned model owns its backing directory
         # and remains usable after training exits.
-        memory_model = bytefast.train_supervised(
+        memory_model = bytefast.proto.train_supervised(
             source, dim=16, bucket=2048, epoch=3, lr=0.2,
             lexical=True, lexical_vocab=80, lexical_min_df=1)
         assert memory_model.model_type == "bytefast-calibrated"
@@ -99,7 +99,7 @@ def main():
         assert bytefast.load_model(saved_again).get_labels() == (
             memory_model.get_labels())
 
-        external = bytefast.train_supervised(
+        external = bytefast.proto.train_supervised(
             fit, lexical=True, lexical_calibration_data=cal,
             lexical_validation_data=dev,
             lexical_vocab=100, lexical_min_df=1,
@@ -116,7 +116,7 @@ def main():
             len(p.read_text().splitlines()) for p in _split_lexical_training(
                 source, custom_split, seed=7, split=(0.6, 0.2, 0.2)))
         assert sizes == (72, 24, 24), sizes
-        configured = bytefast.train_supervised(
+        configured = bytefast.proto.train_supervised(
             source, dim=16, bucket=2048, epoch=3, lr=0.2,
             hash_count=2, position_bins=4,
             lexical=True, lexical_vocab=80, lexical_min_df=1,
@@ -139,7 +139,7 @@ def main():
             {"lexical_fusion_epochs": 0},
         ):
             try:
-                bytefast.train_supervised(source, lexical=True, **bad_params)
+                bytefast.proto.train_supervised(source, lexical=True, **bad_params)
             except ValueError:
                 pass
             else:
@@ -147,7 +147,7 @@ def main():
                                      bad_params)
 
         try:
-            bytefast.train_supervised(source, lexical=False,
+            bytefast.proto.train_supervised(source, lexical=False,
                                      lexical_validation_data=dev)
         except ValueError:
             pass

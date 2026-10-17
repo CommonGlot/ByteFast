@@ -1,0 +1,93 @@
+name: ByteFast core text features
+on:
+  push:
+    branches: ["bytefast/**", "main"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Unit tests for folding and text n-gram hashing
+        run: |
+          c++ -std=c++17 -O2 -Wall -Wextra -Werror -Isrc tests/textnorm_test.cc -o /tmp/textnorm_test
+          /tmp/textnorm_test
+      - name: Check the generated Unicode table is current
+        run: |
+          python3 tools/gen_unicode_fold.py > /tmp/unicode_fold.h
+          python3 - <<'PY'
+          import unicodedata
+          from pathlib import Path
+          committed = Path("src/unicode_fold.h").read_text()
+          version = committed.splitlines()[0].split("Unicode ")[1].split(";")[0]
+          if version == unicodedata.unidata_version:
+              assert committed == Path("/tmp/unicode_fold.h").read_text()
+              print("unicode_fold.h matches Unicode", version)
+          else:
+              print("runner has Unicode", unicodedata.unidata_version,
+                    "; table was generated from", version, "- not compared")
+          PY
+      - name: Build the bytefast CLI
+        run: make -j2 opt
+      - name: Train, test, quantize and reload every feature family
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import random
+          random.seed(0)
+          words = {
+              "alpha": "river stone mountain forest valley meadow".split(),
+              "beta": "engine piston turbine valve gear shaft".split(),
+              "gamma": "violin piano cello flute trumpet harp".split(),
+          }
+          def rows(n):
+              for label, vocab in words.items():
+                  for _ in range(n):
+                      yield "__label__%s %s" % (label, " ".join(random.choices(vocab, k=6)))
+          Path("/tmp/core-train.txt").write_text("\n".join(rows(200)) + "\n")
+          Path("/tmp/core-test.txt").write_text("\n".join(rows(30)) + "\n")
+          PY
+          set -e
+          for cfg in "-minn 2 -maxn 5" "-minb 2 -maxb 5 -minCount 1000000000 -bucket 100000" \
+                     "-minc 1 -maxc 4 -minCount 1000000000 -bucket 100000" \
+                     "-minb 2 -maxb 5 -hashWords -fold unicode -maxBytes 64 -bucket 100000"; do
+            ./bytefast supervised -input /tmp/core-train.txt -output /tmp/core -dim 16 -epoch 10 -lr 0.5 -thread 2 -verbose 0 $cfg
+            ./bytefast test /tmp/core.bin /tmp/core-test.txt | tee /tmp/core-result.txt
+            python3 -c "import sys; p=float(open('/tmp/core-result.txt').read().split()[3]); print('cfg=$cfg P@1=%s' % p); sys.exit(p < 0.95)"
+            ./bytefast quantize -input /tmp/core-train.txt -output /tmp/core -cutoff 2000 -retrain -epoch 2 -verbose 0
+            ./bytefast test /tmp/core.ftz /tmp/core-test.txt
+          done
+          head -c 4 /tmp/core.bin | od -c | head -1
+      - name: Build Python package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .
+      - name: Python text-feature regression
+        run: python tests/test_python_text_features.py
+      - name: Upstream fastText reads models without ByteFast-only features
+        run: |
+          python -m pip install fasttext-numpy2-wheel
+          python - <<'PY'
+          import bytefast, fasttext
+          plain = bytefast.train_supervised(input="/tmp/core-train.txt", minn=2, maxn=5,
+                                            dim=16, epoch=5, thread=1, verbose=0)
+          plain.save_model("/tmp/plain.bin")
+          text = bytefast.train_supervised(input="/tmp/core-train.txt", minb=2, maxb=5,
+                                           bucket=50000, dim=16, epoch=5, thread=1, verbose=0)
+          text.save_model("/tmp/text.bin")
+          upstream = fasttext.load_model("/tmp/plain.bin")
+          assert upstream.predict("piano violin harp")[0] == plain.predict("piano violin harp")[0]
+          try:
+              fasttext.load_model("/tmp/text.bin")
+          except ValueError:
+              pass
+          else:
+              raise AssertionError("upstream fastText loaded a BFCM model")
+          print("UPSTREAM_COMPATIBILITY_PASS")
+          PY

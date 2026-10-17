@@ -1,27 +1,35 @@
-# ByteFast Python package; original fastText algorithms are preserved under
-# bytefast.legacy, using the original Facebook Research sources and MIT license.
+# ByteFast: text classification with byte, character and word features.
+# Built on the original fastText sources (MIT license).
 # Copyright (c) 2017-present, Facebook, Inc., and 2026 CommonGlot contributors.
-from . import core as legacy
-from .core import cbow, skipgram, supervised, tokenize, EOS, BOW, EOW
-from .api import (
-    ByteFastModel,
+from . import core
+from . import proto
+from .core import (
     train_supervised,
-    train_fasttext_supervised,
     train_unsupervised,
-    load_model,
-    bundle_model,
+    tokenize,
+    cbow,
+    skipgram,
+    supervised,
+    EOS,
+    BOW,
+    EOW,
 )
+from .api import load_model
+from .proto import bundle_model
 
-__version__ = "0.1.0"
+# Names kept for code written against earlier releases.
+legacy = core
+train_fasttext_supervised = core.train_supervised
+
+__version__ = "0.2.0"
 __all__ = [
-    "ByteFastModel",
     "train_supervised",
-    "train_fasttext_supervised",
     "train_unsupervised",
     "load_model",
-    "bundle_model",
-    "legacy",
     "tokenize",
+    "core",
+    "proto",
+    "bundle_model",
     "cbow",
     "skipgram",
     "supervised",

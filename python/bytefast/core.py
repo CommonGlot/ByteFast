@@ -106,6 +106,14 @@ class _ByteFast:
                 "minCountLabel",
                 "minn",
                 "maxn",
+                "minb",
+                "maxb",
+                "minc",
+                "maxc",
+                "maxBytes",
+                "fold",
+                "hashWords",
+                "maxVocab",
                 "neg",
                 "wordNgrams",
                 "loss",
@@ -416,9 +424,24 @@ def _parse_loss_string(string):
         raise ValueError("Unrecognized loss name")
 
 
+def _parse_fold_string(string):
+    if isinstance(string, _core.fold_name):
+        return string
+    folds = {"none": _core.fold_name.none, "ascii": _core.fold_name.ascii,
+             "unicode": _core.fold_name.unicode}
+    if string not in folds:
+        raise ValueError("Unrecognized fold name %r: use 'none', 'ascii' or "
+                         "'unicode'" % (string,))
+    return folds[string]
+
+
 def _build_args(args, manually_set_args):
     args["model"] = _parse_model_string(args["model"])
     args["loss"] = _parse_loss_string(args["loss"])
+    if "fold" in args:
+        args["fold"] = _parse_fold_string(args["fold"])
+    if "hashWords" in args:
+        args["hashWords"] = bool(args["hashWords"])
     if type(args["autotuneModelSize"]) == int:
         args["autotuneModelSize"] = str(args["autotuneModelSize"])
 
@@ -429,7 +452,9 @@ def _build_args(args, manually_set_args):
             a.setManual(k)
     a.output = ""  # User should use save_model
     a.saveOutput = 0  # Never use this
-    if a.wordNgrams <= 1 and a.maxn == 0:
+    # Without hashed features the bucket table is unused; keep it empty.
+    if (a.wordNgrams <= 1 and a.maxn == 0 and a.maxb == 0 and a.maxc == 0
+            and not a.hashWords):
         a.bucket = 0
     return a
 
@@ -466,6 +491,15 @@ unsupervised_default = {
     "verbose": 2,
     "pretrainedVectors": "",
     "seed": 0,
+    "minb": 0,
+    "maxb": 0,
+    "minc": 0,
+    "maxc": 0,
+    "maxBytes": 0,
+    "fold": "none",
+    "hashWords": False,
+    "wordlist": "",
+    "maxVocab": 0,
     "autotuneValidationFile": "",
     "autotuneMetric": "f1",
     "autotunePredictions": 1,
@@ -481,6 +515,10 @@ def read_args(arg_list, arg_dict, arg_names, default_values):
         "lr_update_rate": "lrUpdateRate",
         "label_prefix": "label",
         "pretrained_vectors": "pretrainedVectors",
+        "min_count_label": "minCountLabel",
+        "max_bytes": "maxBytes",
+        "hash_words": "hashWords",
+        "max_vocab": "maxVocab",
     }
 
     ret = {}
@@ -504,16 +542,27 @@ def read_args(arg_list, arg_dict, arg_names, default_values):
 
 def train_supervised(*kargs, **kwargs):
     """
-    Train a supervised model and return a model object.
+    Train a supervised classifier and return a model object.
 
-    input must be a filepath. The input text does not need to be tokenized
-    as per the tokenize function, but it must be preprocessed and encoded
-    as UTF-8. You might want to consult standard preprocessing scripts such
-    as tokenizer.perl mentioned here: http://www.statmt.org/wmt07/baseline.html
+    input must be a filepath with one example per line, UTF-8 encoded, with
+    at least one label (``__label__NAME`` by default) per line.
 
-    The input file must must contain at least one label per line. For an
-    example consult the example datasets which are part of the fastText
-    repository such as the dataset pulled by classification-example.sh.
+    Every example is represented by the average of its feature vectors.
+    Features can be combined freely:
+
+    - words: the vocabulary, built with minCount, optionally restricted to a
+      wordlist file and capped at maxVocab words; hashWords=True also gives
+      words outside the vocabulary a hashed vector
+    - minn/maxn: character n-grams inside each word (fastText subwords)
+    - wordNgrams: hashed word n-grams
+    - minb/maxb: byte n-grams over the whole text, across word boundaries
+    - minc/maxc: character n-grams over the whole text, across word
+      boundaries; maxBytes limits how much of the text they read
+    - fold: 'none', 'ascii' or 'unicode' lowercasing before all features
+
+    Set maxb/maxc to 0 to disable text n-grams, and minCount above the corpus
+    size to disable word vectors. Models that use only fastText features are
+    saved in the original fastText format.
     """
     supervised_default = unsupervised_default.copy()
     supervised_default.update(
@@ -548,6 +597,15 @@ def train_supervised(*kargs, **kwargs):
         "verbose",
         "pretrainedVectors",
         "seed",
+        "minb",
+        "maxb",
+        "minc",
+        "maxc",
+        "maxBytes",
+        "fold",
+        "hashWords",
+        "wordlist",
+        "maxVocab",
         "autotuneValidationFile",
         "autotuneMetric",
         "autotunePredictions",
@@ -597,6 +655,9 @@ def train_unsupervised(*kargs, **kwargs):
         "label",
         "verbose",
         "pretrainedVectors",
+        "fold",
+        "wordlist",
+        "maxVocab",
     ]
     args, manually_set_args = read_args(kargs, kwargs, arg_names, unsupervised_default)
     a = _build_args(args, manually_set_args)

@@ -104,6 +104,15 @@ PYBIND11_MODULE(_core_pybind, m) {
       .def_readwrite("bucket", &bytefast::Args::bucket)
       .def_readwrite("minn", &bytefast::Args::minn)
       .def_readwrite("maxn", &bytefast::Args::maxn)
+      .def_readwrite("minb", &bytefast::Args::minb)
+      .def_readwrite("maxb", &bytefast::Args::maxb)
+      .def_readwrite("minc", &bytefast::Args::minc)
+      .def_readwrite("maxc", &bytefast::Args::maxc)
+      .def_readwrite("maxBytes", &bytefast::Args::maxBytes)
+      .def_readwrite("fold", &bytefast::Args::fold)
+      .def_readwrite("hashWords", &bytefast::Args::hashWords)
+      .def_readwrite("wordlist", &bytefast::Args::wordlist)
+      .def_readwrite("maxVocab", &bytefast::Args::maxVocab)
       .def_readwrite("thread", &bytefast::Args::thread)
       .def_readwrite("t", &bytefast::Args::t)
       .def_readwrite("label", &bytefast::Args::label)
@@ -134,6 +143,11 @@ PYBIND11_MODULE(_core_pybind, m) {
       .value("skipgram", bytefast::model_name::sg)
       .value("supervised", bytefast::model_name::sup)
       .export_values();
+
+  py::enum_<bytefast::fold_name>(m, "fold_name", py::module_local())
+      .value("none", bytefast::fold_name::none)
+      .value("ascii", bytefast::fold_name::ascii)
+      .value("unicode", bytefast::fold_name::unicode);
 
   py::enum_<bytefast::loss_name>(m, "loss_name", py::module_local())
       .value("hs", bytefast::loss_name::hs)

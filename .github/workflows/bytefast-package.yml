@@ -69,7 +69,7 @@ jobs:
           assert len(quantized.get_labels())==3
           assert quantized.predict('Bonjour le monde')[0]
 
-          model=bytefast.train_supervised(
+          model=bytefast.proto.train_supervised(
              '/tmp/bytefast-train.txt',output='/tmp/native-bytefast.bin',
              dim=32,bucket=4096,epoch=10,lr=0.3,ascii_fold=True)
           assert model.model_type=='bytefast'
@@ -140,9 +140,11 @@ jobs:
           Path('/tmp/generic-classification.txt').write_text(
               '\n'.join(samples) + '\n', encoding='utf-8')
           model = bytefast.train_supervised(
-              '/tmp/generic-classification.txt',
-              output='/tmp/generic-classification.bin',
-              dim=16, bucket=4096, epoch=6, lr=0.2)
+              input='/tmp/generic-classification.txt',
+              dim=16, bucket=4096, epoch=6, lr=0.2, minb=2, maxb=5,
+              thread=1, verbose=0)
+          model.save_model('/tmp/generic-classification.bin')
+          assert Path('/tmp/generic-classification.bin').read_bytes()[:4] == b'BFCM'
           expected = {'__label__sports', '__label__finance',
                       '__label__technology'}
           assert set(model.get_labels()) == expected

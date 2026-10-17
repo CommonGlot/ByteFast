@@ -21,7 +21,7 @@ import subprocess
 import platform
 import io
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 BYTEFAST_SRC = "src"
 BYTEFAST_PROTO_SRC = os.path.join(BYTEFAST_SRC, "proto")
 
