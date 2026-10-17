@@ -1,0 +1,18 @@
+{
+  "description": "Axis A/B: which input units, at a fixed table size. minCount 1000000000 disables word vectors.",
+  "common": "-dim 64 -bucket 1048576 -loss softmax",
+  "variants": [
+    {"name": "words", "flags": "-minCount 1"},
+    {"name": "words+subwords", "flags": "-minCount 1 -minn 2 -maxn 5"},
+    {"name": "subwords", "flags": "-minCount 1000000000 -minn 2 -maxn 5"},
+    {"name": "bytes2-5", "flags": "-minCount 1000000000 -minb 2 -maxb 5"},
+    {"name": "bytes1-6", "flags": "-minCount 1000000000 -minb 1 -maxb 6"},
+    {"name": "chars1-4", "flags": "-minCount 1000000000 -minc 1 -maxc 4"},
+    {"name": "chars2-5", "flags": "-minCount 1000000000 -minc 2 -maxc 5"},
+    {"name": "bytes2-5+words", "flags": "-minCount 1 -minb 2 -maxb 5"},
+    {"name": "bytes2-5+words5", "flags": "-minCount 5 -minb 2 -maxb 5"},
+    {"name": "bytes2-5+words5+hash", "flags": "-minCount 5 -minb 2 -maxb 5 -hashWords"},
+    {"name": "chars1-4+words", "flags": "-minCount 1 -minc 1 -maxc 4"},
+    {"name": "subwords+bytes2-5+words", "flags": "-minCount 1 -minn 2 -maxn 5 -minb 2 -maxb 5"}
+  ]
+}
