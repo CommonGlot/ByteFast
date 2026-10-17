@@ -4,9 +4,14 @@
 
 Datasets:
   wili     WiLI-2018 language identification (235 labels, Zenodo, ODbL)
-  dbpedia  DBpedia ontology topics (14 labels)
-  ag_news  AG News topics (4 labels)
-  yelp     Yelp review polarity (2 labels)
+  dbpedia  DBpedia ontology topics (14 labels, fancyzhx/dbpedia_14)
+  ag_news  AG News topics (4 labels, fancyzhx/ag_news)
+  yelp     Yelp review polarity (2 labels, fancyzhx/yelp_polarity)
+
+The topic and sentiment sets are the Zhang et al. (2015) splits used in the
+fastText paper; their original download URL is no longer served, so they
+are read from the Hugging Face copies (needs huggingface_hub and pyarrow).
+Labels are the class indices of those copies.
 
 The text is kept as published (no lowercasing or tokenization) so that case
 folding and tokenization remain ablation choices. dev is a deterministic,
@@ -16,20 +21,19 @@ test split.
   python3 benchmarks/prepare_classification.py --dataset dbpedia --out data/dbpedia
 """
 import argparse
-import csv
-import io
 import random
 import sys
-import tarfile
 import urllib.request
 import zipfile
 from collections import defaultdict
 from pathlib import Path
 
-FASTTEXT_DATA = "https://dl.fbaipublicfiles.com/fasttext/data/%s_csv.tar.gz"
 WILI = "https://zenodo.org/records/841984/files/wili-2018.zip?download=1"
-CSV_DATASETS = {"dbpedia": "dbpedia", "ag_news": "ag_news",
-                "yelp": "yelp_review_polarity"}
+HF_DATASETS = {
+    "ag_news": ("fancyzhx/ag_news", ["text"]),
+    "dbpedia": ("fancyzhx/dbpedia_14", ["title", "content"]),
+    "yelp": ("fancyzhx/yelp_polarity", ["text"]),
+}
 
 
 def clean(text):
@@ -45,23 +49,28 @@ def download(url, path):
     return path
 
 
-def read_csv_dataset(name, cache):
-    archive = download(FASTTEXT_DATA % CSV_DATASETS[name],
-                       cache / ("%s_csv.tar.gz" % name))
+def read_hf_dataset(name, cache):
+    from huggingface_hub import snapshot_download
+    import pyarrow.parquet as pq
+
+    repo, columns = HF_DATASETS[name]
+    root = Path(snapshot_download(repo_id=repo, repo_type="dataset",
+                                  allow_patterns=["*.parquet"],
+                                  local_dir=cache / repo.replace("/", "__")))
     splits = {}
-    csv.field_size_limit(1 << 24)
-    with tarfile.open(archive) as tar:
-        for member in tar.getmembers():
-            stem = Path(member.name).name
-            if stem not in ("train.csv", "test.csv"):
+    for split in ("train", "test"):
+        rows = []
+        for path in sorted(root.rglob("*.parquet")):
+            if not path.name.startswith(split):
                 continue
-            rows = []
-            data = io.TextIOWrapper(tar.extractfile(member), encoding="utf-8")
-            for row in csv.reader(data):
-                text = clean(" ".join(row[1:]))
+            table = pq.read_table(path, columns=["label"] + columns).to_pydict()
+            for i, label in enumerate(table["label"]):
+                text = clean(" ".join(str(table[c][i]) for c in columns))
                 if text:
-                    rows.append((row[0], text))
-            splits[stem[:-4]] = rows
+                    rows.append((str(label), text))
+        if not rows:
+            raise RuntimeError("no %s parquet files for %s" % (split, repo))
+        splits[split] = rows
     return splits["train"], splits["test"]
 
 
@@ -87,7 +96,7 @@ def write(path, rows):
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--dataset", required=True, choices=["wili"] + sorted(CSV_DATASETS))
+    p.add_argument("--dataset", required=True, choices=["wili"] + sorted(HF_DATASETS))
     p.add_argument("--out", required=True, type=Path)
     p.add_argument("--cache", type=Path, default=None)
     p.add_argument("--dev-fraction", type=float, default=0.1)
@@ -99,7 +108,7 @@ def main():
     cache = a.cache or a.out
     cache.mkdir(parents=True, exist_ok=True)
 
-    train, test = read_wili(cache) if a.dataset == "wili" else read_csv_dataset(a.dataset, cache)
+    train, test = read_wili(cache) if a.dataset == "wili" else read_hf_dataset(a.dataset, cache)
     by_label = defaultdict(list)
     for row in train:
         by_label[row[0]].append(row)
