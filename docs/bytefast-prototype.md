@@ -8,7 +8,7 @@ accepts its original commands and model files.
 
 ```bash
 make -j2 opt
-make bytefast bytefast-lexical bytefast-calibrated
+make bytefast-proto bytefast-lexical bytefast-calibrated
 ```
 
 A C++17 compiler is required.
@@ -31,13 +31,13 @@ accepts one label per training line.
 ## Byte classifier commands
 
 ```bash
-./bytefast train train.txt classifier.bin \
+./bytefast-proto train train.txt classifier.bin \
     -dim 32 -bucket 16384 -epoch 10 -lr 0.15 \
     -minn 2 -maxn 5 -hashCount 1
 
-./bytefast test classifier.bin test-labeled.txt
-./bytefast predict classifier.bin inputs.txt
-./bytefast bench classifier.bin inputs.txt
+./bytefast-proto test classifier.bin test-labeled.txt
+./bytefast-proto predict classifier.bin inputs.txt
+./bytefast-proto bench classifier.bin inputs.txt
 ```
 
 The optional `-asciiFold 1` setting folds ASCII uppercase letters to
@@ -87,7 +87,7 @@ Use `bytefast.load_model()` from Python to load an original fastText
 `.bin`/`.ftz` file or a ByteFast model. It checks the header and selects
 the corresponding reader.
 
-The `./fasttext` executable continues to read original fastText models;
+The `./bytefast` executable continues to read original fastText models;
 the `./bytefast` executable reads ByteFast byte models.
 
 ## Limitations

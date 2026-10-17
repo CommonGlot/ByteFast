@@ -8,7 +8,7 @@
 
 #include "matrix.h"
 
-namespace fasttext {
+namespace bytefast {
 
 Matrix::Matrix() : m_(0), n_(0) {}
 
@@ -22,4 +22,4 @@ int64_t Matrix::size(int64_t dim) const {
   return n_;
 }
 
-} // namespace fasttext
+} // namespace bytefast

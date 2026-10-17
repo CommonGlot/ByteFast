@@ -53,8 +53,8 @@ Individual BCMS F1 for the learned variant: bos 0.58947; hbs 0.60417; hrv 0.6605
 
 ## Build and train
 
-    make bytefast bytefast-lexical bytefast-calibrated
-    ./bytefast train train.fasttext byte.bin -dim 32 -bucket 16384 -epoch 10 -asciiFold 1
+    make bytefast-proto bytefast-lexical bytefast-calibrated
+    ./bytefast-proto train train.fasttext byte.bin -dim 32 -bucket 16384 -epoch 10 -asciiFold 1
     ./bytefast-lexical build byte.bin train.fasttext words.lex 200000 1
     ./bytefast-calibrated fit byte.bin words.lex fit.fasttext validation.fasttext weights.fuse
     ./bytefast-calibrated predict byte.bin words.lex weights.fuse input.txt -gate 0.75

@@ -12,7 +12,7 @@
 #include <iostream>
 #include <stdexcept>
 
-namespace fasttext {
+namespace bytefast {
 
 QuantMatrix::QuantMatrix() : Matrix(), qnorm_(false), codesize_(0) {}
 
@@ -122,4 +122,4 @@ void QuantMatrix::dump(std::ostream&) const {
   throw std::runtime_error("Operation not permitted on quantized matrices.");
 }
 
-} // namespace fasttext
+} // namespace bytefast

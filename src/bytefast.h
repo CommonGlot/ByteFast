@@ -29,9 +29,9 @@
 #include "utils.h"
 #include "vector.h"
 
-namespace fasttext {
+namespace bytefast {
 
-class FastText {
+class ByteFast {
  public:
   using TrainCallback =
       std::function<void(float, float, double, double, int64_t)>;
@@ -47,6 +47,7 @@ class FastText {
   std::chrono::steady_clock::time_point start_;
   bool quant_;
   int32_t version;
+  bool textFeatures_ = false;
   std::unique_ptr<DenseMatrix> wordVectors_;
   std::exception_ptr trainException_;
 
@@ -81,7 +82,7 @@ class FastText {
   std::tuple<int64_t, double, double> progressInfo(real progress);
 
  public:
-  FastText();
+  ByteFast();
 
   int32_t getWordId(const std::string& word) const;
 
@@ -167,4 +168,4 @@ class FastText {
     AbortError() : std::runtime_error("Aborted.") {}
   };
 };
-} // namespace fasttext
+} // namespace bytefast

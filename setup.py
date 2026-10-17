@@ -21,8 +21,9 @@ import subprocess
 import platform
 import io
 
-__version__ = "0.1.0"
-FASTTEXT_SRC = "src"
+__version__ = "0.2.0"
+BYTEFAST_SRC = "src"
+BYTEFAST_PROTO_SRC = os.path.join(BYTEFAST_SRC, "proto")
 
 # Based on https://github.com/pybind/python_example
 
@@ -57,31 +58,28 @@ else:
     del sys.argv[coverage_index]
     coverage = True
 
-fasttext_src_files = map(str, os.listdir(FASTTEXT_SRC))
-fasttext_src_cc = list(filter(lambda x: x.endswith(".cc"), fasttext_src_files))
-
-# ByteFast keeps extra standalone C++ executables in src/. They each
-# define main() and must NOT be linked into the legacy fasttext_pybind module.
-# Preserve the upstream fastText sources and Python API unchanged.
-fasttext_src_cc = [
-    os.path.join(FASTTEXT_SRC, filename)
-    for filename in fasttext_src_cc
-    if not filename.startswith("bytefast_")
-]
+# The core library is every .cc file directly in src/ except the CLI entry
+# point. The prototype byte classifier lives in src/proto and has its own
+# extension module.
+core_src_cc = sorted(
+    os.path.join(BYTEFAST_SRC, filename)
+    for filename in os.listdir(BYTEFAST_SRC)
+    if filename.endswith(".cc") and filename != "main.cc"
+)
 
 ext_modules = [
     Extension(
-        str("bytefast._legacy_pybind"),
+        str("bytefast._core_pybind"),
         [
-            str("python/fasttext_module/fasttext/pybind/fasttext_pybind.cc"),
+            str("python/bytefast/pybind/core_pybind.cc"),
         ]
-        + fasttext_src_cc,
+        + core_src_cc,
         include_dirs=[
             # Path to pybind11 headers
             get_pybind_include(),
             get_pybind_include(user=True),
-            # Path to fasttext source code
-            FASTTEXT_SRC,
+            # Path to ByteFast core source code
+            BYTEFAST_SRC,
         ],
         language="c++",
         extra_compile_args=[
@@ -91,12 +89,12 @@ ext_modules = [
         ],
     ),
     Extension(
-        "bytefast._byte_pybind",
-        ["python/fasttext_module/fasttext/pybind/bytefast_pybind.cc"],
+        "bytefast._proto_pybind",
+        ["python/bytefast/pybind/proto_pybind.cc"],
         include_dirs=[
             get_pybind_include(),
             get_pybind_include(user=True),
-            FASTTEXT_SRC,
+            BYTEFAST_PROTO_SRC,
         ],
         language="c++",
         extra_compile_args=["-O3", "-pthread"],
@@ -213,6 +211,6 @@ setup(
     install_requires=["pybind11>=2.2", "setuptools >= 0.7.0", "numpy"],
     cmdclass={"build_ext": BuildExt},
     packages=["bytefast", "bytefast.util"],
-    package_dir={"bytefast": "python/fasttext_module/fasttext"},
+    package_dir={"bytefast": "python/bytefast"},
     zip_safe=False,
 )

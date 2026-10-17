@@ -6,7 +6,7 @@ title: List of options
 Invoke a command without arguments to list available arguments and their default values:
 
 ```bash
-$ ./fasttext supervised
+$ ./bytefast supervised
 Empty input or output path.
 
 The following arguments are mandatory:

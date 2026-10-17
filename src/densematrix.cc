@@ -19,7 +19,7 @@
 #include <immintrin.h>
 #endif
 
-namespace fasttext {
+namespace bytefast {
 
 DenseMatrix::DenseMatrix() : DenseMatrix(0, 0) {}
 
@@ -262,4 +262,4 @@ void DenseMatrix::dump(std::ostream& out) const {
   }
 };
 
-} // namespace fasttext
+} // namespace bytefast

@@ -1,7 +1,9 @@
-"""ByteFast Python API: native byte models and original fastText models.
+"""Prototype byte-only classifier with an optional lexical sidecar.
 
-The model's magic header, rather than its filename or extension, determines
-which backend loads it. Legacy fastText is preserved as bytefast.legacy.
+This is the experimental model from src/proto: a byte n-gram classifier, a
+statistical word-to-class table and learned fusion weights, stored in its own
+file formats. The main ByteFast model (bytefast.train_supervised) combines
+byte n-grams and words in one network; this module is kept for comparison.
 Copyright (c) 2026 CommonGlot contributors. MIT License.
 """
 from __future__ import annotations
@@ -16,18 +18,16 @@ from pathlib import Path
 
 import numpy as np
 
-from . import _byte_pybind
-from . import FastText as legacy
+from . import _proto_pybind
 
 BYTEFAST_MAGIC = 0x42594654
-FASTTEXT_MAGIC = 793712314
 BUNDLE_MAGIC = b"BFBN"
 BUNDLE_VERSION = 1
 MAX_BUNDLE_BYTES = 1_000_000_000
 
 
-class ByteFastModel:
-    """Adapter exposing fastText-style predict/get_labels for native ByteFast."""
+class ProtoModel:
+    """predict/get_labels adapter for prototype byte and lexical models."""
 
     def __init__(self, native, model_type="bytefast", backing=None,
                  parts=None):
@@ -85,38 +85,33 @@ def _magic(path):
 
 
 def _calibrated_model(base_path, words_path, fusion_path, backing=None):
-    native = _byte_pybind.CalibratedByteFastModel()
+    native = _proto_pybind.CalibratedByteFastModel()
     native.load_model(
         os.fspath(base_path), os.fspath(words_path),
         os.fspath(fusion_path))
-    return ByteFastModel(native, model_type="bytefast-calibrated",
+    return ProtoModel(native, model_type="bytefast-calibrated",
                          backing=backing,
                          parts=(base_path, words_path, fusion_path))
 
 
 def load_model(path, *, lexicon=None, fusion=None):
-    """Load a ByteFast .bin, bundled ByteFast .bin, or original fastText .bin/.ftz.
+    """Load a prototype byte model or a bundled prototype lexical model.
 
-    For a ByteFast model with separate lexical sidecars, pass both lexicon=
-    and fusion=. A self-contained bundle created with bundle_model() needs
-    just one file and automatically loads the calibrated classifier.
+    For a byte model with separate lexical sidecars, pass both lexicon= and
+    fusion=. A self-contained bundle created with bundle_model() needs just
+    one file and loads the calibrated classifier.
     """
     path = Path(path)
     signature = _magic(path)
-
-    if signature == FASTTEXT_MAGIC:
-        if lexicon is not None or fusion is not None:
-            raise ValueError("Legacy fastText does not support ByteFast sidecars")
-        return legacy.load_model(str(path))
 
     if signature == BYTEFAST_MAGIC:
         if (lexicon is None) != (fusion is None):
             raise ValueError("Pass both lexicon= and fusion=, or neither")
         if lexicon is not None:
             return _calibrated_model(path, lexicon, fusion)
-        native = _byte_pybind.ByteFastModel()
+        native = _proto_pybind.ByteFastModel()
         native.load_model(str(path))
-        return ByteFastModel(native)
+        return ProtoModel(native)
 
     if signature == int.from_bytes(BUNDLE_MAGIC, "little"):
         if lexicon is not None or fusion is not None:
@@ -159,8 +154,8 @@ def load_model(path, *, lexicon=None, fusion=None):
             raise
 
     raise ValueError(
-        "Unrecognized model format: expected ByteFast, ByteFast bundle, "
-        "or original fastText .bin/.ftz")
+        "Unrecognized model format: expected a prototype byte model or "
+        "prototype bundle")
 
 
 def bundle_model(base, lexicon, fusion, output):
@@ -170,7 +165,7 @@ def bundle_model(base, lexicon, fusion, output):
     """
     paths = [Path(base), Path(lexicon), Path(fusion)]
     if _magic(paths[0]) != BYTEFAST_MAGIC:
-        raise ValueError("Expected a ByteFast base model, not legacy fastText")
+        raise ValueError("Expected a prototype byte model as the base")
     sizes = [p.stat().st_size for p in paths]
     if not all(sizes) or sum(sizes) > MAX_BUNDLE_BYTES:
         raise ValueError("Combined model exceeds the 1 GB file budget")
@@ -261,7 +256,7 @@ def train_supervised(
     lexical_fusion_lr=0.07, lexical_fusion_l2=0.01,
     lexical_fusion_patience=16,
 ):
-    """Train a native ByteFast text classifier.
+    """Train the prototype byte classifier (optionally with a lexical sidecar).
 
     By default, train only the byte-level classifier (backward compatible).
 
@@ -281,17 +276,16 @@ def train_supervised(
     (lexical_fusion_epochs, lexical_fusion_lr, lexical_fusion_l2,
     lexical_fusion_patience).
 
-    For the original fastText algorithm, use
-    bytefast.train_fasttext_supervised(...) or bytefast.legacy.
+    The main ByteFast model is bytefast.train_supervised(...).
     """
     if not lexical:
         if (lexical_calibration_data is not None or
                 lexical_validation_data is not None):
             raise ValueError("lexical=True is required for calibration data")
-        native = _byte_pybind.ByteFastModel()
+        native = _proto_pybind.ByteFastModel()
         native.train(os.fspath(input), dim, bucket, minn, maxn, epoch, lr,
                      bool(ascii_fold), max_bytes, hash_count, position_bins)
-        model = ByteFastModel(native)
+        model = ProtoModel(native)
         if output is not None:
             model.save_model(output)
         return model
@@ -340,12 +334,12 @@ def train_supervised(
         base = Path(workdir.name) / "base.bin"
         lexicon = Path(workdir.name) / "words.lex"
         fusion = Path(workdir.name) / "weights.fuse"
-        native = _byte_pybind.ByteFastModel()
+        native = _proto_pybind.ByteFastModel()
         native.train(os.fspath(fit_path), dim, bucket, minn, maxn,
                      epoch, lr, bool(ascii_fold), max_bytes,
                      hash_count, position_bins)
         native.save_model(str(base))
-        _byte_pybind.fit_lexical_sidecars(
+        _proto_pybind.fit_lexical_sidecars(
             str(base), os.fspath(fit_path),
             os.fspath(calibration_path), os.fspath(validation_path),
             str(lexicon), str(fusion), lexical_vocab, lexical_min_df,
@@ -368,11 +362,5 @@ def train_supervised(
             workdir.cleanup()
 
 
-def train_fasttext_supervised(*args, **kwargs):
-    """Train the original fastText algorithm, preserving its word vocabulary."""
-    return legacy.train_supervised(*args, **kwargs)
-
-
-def train_unsupervised(*args, **kwargs):
-    """Use the original fastText unsupervised word-embedding implementation."""
-    return legacy.train_unsupervised(*args, **kwargs)
+# Kept for code written against earlier releases.
+ByteFastModel = ProtoModel

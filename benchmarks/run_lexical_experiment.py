@@ -66,7 +66,7 @@ def main():
     goldtest=load_labels(root/"test.fasttext")
     configs=[("base",0,0)]
     base_dev=root/"lex-base-dev.pred"
-    run(["./bytefast","predict",str(model),str(devtext)],base_dev)
+    run(["./bytefast-proto","predict",str(model),str(devtext)],base_dev)
     baseline=scores(golddev,load_labels(base_dev))
     print("DEV baseline",json.dumps(baseline,sort_keys=True),flush=True)
     chosen={"name":"base","cap":0,"alpha":0.0,"metrics":baseline}
@@ -93,13 +93,13 @@ def main():
 
     print("SELECTED using dev only",json.dumps(chosen,sort_keys=True),flush=True)
     reports=[]
-    variants=[("base",["./bytefast","predict",str(model),str(testtext)],model)]
+    variants=[("base",["./bytefast-proto","predict",str(model),str(testtext)],model)]
     if chosen["cap"]:
         lex=root/f"lex-{chosen['cap']}.bin"
         variants.append(("lexical",[exe,"predict",str(model),str(lex),
                     str(testtext),"-weight",str(chosen["alpha"])],lex))
     if (root/"lex-fasttext.bin").exists():
-        variants.append(("fasttext",["./fasttext","predict",
+        variants.append(("fasttext",["./bytefast","predict",
                         str(root/"lex-fasttext.bin"),str(testtext)],root/"lex-fasttext.bin"))
     for name,command,modelpath in variants:
         prediction=root/f"lex-{name}-test.pred"

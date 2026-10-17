@@ -8,14 +8,14 @@
 
 #include <emscripten.h>
 #include <emscripten/bind.h>
-#include <fasttext.h>
+#include <bytefast.h>
 #include <functional>
 #include <sstream>
 #include <string>
 #include <vector>
 
 using namespace emscripten;
-using namespace fasttext;
+using namespace bytefast;
 
 struct Float32ArrayBridge {
   uintptr_t ptr;
@@ -33,7 +33,7 @@ void fillFloat32ArrayFromVector(
 }
 
 std::vector<std::pair<float, std::string>>
-predict(FastText* fasttext, std::string text, int k, double threshold) {
+predict(ByteFast* fasttext, std::string text, int k, double threshold) {
   std::stringstream ioss(text + std::string("\n"));
 
   std::vector<std::pair<float, std::string>> predictions;
@@ -43,7 +43,7 @@ predict(FastText* fasttext, std::string text, int k, double threshold) {
 }
 
 void getWordVector(
-    FastText* fasttext,
+    ByteFast* fasttext,
     const Float32ArrayBridge& vecFloat,
     std::string word) {
   assert(fasttext);
@@ -54,7 +54,7 @@ void getWordVector(
 }
 
 void getSentenceVector(
-    FastText* fasttext,
+    ByteFast* fasttext,
     const Float32ArrayBridge& vecFloat,
     std::string text) {
   assert(fasttext);
@@ -66,7 +66,7 @@ void getSentenceVector(
 }
 
 std::pair<std::vector<std::string>, std::vector<int32_t>> getSubwords(
-    FastText* fasttext,
+    ByteFast* fasttext,
     std::string word) {
   assert(fasttext);
   std::vector<std::string> subwords;
@@ -79,7 +79,7 @@ std::pair<std::vector<std::string>, std::vector<int32_t>> getSubwords(
 }
 
 void getInputVector(
-    FastText* fasttext,
+    ByteFast* fasttext,
     const Float32ArrayBridge& vecFloat,
     int32_t ind) {
   assert(fasttext);
@@ -89,7 +89,7 @@ void getInputVector(
   fillFloat32ArrayFromVector(vecFloat, v);
 }
 
-void train(FastText* fasttext, Args* args, emscripten::val jsCallback) {
+void train(ByteFast* fasttext, Args* args, emscripten::val jsCallback) {
   assert(args);
   assert(fasttext);
   fasttext->train(
@@ -99,20 +99,20 @@ void train(FastText* fasttext, Args* args, emscripten::val jsCallback) {
       });
 }
 
-const DenseMatrix* getInputMatrix(FastText* fasttext) {
+const DenseMatrix* getInputMatrix(ByteFast* fasttext) {
   assert(fasttext);
   std::shared_ptr<const DenseMatrix> mm = fasttext->getInputMatrix();
   return mm.get();
 }
 
-const DenseMatrix* getOutputMatrix(FastText* fasttext) {
+const DenseMatrix* getOutputMatrix(ByteFast* fasttext) {
   assert(fasttext);
   std::shared_ptr<const DenseMatrix> mm = fasttext->getOutputMatrix();
   return mm.get();
 }
 
 std::pair<std::vector<std::string>, std::vector<int32_t>> getTokens(
-    const FastText& fasttext,
+    const ByteFast& fasttext,
     const std::function<std::string(const Dictionary&, int32_t)> getter,
     entry_type entryType) {
   std::vector<std::string> tokens;
@@ -128,19 +128,19 @@ std::pair<std::vector<std::string>, std::vector<int32_t>> getTokens(
 }
 
 std::pair<std::vector<std::string>, std::vector<int32_t>> getWords(
-    FastText* fasttext) {
+    ByteFast* fasttext) {
   assert(fasttext);
   return getTokens(*fasttext, &Dictionary::getWord, entry_type::word);
 }
 
 std::pair<std::vector<std::string>, std::vector<int32_t>> getLabels(
-    FastText* fasttext) {
+    ByteFast* fasttext) {
   assert(fasttext);
   return getTokens(*fasttext, &Dictionary::getLabel, entry_type::label);
 }
 
 std::pair<std::vector<std::string>, std::vector<std::string>> getLine(
-    FastText* fasttext,
+    ByteFast* fasttext,
     const std::string text) {
   assert(fasttext);
   std::shared_ptr<const Dictionary> d = fasttext->getDictionary();
@@ -166,7 +166,7 @@ std::pair<std::vector<std::string>, std::vector<std::string>> getLine(
 }
 
 Meter test(
-    FastText* fasttext,
+    ByteFast* fasttext,
     const std::string& filename,
     int32_t k,
     float threshold) {
@@ -220,18 +220,18 @@ EMSCRIPTEN_BINDINGS(fasttext) {
       .property("autotuneDuration", &Args::autotuneDuration)
       .property("autotuneModelSize", &Args::autotuneModelSize);
 
-  class_<FastText>("FastText")
+  class_<ByteFast>("ByteFast")
       .constructor<>()
       .function(
           "loadModel",
-          select_overload<void(const std::string&)>(&FastText::loadModel))
+          select_overload<void(const std::string&)>(&ByteFast::loadModel))
       .function(
           "getNN",
           select_overload<std::vector<std::pair<real, std::string>>(
-              const std::string& word, int32_t k)>(&FastText::getNN))
-      .function("getAnalogies", &FastText::getAnalogies)
-      .function("getWordId", &FastText::getWordId)
-      .function("getSubwordId", &FastText::getSubwordId)
+              const std::string& word, int32_t k)>(&ByteFast::getNN))
+      .function("getAnalogies", &ByteFast::getAnalogies)
+      .function("getWordId", &ByteFast::getWordId)
+      .function("getSubwordId", &ByteFast::getSubwordId)
       .function("getInputMatrix", &getInputMatrix, allow_raw_pointers())
       .function("getOutputMatrix", &getOutputMatrix, allow_raw_pointers())
       .function("getWords", &getWords, allow_raw_pointers())
@@ -244,9 +244,9 @@ EMSCRIPTEN_BINDINGS(fasttext) {
       .function("getSubwords", &getSubwords, allow_raw_pointers())
       .function("getInputVector", &getInputVector, allow_raw_pointers())
       .function("train", &train, allow_raw_pointers())
-      .function("saveModel", &FastText::saveModel)
-      .property("isQuant", &FastText::isQuant)
-      .property("args", &FastText::getArgs);
+      .function("saveModel", &ByteFast::saveModel)
+      .property("isQuant", &ByteFast::isQuant)
+      .property("args", &ByteFast::getArgs);
 
   class_<DenseMatrix>("DenseMatrix")
       .constructor<>()

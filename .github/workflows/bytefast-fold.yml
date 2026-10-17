@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build CPU classifier
-        run: make bytefast
+        run: make bytefast-proto
       - name: Cache WiLI archive
         uses: actions/cache@v4
         with:
@@ -26,7 +26,7 @@ jobs:
       - name: Train byte hashing variants with identical hyperparameters
         run: |
           for flag in 0 1; do
-            ./bytefast train /tmp/wili/train.fasttext /tmp/wili/byte-fold-$flag.bin \
+            ./bytefast-proto train /tmp/wili/train.fasttext /tmp/wili/byte-fold-$flag.bin \
               -dim 32 -bucket 16384 -epoch 10 -lr 0.3 -hashCount 1 -asciiFold "$flag"
           done
       - name: Compare quality on seven test conditions
@@ -35,7 +35,7 @@ jobs:
           for condition in original short32 short64 short128 oddcase noisy8 webprefix; do
             for flag in 0 1; do
               echo "FOLD condition=$condition fold=$flag"
-              ./bytefast predict /tmp/wili/byte-fold-$flag.bin /tmp/wili/robust-$condition-text.txt > /tmp/wili/fold-$flag-$condition.pred
+              ./bytefast-proto predict /tmp/wili/byte-fold-$flag.bin /tmp/wili/robust-$condition-text.txt > /tmp/wili/fold-$flag-$condition.pred
               python3 benchmarks/score_lid.py /tmp/wili/robust-$condition-gold.txt /tmp/wili/fold-$flag-$condition.pred | head -n1
             done
           done
@@ -45,6 +45,6 @@ jobs:
             stat -c "FOLD_SIZE flag=$flag bytes=%s" /tmp/wili/byte-fold-$flag.bin
             for trial in 1 2 3; do
               /usr/bin/time -f "FOLD_SPEED flag=$flag trial=$trial seconds=%e rss_kb=%M" \
-                sh -c "./bytefast predict /tmp/wili/byte-fold-$flag.bin /tmp/wili/robust-original-text.txt >/dev/null"
+                sh -c "./bytefast-proto predict /tmp/wili/byte-fold-$flag.bin /tmp/wili/robust-original-text.txt >/dev/null"
             done
           done

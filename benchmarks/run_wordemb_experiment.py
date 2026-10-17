@@ -77,7 +77,7 @@ def main():
     # Fair test comparison: identical train/dev/test split; word-model choice
     # is fixed before any prediction on official test examples.
     comparisons=[
-        ("byte_only",["./bytefast","predict",str(base),str(testtext)],
+        ("byte_only",["./bytefast-proto","predict",str(base),str(testtext)],
          base.stat().st_size),
         ("learned_word_embeddings",
          ["./bytefast-wordemb","predict",str(base),best["model"],str(testtext)],
@@ -96,7 +96,7 @@ def main():
     if ft.exists():
         comparisons.append((
           "ordinary_fasttext",
-          ["./fasttext","predict",str(ft),str(testtext)],
+          ["./bytefast","predict",str(ft),str(testtext)],
           ft.stat().st_size
         ))
     outcome=[]

@@ -8,35 +8,35 @@
 
 CXX = c++
 CXXFLAGS = -pthread -std=c++17 -march=native
-OBJS = args.o autotune.o matrix.o dictionary.o loss.o productquantizer.o densematrix.o quantmatrix.o vector.o model.o utils.o meter.o fasttext.o
+OBJS = args.o autotune.o matrix.o dictionary.o loss.o productquantizer.o densematrix.o quantmatrix.o vector.o model.o utils.o meter.o bytefast.o
 INCLUDES = -I.
 
-# Standalone byte-mode supervised classifier, preserving legacy fasttext.
-bytefast: src/bytefast_cli.cc src/bytefast_model.h src/byte_ngrams.h
-	$(CXX) $(CXXFLAGS) -O3 -DNDEBUG -Isrc src/bytefast_cli.cc -o bytefast
+# Prototype byte-only classifier and its lexical tools (src/proto).
+bytefast-proto: src/proto/bytefast_cli.cc src/proto/bytefast_model.h src/proto/byte_ngrams.h
+	$(CXX) $(CXXFLAGS) -O3 -DNDEBUG -Isrc/proto src/proto/bytefast_cli.cc -o bytefast-proto
 
-bytefast-lexical: src/bytefast_lexical.cc src/bytefast_model.h src/byte_ngrams.h
-	$(CXX) $(CXXFLAGS) -O3 -DNDEBUG -Isrc src/bytefast_lexical.cc -o bytefast-lexical
+bytefast-lexical: src/proto/bytefast_lexical.cc src/proto/bytefast_model.h src/proto/byte_ngrams.h
+	$(CXX) $(CXXFLAGS) -O3 -DNDEBUG -Isrc/proto src/proto/bytefast_lexical.cc -o bytefast-lexical
 
-bytefast-wordemb: src/bytefast_wordemb.cc src/bytefast_lexical.h src/bytefast_model.h src/byte_ngrams.h
-	$(CXX) $(CXXFLAGS) -O3 -DNDEBUG -Isrc src/bytefast_wordemb.cc -o bytefast-wordemb
+bytefast-wordemb: src/proto/bytefast_wordemb.cc src/proto/bytefast_lexical.h src/proto/bytefast_model.h src/proto/byte_ngrams.h
+	$(CXX) $(CXXFLAGS) -O3 -DNDEBUG -Isrc/proto src/proto/bytefast_wordemb.cc -o bytefast-wordemb
 
-bytefast-calibrated: src/bytefast_calibrated.cc src/bytefast_lexical.h src/bytefast_model.h src/byte_ngrams.h
-	$(CXX) $(CXXFLAGS) -O3 -DNDEBUG -Isrc src/bytefast_calibrated.cc -o bytefast-calibrated
+bytefast-calibrated: src/proto/bytefast_calibrated.cc src/proto/bytefast_lexical.h src/proto/bytefast_model.h src/proto/byte_ngrams.h
+	$(CXX) $(CXXFLAGS) -O3 -DNDEBUG -Isrc/proto src/proto/bytefast_calibrated.cc -o bytefast-calibrated
 
 opt: CXXFLAGS += -O3 -funroll-loops -DNDEBUG
-opt: fasttext
+opt: bytefast
 
 coverage: CXXFLAGS += -O0 -fno-inline -fprofile-arcs --coverage
-coverage: fasttext
+coverage: bytefast
 
 debug: CXXFLAGS += -g -O0 -fno-inline
-debug: fasttext
+debug: bytefast
 
-wasm: webassembly/fasttext_wasm.js
+wasm: webassembly/bytefast_wasm.js
 
 wasmdebug: export EMCC_DEBUG=1
-wasmdebug: webassembly/fasttext_wasm.js
+wasmdebug: webassembly/bytefast_wasm.js
 
 
 args.o: src/args.cc src/args.h
@@ -75,23 +75,23 @@ utils.o: src/utils.cc src/utils.h
 meter.o: src/meter.cc src/meter.h
 	$(CXX) $(CXXFLAGS) -c src/meter.cc
 
-fasttext.o: src/fasttext.cc src/*.h
-	$(CXX) $(CXXFLAGS) -c src/fasttext.cc
+bytefast.o: src/bytefast.cc src/*.h
+	$(CXX) $(CXXFLAGS) -c src/bytefast.cc
 
-fasttext: $(OBJS) src/fasttext.cc src/main.cc
-	$(CXX) $(CXXFLAGS) $(OBJS) src/main.cc -o fasttext
+bytefast: $(OBJS) src/bytefast.cc src/main.cc
+	$(CXX) $(CXXFLAGS) $(OBJS) src/main.cc -o bytefast
 
 clean:
-	rm -rf *.o *.gcno *.gcda fasttext bytefast bytefast-lexical bytefast-wordemb bytefast-calibrated *.bc webassembly/fasttext_wasm.js webassembly/fasttext_wasm.wasm
+	rm -rf *.o *.gcno *.gcda bytefast bytefast-proto bytefast-lexical bytefast-wordemb bytefast-calibrated *.bc webassembly/bytefast_wasm.js webassembly/bytefast_wasm.wasm
 
 
 EMCXX = em++
-EMCXXFLAGS = --bind --std=c++11 -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -s "EXTRA_EXPORTED_RUNTIME_METHODS=['addOnPostRun', 'FS']" -s "DISABLE_EXCEPTION_CATCHING=0" -s "EXCEPTION_DEBUG=1" -s "FORCE_FILESYSTEM=1" -s "MODULARIZE=1" -s "EXPORT_ES6=1" -s 'EXPORT_NAME="FastTextModule"' -Isrc/
-EMOBJS = args.bc autotune.bc matrix.bc dictionary.bc loss.bc productquantizer.bc densematrix.bc quantmatrix.bc vector.bc model.bc utils.bc meter.bc fasttext.bc main.bc
+EMCXXFLAGS = --bind --std=c++11 -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -s "EXTRA_EXPORTED_RUNTIME_METHODS=['addOnPostRun', 'FS']" -s "DISABLE_EXCEPTION_CATCHING=0" -s "EXCEPTION_DEBUG=1" -s "FORCE_FILESYSTEM=1" -s "MODULARIZE=1" -s "EXPORT_ES6=1" -s 'EXPORT_NAME="ByteFastModule"' -Isrc/
+EMOBJS = args.bc autotune.bc matrix.bc dictionary.bc loss.bc productquantizer.bc densematrix.bc quantmatrix.bc vector.bc model.bc utils.bc meter.bc bytefast.bc main.bc
 
 
-main.bc: webassembly/fasttext_wasm.cc
-	$(EMCXX) $(EMCXXFLAGS)  webassembly/fasttext_wasm.cc -o main.bc
+main.bc: webassembly/bytefast_wasm.cc
+	$(EMCXX) $(EMCXXFLAGS)  webassembly/bytefast_wasm.cc -o main.bc
 
 args.bc: src/args.cc src/args.h
 	$(EMCXX) $(EMCXXFLAGS)  src/args.cc -o args.bc
@@ -129,10 +129,10 @@ utils.bc: src/utils.cc src/utils.h
 meter.bc: src/meter.cc src/meter.h
 	$(EMCXX) $(EMCXXFLAGS)  src/meter.cc -o meter.bc
 
-fasttext.bc: src/fasttext.cc src/*.h
-	$(EMCXX) $(EMCXXFLAGS)  src/fasttext.cc -o fasttext.bc
+bytefast.bc: src/bytefast.cc src/*.h
+	$(EMCXX) $(EMCXXFLAGS)  src/bytefast.cc -o bytefast.bc
 
-webassembly/fasttext_wasm.js: $(EMOBJS) webassembly/fasttext_wasm.cc Makefile
-	$(EMCXX) $(EMCXXFLAGS) $(EMOBJS) -o webassembly/fasttext_wasm.js
+webassembly/bytefast_wasm.js: $(EMOBJS) webassembly/bytefast_wasm.cc Makefile
+	$(EMCXX) $(EMCXXFLAGS) $(EMOBJS) -o webassembly/bytefast_wasm.js
 
 

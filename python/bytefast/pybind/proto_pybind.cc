@@ -140,7 +140,7 @@ void fitLexicalSidecars(
   fusion.save(fusionOutput);
 }
 
-PYBIND11_MODULE(_byte_pybind,m) {
+PYBIND11_MODULE(_proto_pybind,m) {
   m.doc()="ByteFast UTF-8 byte-based text classifiers with optional learned lexical fusion";
   m.def("fit_lexical_sidecars",&fitLexicalSidecars,
         py::arg("base_model"),py::arg("train_data"),

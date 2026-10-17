@@ -13,7 +13,7 @@
 #include <algorithm>
 #include <stdexcept>
 
-namespace fasttext {
+namespace bytefast {
 
 Model::State::State(int32_t hiddenSize, int32_t outputSize, int32_t seed)
     : lossValue_(0.0),
@@ -90,4 +90,4 @@ real Model::std_log(real x) const {
   return std::log(x + 1e-5);
 }
 
-} // namespace fasttext
+} // namespace bytefast

@@ -6,5 +6,5 @@ includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
 Name: @PROJECT_NAME@
 Description: Efficient learning of word representations and sentence classification
 Version: @PROJECT_VERSION@
-Libs: -L${libdir} -lfasttext
+Libs: -L${libdir} -lbytefast
 Cflags: -I${includedir}

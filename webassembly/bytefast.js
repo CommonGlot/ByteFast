@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import fastTextModularized from './fasttext_wasm.js';
+import fastTextModularized from './bytefast_wasm.js';
 const fastTextModule = fastTextModularized();
 
 let postRunFunc = null;
@@ -40,9 +40,9 @@ const getFloat32ArrayFromHeap = (len) => {
 
 const heapToFloat32 = (r) => new Float32Array(r.buffer, r.ptr, r.size);
 
-class FastText {
+class ByteFast {
   constructor() {
-    this.f = new fastTextModule.FastText();
+    this.f = new fastTextModule.ByteFast();
   }
 
   /**
@@ -517,4 +517,4 @@ class FastTextModel {
 }
 
 
-export {FastText, addOnPostRun};
+export {ByteFast, addOnPostRun};

@@ -10,8 +10,8 @@
 #include <vector>
 #include <stdexcept>
 
-namespace fasttext {
 namespace bytefast {
+namespace proto {
 
 // FNV-1a over *unsigned bytes*, independent of char signedness.
 // This intentionally differs from the legacy fastText hash.
@@ -83,5 +83,5 @@ inline std::vector<uint32_t> byteNgramMultiHashes(
   return result;
 }
 
+} // namespace proto
 } // namespace bytefast
-} // namespace fasttext

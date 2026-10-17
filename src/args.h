@@ -14,7 +14,9 @@
 #include <unordered_set>
 #include <vector>
 
-namespace fasttext {
+#include "textnorm.h"
+
+namespace bytefast {
 
 enum class model_name : int { cbow = 1, sg, sup };
 enum class loss_name : int { hs = 1, ns, softmax, ova };
@@ -52,6 +54,16 @@ class Args {
   int bucket;
   int minn;
   int maxn;
+  // Text-level features over the whole input line (ByteFast).
+  int minb;
+  int maxb;
+  int minc;
+  int maxc;
+  int maxBytes;
+  fold_name fold;
+  bool hashWords;
+  std::string wordlist;
+  int maxVocab;
   int thread;
   double t;
   std::string label;
@@ -81,6 +93,13 @@ class Args {
   void printQuantizationHelp();
   void save(std::ostream&);
   void load(std::istream&);
+  void saveTextFeatures(std::ostream&) const;
+  void loadTextFeatures(std::istream&);
+  bool usesTextFeatures() const;
+  bool usesHashedFeatures() const;
+  void validate() const;
+  std::string foldToString(fold_name) const;
+  static fold_name parseFold(const std::string&);
   void dump(std::ostream&) const;
   bool hasAutotune() const;
   bool isManual(const std::string& argName) const;
@@ -93,4 +112,4 @@ class Args {
 
   static constexpr double kUnlimitedModelSize = -1.0;
 };
-} // namespace fasttext
+} // namespace bytefast

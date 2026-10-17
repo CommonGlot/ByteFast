@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build
-        run: make bytefast
+        run: make bytefast-proto
       - uses: actions/cache@v4
         with:
           path: /tmp/wili/wili-2018.zip
@@ -34,7 +34,7 @@ jobs:
             fi
             fold=0
             if [[ $variant == explicitfold ]]; then fold=1; fi
-            ./bytefast train "$f" /tmp/wili/reject/$variant.bin \
+            ./bytefast-proto train "$f" /tmp/wili/reject/$variant.bin \
               -bucket 16384 -dim 32 -epoch 10 -lr 0.3 -hashCount 1 -asciiFold "$fold"
           done
       - name: Estimate validation-only thresholds and test on 20 fully unseen languages
@@ -42,10 +42,10 @@ jobs:
           set -euo pipefail
           for model in control explicit explicitfold; do
             for sample in dev-known dev-unknown dev-noise test-known test-unknown test-noise; do
-              ./bytefast predict-scores /tmp/wili/reject/$model.bin /tmp/wili/reject/open-$sample-text.txt > /tmp/wili/reject/$model-$sample.scores
+              ./bytefast-proto predict-scores /tmp/wili/reject/$model.bin /tmp/wili/reject/open-$sample-text.txt > /tmp/wili/reject/$model-$sample.scores
             done
             python3 benchmarks/score_open_set.py "$model" --workdir /tmp/wili/reject
             stat -c "NEGATIVE_MODEL_SIZE variant=$model bytes=%s" /tmp/wili/reject/$model.bin
             /usr/bin/time -f "NEGATIVE_SPEED variant=$model seconds=%e rss_kb=%M" \
-              sh -c "./bytefast predict /tmp/wili/reject/$model.bin /tmp/wili/reject/open-test-known-text.txt >/dev/null"
+              sh -c "./bytefast-proto predict /tmp/wili/reject/$model.bin /tmp/wili/reject/open-test-known-text.txt >/dev/null"
           done

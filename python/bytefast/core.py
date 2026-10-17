@@ -9,13 +9,13 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-from . import _legacy_pybind as fasttext
+from . import _core_pybind as _core
 import numpy as np
 import multiprocessing
 from itertools import chain
 
-loss_name = fasttext.loss_name
-model_name = fasttext.model_name
+loss_name = _core.loss_name
+model_name = _core.model_name
 EOS = "</s>"
 BOW = "<"
 EOW = ">"
@@ -76,7 +76,7 @@ class _Meter:
         return recall
 
 
-class _FastText:
+class _ByteFast:
     """
     This class defines the API to inspect models and should not be used to
     create objects. It will be returned by functions such as load_model or
@@ -88,7 +88,7 @@ class _FastText:
     """
 
     def __init__(self, model_path=None, args=None):
-        self.f = fasttext.fasttext()
+        self.f = _core.bytefast()
         if model_path is not None:
             self.f.loadModel(model_path)
         self._words = None
@@ -106,6 +106,14 @@ class _FastText:
                 "minCountLabel",
                 "minn",
                 "maxn",
+                "minb",
+                "maxb",
+                "minc",
+                "maxc",
+                "maxBytes",
+                "fold",
+                "hashWords",
+                "maxVocab",
                 "neg",
                 "wordNgrams",
                 "loss",
@@ -131,7 +139,7 @@ class _FastText:
     def get_word_vector(self, word):
         """Get the vector representation of word."""
         dim = self.get_dimension()
-        b = fasttext.Vector(dim)
+        b = _core.Vector(dim)
         self.f.getWordVector(b, word)
         return np.array(b)
 
@@ -146,7 +154,7 @@ class _FastText:
             raise ValueError("predict processes one line at a time (remove '\\n')")
         text += "\n"
         dim = self.get_dimension()
-        b = fasttext.Vector(dim)
+        b = _core.Vector(dim)
         self.f.getSentenceVector(b, text)
         return np.array(b)
 
@@ -188,7 +196,7 @@ class _FastText:
         Given an index, get the corresponding vector of the Input Matrix.
         """
         dim = self.get_dimension()
-        b = fasttext.Vector(dim)
+        b = _core.Vector(dim)
         self.f.getInputVector(b, ind)
         return np.array(b)
 
@@ -416,33 +424,50 @@ def _parse_loss_string(string):
         raise ValueError("Unrecognized loss name")
 
 
+def _parse_fold_string(string):
+    if isinstance(string, _core.fold_name):
+        return string
+    folds = {"none": _core.fold_name.none, "ascii": _core.fold_name.ascii,
+             "unicode": _core.fold_name.unicode}
+    if string not in folds:
+        raise ValueError("Unrecognized fold name %r: use 'none', 'ascii' or "
+                         "'unicode'" % (string,))
+    return folds[string]
+
+
 def _build_args(args, manually_set_args):
     args["model"] = _parse_model_string(args["model"])
     args["loss"] = _parse_loss_string(args["loss"])
+    if "fold" in args:
+        args["fold"] = _parse_fold_string(args["fold"])
+    if "hashWords" in args:
+        args["hashWords"] = bool(args["hashWords"])
     if type(args["autotuneModelSize"]) == int:
         args["autotuneModelSize"] = str(args["autotuneModelSize"])
 
-    a = fasttext.args()
+    a = _core.args()
     for (k, v) in args.items():
         setattr(a, k, v)
         if k in manually_set_args:
             a.setManual(k)
     a.output = ""  # User should use save_model
     a.saveOutput = 0  # Never use this
-    if a.wordNgrams <= 1 and a.maxn == 0:
+    # Without hashed features the bucket table is unused; keep it empty.
+    if (a.wordNgrams <= 1 and a.maxn == 0 and a.maxb == 0 and a.maxc == 0
+            and not a.hashWords):
         a.bucket = 0
     return a
 
 
 def tokenize(text):
     """Given a string of text, tokenize it and return a list of tokens"""
-    f = fasttext.fasttext()
+    f = _core.bytefast()
     return f.tokenize(text)
 
 
 def load_model(path):
     """Load a model given a filepath and return a model object."""
-    return _FastText(model_path=path)
+    return _ByteFast(model_path=path)
 
 
 unsupervised_default = {
@@ -466,6 +491,15 @@ unsupervised_default = {
     "verbose": 2,
     "pretrainedVectors": "",
     "seed": 0,
+    "minb": 0,
+    "maxb": 0,
+    "minc": 0,
+    "maxc": 0,
+    "maxBytes": 0,
+    "fold": "none",
+    "hashWords": False,
+    "wordlist": "",
+    "maxVocab": 0,
     "autotuneValidationFile": "",
     "autotuneMetric": "f1",
     "autotunePredictions": 1,
@@ -481,6 +515,10 @@ def read_args(arg_list, arg_dict, arg_names, default_values):
         "lr_update_rate": "lrUpdateRate",
         "label_prefix": "label",
         "pretrained_vectors": "pretrainedVectors",
+        "min_count_label": "minCountLabel",
+        "max_bytes": "maxBytes",
+        "hash_words": "hashWords",
+        "max_vocab": "maxVocab",
     }
 
     ret = {}
@@ -504,16 +542,27 @@ def read_args(arg_list, arg_dict, arg_names, default_values):
 
 def train_supervised(*kargs, **kwargs):
     """
-    Train a supervised model and return a model object.
+    Train a supervised classifier and return a model object.
 
-    input must be a filepath. The input text does not need to be tokenized
-    as per the tokenize function, but it must be preprocessed and encoded
-    as UTF-8. You might want to consult standard preprocessing scripts such
-    as tokenizer.perl mentioned here: http://www.statmt.org/wmt07/baseline.html
+    input must be a filepath with one example per line, UTF-8 encoded, with
+    at least one label (``__label__NAME`` by default) per line.
 
-    The input file must must contain at least one label per line. For an
-    example consult the example datasets which are part of the fastText
-    repository such as the dataset pulled by classification-example.sh.
+    Every example is represented by the average of its feature vectors.
+    Features can be combined freely:
+
+    - words: the vocabulary, built with minCount, optionally restricted to a
+      wordlist file and capped at maxVocab words; hashWords=True also gives
+      words outside the vocabulary a hashed vector
+    - minn/maxn: character n-grams inside each word (fastText subwords)
+    - wordNgrams: hashed word n-grams
+    - minb/maxb: byte n-grams over the whole text, across word boundaries
+    - minc/maxc: character n-grams over the whole text, across word
+      boundaries; maxBytes limits how much of the text they read
+    - fold: 'none', 'ascii' or 'unicode' lowercasing before all features
+
+    Set maxb/maxc to 0 to disable text n-grams, and minCount above the corpus
+    size to disable word vectors. Models that use only fastText features are
+    saved in the original fastText format.
     """
     supervised_default = unsupervised_default.copy()
     supervised_default.update(
@@ -548,6 +597,15 @@ def train_supervised(*kargs, **kwargs):
         "verbose",
         "pretrainedVectors",
         "seed",
+        "minb",
+        "maxb",
+        "minc",
+        "maxc",
+        "maxBytes",
+        "fold",
+        "hashWords",
+        "wordlist",
+        "maxVocab",
         "autotuneValidationFile",
         "autotuneMetric",
         "autotunePredictions",
@@ -556,8 +614,8 @@ def train_supervised(*kargs, **kwargs):
     ]
     args, manually_set_args = read_args(kargs, kwargs, arg_names, supervised_default)
     a = _build_args(args, manually_set_args)
-    ft = _FastText(args=a)
-    fasttext.train(ft.f, a)
+    ft = _ByteFast(args=a)
+    _core.train(ft.f, a)
     ft.set_args(ft.f.getArgs())
     return ft
 
@@ -597,11 +655,14 @@ def train_unsupervised(*kargs, **kwargs):
         "label",
         "verbose",
         "pretrainedVectors",
+        "fold",
+        "wordlist",
+        "maxVocab",
     ]
     args, manually_set_args = read_args(kargs, kwargs, arg_names, unsupervised_default)
     a = _build_args(args, manually_set_args)
-    ft = _FastText(args=a)
-    fasttext.train(ft.f, a)
+    ft = _ByteFast(args=a)
+    _core.train(ft.f, a)
     ft.set_args(ft.f.getArgs())
     return ft
 

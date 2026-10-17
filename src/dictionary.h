@@ -20,7 +20,7 @@
 #include "args.h"
 #include "real.h"
 
-namespace fasttext {
+namespace bytefast {
 
 typedef int32_t id_type;
 enum class entry_type : int8_t { word = 0, label = 1 };
@@ -44,6 +44,12 @@ class Dictionary {
   void reset(std::istream&) const;
   void pushHash(std::vector<int32_t>&, int32_t) const;
   void addSubwords(std::vector<int32_t>&, const std::string_view, int32_t) const;
+  void normalize(std::string&) const;
+  void addHashedWord(std::vector<int32_t>&, const std::string_view) const;
+  void addTextNgrams(std::vector<int32_t>&, const std::vector<std::string>&)
+      const;
+  void applyWordlist();
+  void applyMaxVocab();
 
   std::shared_ptr<Args> args_;
   std::vector<int32_t> word2int_;
@@ -111,4 +117,4 @@ class Dictionary {
   void init();
 };
 
-} // namespace fasttext
+} // namespace bytefast

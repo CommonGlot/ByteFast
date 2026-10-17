@@ -3,9 +3,9 @@ on:
   push:
     branches: ["bytefast/trainable-word-branch"]
     paths:
-      - "src/bytefast_wordemb.cc"
-      - "src/bytefast_lexical.h"
-      - "src/bytefast_lexical.cc"
+      - "src/proto/bytefast_wordemb.cc"
+      - "src/proto/bytefast_lexical.h"
+      - "src/proto/bytefast_lexical.cc"
       - "Makefile"
       - ".github/workflows/bytefast-wordemb-smoke.yml"
   workflow_dispatch:
@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Compile CPU byte and word classifiers
-        run: make bytefast bytefast-wordemb bytefast-lexical
+        run: make bytefast-proto bytefast-wordemb bytefast-lexical
       - name: Train test model, learn word vectors, save and reload
         run: |
           set -euo pipefail
@@ -36,7 +36,7 @@ jobs:
           Path('/tmp/word-text.txt').write_text(
              "Sljedeći tjedan ide vlak.\nVoz sada polazi sa stanice.\nOve nedelje voz polazi.\n",encoding='utf8')
           PY
-          ./bytefast train /tmp/word-train.txt /tmp/word-byte.bin -bucket 2048 -dim 16 -epoch 5 -lr 0.3 -asciiFold 1
+          ./bytefast-proto train /tmp/word-train.txt /tmp/word-byte.bin -bucket 2048 -dim 16 -epoch 5 -lr 0.3 -asciiFold 1
           ./bytefast-wordemb train /tmp/word-byte.bin /tmp/word-train.txt /tmp/word-learned.bin \
             -vocab 80 -dim 8 -minCount 2 -epoch 4 -lr 0.025 -selection confusion
           ./bytefast-wordemb predict /tmp/word-byte.bin /tmp/word-learned.bin /tmp/word-text.txt > /tmp/word-pred.txt

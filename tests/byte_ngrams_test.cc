@@ -12,8 +12,8 @@
 #include <cassert>
 #include <string>
 
-using fasttext::bytefast::byteNgramHashes;
-using fasttext::bytefast::hashByteNgram;
+using bytefast::proto::byteNgramHashes;
+using bytefast::proto::hashByteNgram;
 
 int main() {
   const std::string withSpace = "a b";
@@ -30,9 +30,9 @@ int main() {
   assert(byteNgramHashes("x", 2, 5, 100000).empty());
   assert(byteNgramHashes("hi", 2, 5, 0).empty());
   assert(byteNgramHashes("hi", 0, 5, 100000).empty());
-  const auto one = fasttext::bytefast::byteNgramMultiHashes(
+  const auto one = bytefast::proto::byteNgramMultiHashes(
       "a b", 2, 3, 100000, 1);
-  const auto two = fasttext::bytefast::byteNgramMultiHashes(
+  const auto two = bytefast::proto::byteNgramMultiHashes(
       "a b", 2, 3, 100000, 2);
   assert(one == features);
   assert(two.size() == 2 * features.size());
@@ -42,7 +42,7 @@ int main() {
   }
   bool rejected = false;
   try {
-    (void)fasttext::bytefast::byteNgramMultiHashes(
+    (void)bytefast::proto::byteNgramMultiHashes(
         "abc", 2, 3, 100, 0);
   } catch (const std::invalid_argument&) {
     rejected = true;

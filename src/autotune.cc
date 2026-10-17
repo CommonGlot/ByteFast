@@ -47,14 +47,14 @@ class ElapsedTimeMarker {
     start_ = std::chrono::steady_clock::now();
   }
   double getElapsed() {
-    return fasttext::utils::getDuration(
+    return bytefast::utils::getDuration(
         start_, std::chrono::steady_clock::now());
   }
 };
 
 } // namespace
 
-namespace fasttext {
+namespace bytefast {
 
 constexpr double kUnknownBestScore = -1.0;
 constexpr int kCutoffLimit = 256;
@@ -205,7 +205,7 @@ void AutotuneStrategy::updateBest(const Args& args) {
   }
 }
 
-Autotune::Autotune(const std::shared_ptr<FastText>& fastText)
+Autotune::Autotune(const std::shared_ptr<ByteFast>& fastText)
     : fastText_(fastText),
       elapsed_(0.),
       bestScore_(0.),
@@ -441,7 +441,7 @@ void Autotune::train(const Args& autotuneArgs) {
       // ignore parameter samples asking too much memory
     } catch (TimeoutError&) {
       break;
-    } catch (FastText::AbortError&) {
+    } catch (ByteFast::AbortError&) {
       break;
     }
     LOG_VAL_NAN(currentScore, currentScore)
@@ -474,4 +474,4 @@ void Autotune::train(const Args& autotuneArgs) {
   }
 }
 
-} // namespace fasttext
+} // namespace bytefast

@@ -1,17 +1,7 @@
 # Python package and model-file compatibility
 
-ByteFast is a general-purpose text classification library based on the
-original [fastText](https://github.com/facebookresearch/fastText) implementation.
-The distribution and Python import name are `bytefast`. The upstream package
-remains `fasttext`, and both can be installed together.
-
-The original fastText documentation is maintained separately in
-[original-fasttext.md](original-fasttext.md).
-
-## Installation
-
-This package is available from the source repository; it has not been
-published to PyPI:
+The distribution and import name is `bytefast`. It can be installed next to
+the upstream `fasttext` package.
 
 ```bash
 git clone https://github.com/CommonGlot/ByteFast.git
@@ -19,114 +9,75 @@ cd ByteFast
 python -m pip install .
 ```
 
-The upstream distribution may be installed alongside it:
+## Training
 
-```bash
-python -m pip install fasttext
-```
-
-## Load existing models
+`bytefast.train_supervised` trains the ByteFast model. It takes every fastText
+supervised argument plus the ByteFast text features:
 
 ```python
 import bytefast
 
-native = bytefast.load_model("bytefast-model.bin")
-original = bytefast.load_model("original-fasttext-model.bin")
-quantized = bytefast.load_model("original-fasttext-model.ftz")
-combined = bytefast.load_model("combined-bytefast-model.bin")
-
-labels, probabilities = combined.predict("The team won the tournament", k=2)
-```
-
-The loader identifies model formats by the first bytes of the file rather than
-the filename extension. The supported model types are:
-
-| Type | Reader |
-| --- | --- |
-| Original fastText `.bin` | Original fastText backend |
-| Quantized fastText `.ftz` | Original fastText backend |
-| ByteFast byte classifier | ByteFast byte model |
-| ByteFast lexical bundle | ByteFast byte model, lexicon, and learned fusion |
-
-The original fastText Python package cannot read ByteFast models directly.
-Use `bytefast.load_model()` for those models.
-
-## Train an arbitrary classification dataset
-
-The input format is one labeled record per line:
-
-```text
-__label__sports The team won its match.
-__label__finance The company reported earnings.
-__label__technology The computer uses a new processor.
-```
-
-```python
 model = bytefast.train_supervised(
-    "train.txt",
-    output="classifier.bin",
-    dim=32,
-    bucket=16384,
-    minn=2,
-    maxn=5,
-    epoch=10,
+    input="train.txt",
+    minb=2, maxb=5,                 # byte n-grams over the text
+    minc=0, maxc=0,                 # character n-grams over the text (off)
+    minCount=5, max_vocab=200_000,  # word vectors
+    wordlist="",                    # optional allowed vocabulary
+    hash_words=True,                # hashed vectors for other words
+    fold="unicode", max_bytes=0,
+    bucket=1_000_000, dim=64, epoch=5, lr=0.5, thread=8, loss="softmax",
 )
+model.save_model("model.bin")
 ```
 
-All class labels are supplied by the training data. The byte encoder uses
-continuous UTF-8 n-grams, including n-grams across whitespace. Training data
-with longer records may require a larger `max_bytes` setting than its default.
+`bytefast.train_unsupervised` trains word vectors as in fastText and accepts
+`fold`, `wordlist` and `maxVocab`.
 
-For additional lexical evidence, use the separate native C++ tools:
+Both functions accept fastText's camelCase names and these snake_case
+aliases: `min_count`, `min_count_label`, `word_ngrams`, `lr_update_rate`,
+`label_prefix`, `pretrained_vectors`, `max_bytes`, `hash_words` and
+`max_vocab`.
 
-```bash
-make bytefast bytefast-lexical bytefast-calibrated
-./bytefast train train.txt base.bin -dim 32 -bucket 16384 -epoch 10
-./bytefast-lexical build base.bin train.txt words.lex 200000 1
-./bytefast-calibrated fit base.bin words.lex \
-    calibration.txt validation.txt weights.fuse
-```
+## Loading models
 
-To store the three ByteFast components in one file:
+`bytefast.load_model(path)` reads the file header and picks the reader:
+
+| File | Reader |
+| --- | --- |
+| ByteFast model with text features (`BFCM`) | `bytefast.core` |
+| ByteFast model with only fastText features | `bytefast.core`, also upstream `fasttext` |
+| Original fastText `.bin` / `.ftz` | `bytefast.core`, also upstream `fasttext` |
+| Prototype byte model (`TFYB`) and bundle (`BFBN`) | `bytefast.proto` |
+
+Upstream `fasttext` rejects `BFCM` files with "wrong file format".
+
+## Prototype API
+
+The earlier byte-only classifier and its lexical sidecar are in
+`bytefast.proto`:
 
 ```python
-bytefast.bundle_model(
-    "base.bin", "words.lex", "weights.fuse", "complete.bin"
+model = bytefast.proto.train_supervised(
+    "train.txt", output="proto.bin", dim=32, bucket=16384, epoch=10,
+    lexical=True, lexical_vocab=200000, lexical_min_df=1,
+    lexical_split=(0.8, 0.1, 0.1), lexical_fusion_epochs=90,
 )
-model = bytefast.load_model("complete.bin")
+bytefast.bundle_model("base.bin", "words.lex", "weights.fuse", "complete.bin")
 ```
 
-The single-file bundle uses a versioned and size-checked header. During
-loading, the components are unpacked into a temporary directory that remains
-available while the model object exists.
+See [bytefast-prototype.md](bytefast-prototype.md) for the matching
+command-line tools.
 
-## Original fastText algorithms
+## Renamed names
 
-The existing fastText supervised, unsupervised and word-embedding algorithms
-remain available:
+| Before | Now |
+| --- | --- |
+| `bytefast.train_supervised` (byte prototype) | `bytefast.proto.train_supervised` |
+| `bytefast.train_fasttext_supervised` | `bytefast.train_supervised` (old name still works) |
+| `bytefast.legacy` | `bytefast.core` (old name still works) |
+| `bytefast.ByteFastModel` | `bytefast.proto.ProtoModel` |
+| `bytefast.util.download_model` | removed; download published vectors directly |
 
-```python
-import bytefast
-
-classic = bytefast.train_fasttext_supervised(input="train.txt")
-vectors = bytefast.train_unsupervised(input="corpus.txt")
-```
-
-They are also accessible through `bytefast.legacy`.
-
-The native C++ programs remain separate: `./fasttext` retains the original
-fastText commands; `./bytefast` uses its own model format.
-
-## Limitations
-
-- ByteFast does not accept every original fastText training parameter through
-  its `train_supervised` wrapper. Use `train_fasttext_supervised` for the
-  original algorithm and its options.
-- Original fastText model loading and native ByteFast model loading are
-  separate implementations selected by the header.
-- Benchmarks depend on the classification dataset, label inventory, and model
-  configuration. Results from a particular application do not establish
-  performance on other datasets.
-
-The automated package and model-compatibility tests are in
+The automated tests are in
+[bytefast-core.yml](../.github/workflows/bytefast-core.yml) and
 [bytefast-package.yml](../.github/workflows/bytefast-package.yml).

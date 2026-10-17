@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build CPU classifiers
-        run: make bytefast bytefast-lexical
+        run: make bytefast-proto bytefast-lexical
       - uses: actions/cache@v4
         with:
           path: /tmp/wili/wili-2018.zip
@@ -24,7 +24,7 @@ jobs:
           python3 benchmarks/prepare_lexical_dev.py --workdir /tmp/wili --train-count 400 --seed 97234
       - name: Train ByteFast and lexical sidecar
         run: |
-          ./bytefast train /tmp/wili/lex-train.fasttext /tmp/wili/lex-byte.bin \
+          ./bytefast-proto train /tmp/wili/lex-train.fasttext /tmp/wili/lex-byte.bin \
             -dim 32 -bucket 16384 -epoch 10 -lr 0.3 -asciiFold 1 -hashCount 1
           ./bytefast-lexical build /tmp/wili/lex-byte.bin \
             /tmp/wili/lex-train.fasttext /tmp/wili/lex-gate.bin 200000 3

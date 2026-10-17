@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Compile original ByteFast and lexical extension
-        run: make bytefast bytefast-lexical
+        run: make bytefast-proto bytefast-lexical
       - name: Construct tiny multilingual examples
         run: |
           python3 - <<'PY'
@@ -26,9 +26,9 @@ jobs:
           PY
       - name: Train, build compact lexicon, reload and compare neutral weight
         run: |
-          ./bytefast train /tmp/lex-train.txt /tmp/lex-base.bin -bucket 1024 -dim 32 -epoch 12 -lr 0.3
+          ./bytefast-proto train /tmp/lex-train.txt /tmp/lex-base.bin -bucket 1024 -dim 32 -epoch 12 -lr 0.3
           ./bytefast-lexical build /tmp/lex-base.bin /tmp/lex-train.txt /tmp/lex-words.bin 128 2
-          ./bytefast predict /tmp/lex-base.bin /tmp/lex-test.txt > /tmp/lex-neutral.expected
+          ./bytefast-proto predict /tmp/lex-base.bin /tmp/lex-test.txt > /tmp/lex-neutral.expected
           ./bytefast-lexical predict /tmp/lex-base.bin /tmp/lex-words.bin /tmp/lex-test.txt -weight 0 > /tmp/lex-neutral.actual
           cut -d' ' -f1 /tmp/lex-neutral.expected > /tmp/lex-neutral.labels
           diff /tmp/lex-neutral.labels /tmp/lex-neutral.actual

@@ -26,15 +26,15 @@ fi
 make
 
 echo "Training..."
-./fasttext supervised -input "${DATADIR}/dbpedia.train" -output "${RESULTDIR}/dbpedia" -dim 10 -lr 0.1 -wordNgrams 2 -minCount 1 -bucket 10000000 -epoch 5 -thread 4
+./bytefast supervised -input "${DATADIR}/dbpedia.train" -output "${RESULTDIR}/dbpedia" -dim 10 -lr 0.1 -wordNgrams 2 -minCount 1 -bucket 10000000 -epoch 5 -thread 4
 
 echo "Quantizing..."
-./fasttext quantize -output "${RESULTDIR}/dbpedia" -input "${DATADIR}/dbpedia.train" -qnorm -retrain -epoch 1 -cutoff 100000
+./bytefast quantize -output "${RESULTDIR}/dbpedia" -input "${DATADIR}/dbpedia.train" -qnorm -retrain -epoch 1 -cutoff 100000
 
 echo "Testing original model..."
-./fasttext test "${RESULTDIR}/dbpedia.bin" "${DATADIR}/dbpedia.test"
+./bytefast test "${RESULTDIR}/dbpedia.bin" "${DATADIR}/dbpedia.test"
 echo "Testing quantized model..."
-./fasttext test "${RESULTDIR}/dbpedia.ftz" "${DATADIR}/dbpedia.test"
+./bytefast test "${RESULTDIR}/dbpedia.ftz" "${DATADIR}/dbpedia.test"
 
 wc -c < "${RESULTDIR}/dbpedia.bin" | awk '{print "Size of the original model:\t",$1;}'
 wc -c < "${RESULTDIR}/dbpedia.ftz" | awk '{print "Size of the quantized model:\t",$1;}'

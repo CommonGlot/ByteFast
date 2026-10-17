@@ -16,7 +16,7 @@ For example, using the same data as our [tutorial example](/docs/en/supervised-t
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```sh
->> ./fasttext supervised -input cooking.train -output model_cooking -autotune-validation cooking.valid
+>> ./bytefast supervised -input cooking.train -output model_cooking -autotune-validation cooking.valid
 ```
 <!--Python-->
 ```py
@@ -35,7 +35,7 @@ Now we can test the obtained model with:
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```sh
->> ./fasttext test model_cooking.bin cooking.valid
+>> ./bytefast test model_cooking.bin cooking.valid
 N       3000
 P@1     0.666
 R@1     0.288
@@ -53,7 +53,7 @@ By default, the search will take 5 minutes. You can set the timeout in seconds w
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```sh
->> ./fasttext supervised -input cooking.train -output model_cooking -autotune-validation cooking.valid -autotune-duration 600
+>> ./bytefast supervised -input cooking.train -output model_cooking -autotune-validation cooking.valid -autotune-duration 600
 ```
 <!--Python-->
 ```py
@@ -76,13 +76,13 @@ Fortunately, autotune can also find the hyperparameters for this compression tas
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```sh
->> ./fasttext supervised -input cooking.train -output model_cooking -autotune-validation cooking.valid -autotune-modelsize 2M
+>> ./bytefast supervised -input cooking.train -output model_cooking -autotune-validation cooking.valid -autotune-modelsize 2M
 ```
 This will produce a `.ftz` file with the best accuracy having the desired size:
 ```sh
 >> ls -la model_cooking.ftz
 -rw-r--r--. 1 celebio users 1990862 Aug 25 05:39 model_cooking.ftz
->> ./fasttext test model_cooking.ftz cooking.valid
+>> ./bytefast test model_cooking.ftz cooking.valid
 N       3000
 P@1     0.57
 R@1     0.246
@@ -109,17 +109,17 @@ If you save the model, you will obtain a model file with the desired size:
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 <br />
-By default, autotune will test the validation file you provide, exactly the same way as `./fasttext test model_cooking.bin cooking.valid` and try to optimize to get the highest [f1-score](https://en.wikipedia.org/wiki/F1_score).
+By default, autotune will test the validation file you provide, exactly the same way as `./bytefast test model_cooking.bin cooking.valid` and try to optimize to get the highest [f1-score](https://en.wikipedia.org/wiki/F1_score).
 
 But, if we want to optimize the score of a specific label, say `__label__baking`, we can set the `-autotune-metric` argument:
 
 ```sh
->> ./fasttext supervised -input cooking.train -output model_cooking -autotune-validation cooking.valid -autotune-metric f1:__label__baking
+>> ./bytefast supervised -input cooking.train -output model_cooking -autotune-validation cooking.valid -autotune-metric f1:__label__baking
 ```
 
-This is equivalent to manually optimize the f1-score we get when we test with `./fasttext test-label model_cooking.bin cooking.valid | grep __label__baking` in command line.
+This is equivalent to manually optimize the f1-score we get when we test with `./bytefast test-label model_cooking.bin cooking.valid | grep __label__baking` in command line.
 
-Sometimes, you may be interested in predicting more than one label. For example, if you were optimizing the hyperparameters manually to get the best score to predict two labels, you would test with `./fasttext test model_cooking.bin cooking.valid 2`. You can also tell autotune to optimize the parameters by testing two labels with the `-autotune-predictions` argument.
+Sometimes, you may be interested in predicting more than one label. For example, if you were optimizing the hyperparameters manually to get the best score to predict two labels, you would test with `./bytefast test model_cooking.bin cooking.valid 2`. You can also tell autotune to optimize the parameters by testing two labels with the `-autotune-predictions` argument.
 <!--Python-->
 <br />
 By default, autotune will test the validation file you provide, exactly the same way as `model.test("cooking.valid")` and try to optimize to get the highest [f1-score](https://en.wikipedia.org/wiki/F1_score).
@@ -140,17 +140,17 @@ You can also force autotune to optimize for the best precision for a given recal
 
 For example, in order to get the best precision at recall = `30%`:
 ```sh
->> ./fasttext supervised [...] -autotune-metric precisionAtRecall:30
+>> ./bytefast supervised [...] -autotune-metric precisionAtRecall:30
 ```
 And to get the best precision at recall = `30%` for the label `__label__baking`:
 ```sh
->> ./fasttext supervised [...] -autotune-metric precisionAtRecall:30:__label__baking
+>> ./bytefast supervised [...] -autotune-metric precisionAtRecall:30:__label__baking
 ```
 
 Similarly, you can use `recallAtPrecision`:
 ```sh
->> ./fasttext supervised [...] -autotune-metric recallAtPrecision:30
->> ./fasttext supervised [...] -autotune-metric recallAtPrecision:30:__label__baking
+>> ./bytefast supervised [...] -autotune-metric recallAtPrecision:30
+>> ./bytefast supervised [...] -autotune-metric recallAtPrecision:30:__label__baking
 ```
 
 

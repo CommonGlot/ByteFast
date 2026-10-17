@@ -20,13 +20,13 @@ int main() {
     volatile uint64_t checksum = 0;
     const auto begin = std::chrono::steady_clock::now();
     for (int i = 0; i < repeats; ++i) {
-      auto features = fasttext::bytefast::byteNgramMultiHashes(
+      auto features = bytefast::proto::byteNgramMultiHashes(
           sample, 2, 5, buckets, hashes);
       checksum += features[static_cast<size_t>(i) % features.size()];
     }
     const double seconds = std::chrono::duration<double>(
         std::chrono::steady_clock::now() - begin).count();
-    const size_t featureCount = fasttext::bytefast::byteNgramMultiHashes(
+    const size_t featureCount = bytefast::proto::byteNgramMultiHashes(
         sample, 2, 5, buckets, hashes).size();
     std::cout << "hashes=" << hashes << " docs=" << repeats
               << " bytes/doc=" << sample.size()

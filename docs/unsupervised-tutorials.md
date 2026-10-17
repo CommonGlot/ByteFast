@@ -45,7 +45,7 @@ Learning  word vectors on this data can now be achieved with a single command:
 
 ```bash
 $ mkdir result
-$ ./fasttext skipgram -input data/fil9 -output result/fil9
+$ ./bytefast skipgram -input data/fil9 -output result/fil9
 ```
 
 To decompose this command line: ./fastext calls the binary fastText executable (see how to install fastText [here](https://fasttext.cc/docs/en/support.html)) with the 'skipgram' model  (it can also be 'cbow'). We then specify the requires options '-input' for the location of the data and '-output' for the location where the word representations will be saved.
@@ -118,7 +118,7 @@ To train a cbow model with fastText, you run the following command:
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
-./fasttext cbow -input data/fil9 -output result/fil9
+./bytefast cbow -input data/fil9 -output result/fil9
 ```
 <!--Python-->
 ```py
@@ -138,7 +138,7 @@ The most important parameters of the model are its dimension and the range of si
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
-$ ./fasttext skipgram -input data/fil9 -output result/fil9 -minn 2 -maxn 5 -dim 300
+$ ./bytefast skipgram -input data/fil9 -output result/fil9 -minn 2 -maxn 5 -dim 300
 ```
 <!--Python-->
 ```py
@@ -152,7 +152,7 @@ Depending on the quantity of data you have, you may want to change the parameter
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
-$ ./fasttext skipgram -input data/fil9 -output result/fil9 -epoch 1 -lr 0.5
+$ ./bytefast skipgram -input data/fil9 -output result/fil9 -epoch 1 -lr 0.5
 ```
 <!--Python-->
 ```py
@@ -166,7 +166,7 @@ Finally , fastText is multi-threaded and uses 12 threads by default. If you have
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
-$ ./fasttext skipgram -input data/fil9 -output result/fil9 -thread 4
+$ ./bytefast skipgram -input data/fil9 -output result/fil9 -thread 4
 ```
 <!--Python-->
 ```py
@@ -184,7 +184,7 @@ For example, we can print the word vectors of words *asparagus,* *pidgey* and *y
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
-$ echo "asparagus pidgey yellow" | ./fasttext print-word-vectors result/fil9.bin
+$ echo "asparagus pidgey yellow" | ./bytefast print-word-vectors result/fil9.bin
 asparagus 0.46826 -0.20187 -0.29122 -0.17918 0.31289 -0.31679 0.17828 -0.04418 ...
 pidgey -0.16065 -0.45867 0.10565 0.036952 -0.11482 0.030053 0.12115 0.39725 ...
 yellow -0.39965 -0.41068 0.067086 -0.034611 0.15246 -0.12208 -0.040719 -0.30155 ...
@@ -218,7 +218,7 @@ As an example let's try with a misspelled word:
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
-$ echo "enviroment" | ./fasttext print-word-vectors result/fil9.bin
+$ echo "enviroment" | ./bytefast print-word-vectors result/fil9.bin
 ```
 <!--Python-->
 ```py
@@ -238,7 +238,7 @@ This can be achieved with the nearest neighbor (*nn*) functionality. For example
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
-$ ./fasttext nn result/fil9.bin
+$ ./bytefast nn result/fil9.bin
 Pre-computing word vectors... done.
 ```
 
@@ -333,7 +333,7 @@ This can be done with the *analogies* functionality. It takes a word triplet (li
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
-$ ./fasttext analogies result/fil9.bin
+$ ./bytefast analogies result/fil9.bin
 Pre-computing word vectors... done.
 Query triplet (A - B + C)? berlin germany france
 paris 0.896462
@@ -417,7 +417,7 @@ Now that we have seen the interest of subword information for unknown words, let
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
-$ ./fasttext skipgram -input data/fil9 -output result/fil9-none -maxn 0
+$ ./bytefast skipgram -input data/fil9 -output result/fil9-none -maxn 0
 ```
 The results are saved in result/fil9-non.vec and result/fil9-non.bin.
 <!--Python-->
@@ -432,7 +432,7 @@ To illustrate the difference, let us take an uncommon word in Wikipedia, like *a
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
-$ ./fasttext nn result/fil9-none.bin
+$ ./bytefast nn result/fil9-none.bin
 Query word? accomodation
 sunnhordland 0.775057
 accomodations 0.769206
