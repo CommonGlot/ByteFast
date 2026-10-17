@@ -6,9 +6,12 @@ Copyright (c) 2026 CommonGlot contributors. MIT License.
 """
 from __future__ import annotations
 
+import hashlib
 import os
+import random
 import struct
 import tempfile
+from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
@@ -26,11 +29,13 @@ MAX_BUNDLE_BYTES = 1_000_000_000
 class ByteFastModel:
     """Adapter exposing fastText-style predict/get_labels for native ByteFast."""
 
-    def __init__(self, native, model_type="bytefast", backing=None):
+    def __init__(self, native, model_type="bytefast", backing=None,
+                 parts=None):
         self._native = native
         self.model_type = model_type
         # Retain extracted bundle until this model object is discarded.
         self._backing = backing
+        self._parts = parts
 
     def predict(self, text, k=1, threshold=0.0, gate=0.75):
         """Return (labels, scores) or a list of such pairs for text batches."""
@@ -57,11 +62,12 @@ class ByteFastModel:
         raise TypeError("predict expects a string or list of strings")
 
     def save_model(self, path):
-        if self.model_type != "bytefast":
-            raise ValueError(
-                "A calibrated model consists of base, lexicon and fusion; "
-                "use bundle_model() to create a single portable .bin file")
-        self._native.save_model(os.fspath(path))
+        if self.model_type == "bytefast-calibrated":
+            if self._parts is None:
+                raise ValueError("No lexical components available to save")
+            bundle_model(*self._parts, path)
+        else:
+            self._native.save_model(os.fspath(path))
 
     def get_labels(self):
         return self._native.get_labels()
@@ -84,7 +90,8 @@ def _calibrated_model(base_path, words_path, fusion_path, backing=None):
         os.fspath(base_path), os.fspath(words_path),
         os.fspath(fusion_path))
     return ByteFastModel(native, model_type="bytefast-calibrated",
-                         backing=backing)
+                         backing=backing,
+                         parts=(base_path, words_path, fusion_path))
 
 
 def load_model(path, *, lexicon=None, fusion=None):
@@ -184,22 +191,181 @@ def bundle_model(base, lexicon, fusion, output):
     return destination
 
 
+def _split_lexical_training(source, directory, seed, split=(0.8, 0.1, 0.1)):
+    """Make class-stratified, mutually disjoint fit/calibration/validation
+    partitions (80/10/10 by default).
+
+    Base training and word statistics use the 80% fit partition; the
+    other partitions are reserved for supervised fusion and early stopping.
+    """
+    lines = []
+    groups = defaultdict(list)
+    with open(source, "r", encoding="utf-8") as stream:
+        for line in stream:
+            line = line.rstrip("\r\n")
+            if not line:
+                continue
+            fields = line.split(maxsplit=1)
+            if (len(fields) != 2 or
+                    not fields[0].startswith("__label__") or
+                    len(fields[0]) <= len("__label__")):
+                raise ValueError("Expected '__label__CLASS text' on every line")
+            groups[fields[0]].append(len(lines))
+            lines.append(line)
+
+    fit_indices = set()
+    calibration_indices = set()
+    validation_indices = set()
+    for label, indices in groups.items():
+        if len(indices) < 10:
+            raise ValueError(
+                "lexical=True requires at least 10 documents per class "
+                "for the automatic lexical_split; class %s has %d"
+                % (label, len(indices)))
+        # Avoid Python's process-dependent string hash.
+        label_seed = int.from_bytes(
+            hashlib.blake2b(label.encode("utf-8"),
+                            digest_size=8).digest(), "little")
+        shuffled = list(indices)
+        random.Random(int(seed) ^ label_seed).shuffle(shuffled)
+        n_cal = max(1, round(len(indices) * split[1]))
+        n_val = max(1, round(len(indices) * split[2]))
+        calibration_indices.update(shuffled[:n_cal])
+        validation_indices.update(shuffled[n_cal:n_cal + n_val])
+        fit_indices.update(shuffled[n_cal + n_val:])
+
+    partitions = (
+        ("fit", fit_indices),
+        ("calibration", calibration_indices),
+        ("validation", validation_indices),
+    )
+    results = []
+    for name, indices in partitions:
+        path = Path(directory) / ("%s.fasttext" % name)
+        with path.open("w", encoding="utf-8") as output_file:
+            for index, line in enumerate(lines):
+                if index in indices:
+                    output_file.write(line + "\n")
+        results.append(path)
+    return results
+
+
 def train_supervised(
     input, *, output=None, dim=64, bucket=65536, minn=2, maxn=5,
     epoch=5, lr=0.15, ascii_fold=False, max_bytes=512,
+    hash_count=1, position_bins=0,
+    lexical=False, lexical_vocab=200000, lexical_min_df=1,
+    lexical_selection="global", lexical_seed=1337,
+    lexical_calibration_data=None, lexical_validation_data=None,
+    lexical_split=(0.8, 0.1, 0.1), lexical_fusion_epochs=90,
+    lexical_fusion_lr=0.07, lexical_fusion_l2=0.01,
+    lexical_fusion_patience=16,
 ):
-    """Train the *ByteFast* byte-level classifier.
+    """Train a native ByteFast text classifier.
 
-    For the original whitespace-tokenized fastText algorithm instead call
-    bytefast.legacy.train_supervised(input=...).
+    By default, train only the byte-level classifier (backward compatible).
+
+    With lexical=True, select word-to-class statistics from training data,
+    fit lexical fusion weights from separate calibration examples, and
+    return a combined lexical model. If no calibration/validation files
+    are supplied, make reproducible 80/10/10 splits *per class* from input;
+    all three sets are disjoint. Output is one ByteFast bundle .bin.
+
+    lexical_selection="global" is the current supported word-ranking method.
+    Class-balanced and confusion-aware selection are not implemented yet.
+
+    Every training setting is an argument: the byte encoder (dim, bucket,
+    minn, maxn, epoch, lr, ascii_fold, max_bytes, hash_count,
+    position_bins), the word table (lexical_vocab, lexical_min_df), the
+    automatic split (lexical_split, lexical_seed) and the fusion optimizer
+    (lexical_fusion_epochs, lexical_fusion_lr, lexical_fusion_l2,
+    lexical_fusion_patience).
+
+    For the original fastText algorithm, use
+    bytefast.train_fasttext_supervised(...) or bytefast.legacy.
     """
-    native = _byte_pybind.ByteFastModel()
-    native.train(os.fspath(input), dim, bucket, minn, maxn, epoch, lr,
-                 bool(ascii_fold), max_bytes)
-    model = ByteFastModel(native)
-    if output is not None:
-        model.save_model(output)
-    return model
+    if not lexical:
+        if (lexical_calibration_data is not None or
+                lexical_validation_data is not None):
+            raise ValueError("lexical=True is required for calibration data")
+        native = _byte_pybind.ByteFastModel()
+        native.train(os.fspath(input), dim, bucket, minn, maxn, epoch, lr,
+                     bool(ascii_fold), max_bytes, hash_count, position_bins)
+        model = ByteFastModel(native)
+        if output is not None:
+            model.save_model(output)
+        return model
+
+    if lexical_selection != "global":
+        raise ValueError(
+            "Only lexical_selection='global' is implemented; "
+            "class-balanced and confusion-aware selection require "
+            "additional training support")
+    if (isinstance(lexical_vocab, bool) or
+            not isinstance(lexical_vocab, int) or
+            not 1 <= lexical_vocab <= 1000000):
+        raise ValueError("lexical_vocab must be an integer in [1, 1000000]")
+    if (isinstance(lexical_min_df, bool) or
+            not isinstance(lexical_min_df, int) or
+            lexical_min_df < 1):
+        raise ValueError("lexical_min_df must be a positive integer")
+    if (lexical_calibration_data is None) != (lexical_validation_data is None):
+        raise ValueError(
+            "Pass both lexical_calibration_data and "
+            "lexical_validation_data, or neither")
+    if (lexical_calibration_data is not None and
+            len({os.path.abspath(os.fspath(path)) for path in
+                 (input, lexical_calibration_data,
+                  lexical_validation_data)}) != 3):
+        raise ValueError(
+            "Training, calibration and validation paths must be distinct")
+
+    split = tuple(float(x) for x in lexical_split)
+    if (len(split) != 3 or min(split) <= 0 or
+            abs(sum(split) - 1.0) > 1e-6):
+        raise ValueError(
+            "lexical_split must be three positive fractions summing to 1")
+
+    workdir = tempfile.TemporaryDirectory(prefix="bytefast-train-")
+    try:
+        if lexical_calibration_data is None:
+            fit_path, calibration_path, validation_path = (
+                _split_lexical_training(input, workdir.name, lexical_seed,
+                                        split))
+        else:
+            fit_path = Path(input)
+            calibration_path = Path(lexical_calibration_data)
+            validation_path = Path(lexical_validation_data)
+
+        base = Path(workdir.name) / "base.bin"
+        lexicon = Path(workdir.name) / "words.lex"
+        fusion = Path(workdir.name) / "weights.fuse"
+        native = _byte_pybind.ByteFastModel()
+        native.train(os.fspath(fit_path), dim, bucket, minn, maxn,
+                     epoch, lr, bool(ascii_fold), max_bytes,
+                     hash_count, position_bins)
+        native.save_model(str(base))
+        _byte_pybind.fit_lexical_sidecars(
+            str(base), os.fspath(fit_path),
+            os.fspath(calibration_path), os.fspath(validation_path),
+            str(lexicon), str(fusion), lexical_vocab, lexical_min_df,
+            lexical_fusion_epochs, lexical_fusion_lr, lexical_fusion_l2,
+            lexical_fusion_patience)
+
+        if output is None:
+            return _calibrated_model(
+                base, lexicon, fusion, backing=workdir)
+
+        # All lexical parameters, including classwise fusion coefficients,
+        # are stored in the same model file.
+        bundle_model(base, lexicon, fusion, output)
+        model = load_model(output)
+        return model
+    finally:
+        # The no-output model retains workdir; the loader does not need
+        # the intermediate training files once weights have been loaded.
+        if output is not None:
+            workdir.cleanup()
 
 
 def train_fasttext_supervised(*args, **kwargs):

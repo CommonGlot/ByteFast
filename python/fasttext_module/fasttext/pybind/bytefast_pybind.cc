@@ -47,15 +47,18 @@ class ByteModelBinding {
   }
   void train(const std::string& path, uint32_t dim,uint32_t bucket,
              uint32_t minn,uint32_t maxn,uint32_t epochs,float lr,
-             bool ascii_fold,uint32_t max_bytes) {
+             bool ascii_fold,uint32_t max_bytes,
+             uint32_t hash_count,uint32_t position_bins) {
     if(dim<1||dim>4096||bucket<1||bucket>10000000||minn<1||maxn>16||
        minn>maxn||epochs<1||epochs>1000||max_bytes<1||
-       !std::isfinite(lr)||lr<=0||lr>10)
+       !std::isfinite(lr)||lr<=0||lr>10||hash_count<1||hash_count>4||
+       (position_bins!=0&&position_bins!=4))
        throw std::runtime_error("Invalid byte training hyperparameters");
     model.opt.dim=dim;model.opt.bucket=bucket;
     model.opt.minN=minn;model.opt.maxN=maxn;
     model.opt.epochs=epochs;model.opt.lr=lr;
     model.opt.maxBytes=max_bytes;model.opt.asciiFold=ascii_fold?1:0;
+    model.opt.hashes=hash_count;model.opt.positions=position_bins?1:0;
     const auto examples=readRecords(path);
     model.train(examples);
   }
@@ -110,8 +113,43 @@ class CalibratedBinding {
   }
 };
 
+// Train lexical evidence and its supervised fusion parameters after the
+// base byte model has been fitted on a disjoint training partition.
+void fitLexicalSidecars(
+    const std::string& baseFile, const std::string& trainFile,
+    const std::string& calibrationFile, const std::string& validationFile,
+    const std::string& lexiconOutput, const std::string& fusionOutput,
+    uint32_t vocabLimit, uint32_t minDocumentFrequency,
+    unsigned fusionEpochs, double fusionStep, double fusionL2,
+    unsigned fusionPatience) {
+  if(vocabLimit<1||vocabLimit>1000000||minDocumentFrequency<1)
+    throw std::invalid_argument("Invalid lexical vocabulary settings");
+  Model base;
+  base.load(baseFile);
+  Lexicon lexicon;
+  lexicon.train(base,readRecords(trainFile),vocabLimit,minDocumentFrequency);
+  if(lexicon.entries.empty())
+    throw std::runtime_error("Lexical selection produced an empty vocabulary");
+  lexicon.save(lexiconOutput);
+  FusionOptions options;
+  options.maxEpochs=fusionEpochs;options.step=fusionStep;
+  options.l2=fusionL2;options.patience=fusionPatience;
+  Fusion fusion;
+  fusion.fit(base,lexicon,readRecords(calibrationFile),
+             readRecords(validationFile),options);
+  fusion.save(fusionOutput);
+}
+
 PYBIND11_MODULE(_byte_pybind,m) {
   m.doc()="ByteFast UTF-8 byte-based text classifiers with optional learned lexical fusion";
+  m.def("fit_lexical_sidecars",&fitLexicalSidecars,
+        py::arg("base_model"),py::arg("train_data"),
+        py::arg("calibration_data"),py::arg("validation_data"),
+        py::arg("lexicon_output"),py::arg("fusion_output"),
+        py::arg("lexical_vocab"),py::arg("lexical_min_df"),
+        py::arg("fusion_epochs")=90,py::arg("fusion_lr")=0.07,
+        py::arg("fusion_l2")=0.01,py::arg("fusion_patience")=16,
+        py::call_guard<py::gil_scoped_release>());
   py::class_<ByteModelBinding>(m,"ByteFastModel")
     .def(py::init<>())
     .def("load_model",&ByteModelBinding::load_model)
@@ -124,7 +162,8 @@ PYBIND11_MODULE(_byte_pybind,m) {
          py::arg("input"),py::arg("dim")=64,py::arg("bucket")=65536,
          py::arg("minn")=2,py::arg("maxn")=5,
          py::arg("epoch")=5,py::arg("lr")=.15f,
-         py::arg("ascii_fold")=false,py::arg("max_bytes")=512);
+         py::arg("ascii_fold")=false,py::arg("max_bytes")=512,
+         py::arg("hash_count")=1,py::arg("position_bins")=0);
   py::class_<CalibratedBinding>(m,"CalibratedByteFastModel")
     .def(py::init<>())
     .def("load_model",&CalibratedBinding::load)
