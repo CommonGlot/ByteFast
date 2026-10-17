@@ -80,7 +80,9 @@ void Loss::findKBest(
     if (output[i] < threshold) {
       continue;
     }
-    if (heap.size() == k && std_log(output[i]) < heap.front().first) {
+    // Compare probabilities (std_log is monotonic) so that the log is only
+    // taken for labels that enter the heap.
+    if (heap.size() == k && output[i] < output[heap.front().second]) {
       continue;
     }
     heap.push_back(std::make_pair(std_log(output[i]), i));

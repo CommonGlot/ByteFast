@@ -113,9 +113,24 @@ real DenseMatrix::dotRow(const Vector& vec, int64_t i) const {
   assert(i >= 0);
   assert(i < m_);
   assert(vec.size() == n_);
+  // Independent partial sums let the compiler vectorize the loop (SSE/AVX
+  // on x86, NEON on ARM); a single accumulator forces a serial chain.
+  constexpr int64_t kLanes = 8;
+  const real* row = data_.data() + i * n_;
+  const real* v = vec.data();
+  real partial[kLanes] = {};
+  int64_t j = 0;
+  for (; j + kLanes <= n_; j += kLanes) {
+    for (int64_t l = 0; l < kLanes; l++) {
+      partial[l] += row[j + l] * v[j + l];
+    }
+  }
   real d = 0.0;
-  for (int64_t j = 0; j < n_; j++) {
-    d += at(i, j) * vec[j];
+  for (int64_t l = 0; l < kLanes; l++) {
+    d += partial[l];
+  }
+  for (; j < n_; j++) {
+    d += row[j] * v[j];
   }
   if (std::isnan(d)) {
     throw EncounteredNaNError();
@@ -208,8 +223,34 @@ template <unsigned Cols> void averageRowsFast(Vector& x, const std::vector<int32
 }
 #endif
 
+#if !(defined(__AVX512F__) || defined(__AVX__) || defined(__SSE__))
+/* Portable version of averageRowsFast: a fixed-size local accumulator that
+ * the compiler can keep in vector registers (e.g. NEON on ARM). */
+template <unsigned Cols> void averageRowsFast(Vector& x, const std::vector<int32_t>& rows, const DenseMatrix &matrix) {
+  if (rows.empty()) {
+    x.zero();
+    x.mul(1.0 / rows.size());
+    return;
+  }
+  real accum[Cols];
+  const real* base = matrix.data() + matrix.cols() * rows[0];
+  for (unsigned i = 0; i < Cols; ++i) {
+    accum[i] = base[i];
+  }
+  for (size_t r = 1; r < rows.size(); ++r) {
+    base = matrix.data() + matrix.cols() * rows[r];
+    for (unsigned i = 0; i < Cols; ++i) {
+      accum[i] += base[i];
+    }
+  }
+  const real mul = 1.0 / rows.size();
+  for (unsigned i = 0; i < Cols; ++i) {
+    x[i] = accum[i] * mul;
+  }
+}
+#endif
+
 void DenseMatrix::averageRowsToVector(Vector& x, const std::vector<int32_t>& rows) const {
-#if defined(__AVX512F__) || defined(__AVX__) || defined(__SSE__)
   switch (cols()) {
     case 512:
       // Maximum number that can fit all in registers on AVX512F.
@@ -224,11 +265,13 @@ void DenseMatrix::averageRowsToVector(Vector& x, const std::vector<int32_t>& row
     case 32:
       averageRowsFast<32>(x, rows, *this);
       return;
+    case 128:
+      averageRowsFast<128>(x, rows, *this);
+      return;
     case 16:
       averageRowsFast<16>(x, rows, *this);
       return;
   }
-#endif
   x.zero();
   for (auto it = rows.cbegin(); it != rows.cend(); ++it) {
     addRowToVector(x, *it);
