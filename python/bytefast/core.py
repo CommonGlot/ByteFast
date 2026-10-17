@@ -508,6 +508,8 @@ unsupervised_default = {
     "cropMax": 0,
     "cropUnit": "char",
     "normProb": 0.0,
+    "saveEpochs": False,
+    "validation": "",
     "autotuneValidationFile": "",
     "autotuneMetric": "f1",
     "autotunePredictions": 1,
@@ -535,6 +537,7 @@ def read_args(arg_list, arg_dict, arg_names, default_values):
         "crop_max": "cropMax",
         "crop_unit": "cropUnit",
         "norm_prob": "normProb",
+        "save_epochs": "saveEpochs",
     }
 
     ret = {}
@@ -639,6 +642,8 @@ def train_supervised(*kargs, **kwargs):
         "cropMax",
         "cropUnit",
         "normProb",
+        "saveEpochs",
+        "validation",
         "autotuneValidationFile",
         "autotuneMetric",
         "autotunePredictions",

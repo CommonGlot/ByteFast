@@ -826,6 +826,8 @@ void ByteFast::continueTraining(const Args& args, const TrainCallback& callback)
   args_->cropMax = args.cropMax;
   args_->cropUnit = args.cropUnit;
   args_->normProb = args.normProb;
+  args_->saveEpochs = args.saveEpochs;
+  args_->validation = args.validation;
   if (args_->input == "-") {
     throw std::invalid_argument("Cannot use stdin for training!");
   }
@@ -869,6 +871,8 @@ void ByteFast::startThreads(const TrainCallback& callback) {
     trainThread(0, callback);
   }
   const int64_t ntokens = trainTokens_;
+  const bool checkpoints = args_->saveEpochs || !args_->validation.empty();
+  int32_t nextEpoch = 1;
   // Same condition as trainThread
   while (keepTraining(ntokens)) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -877,9 +881,19 @@ void ByteFast::startThreads(const TrainCallback& callback) {
       std::cerr << "\r";
       printInfo(progress, loss_, std::cerr);
     }
+    // The workers keep training while a checkpoint is written or scored,
+    // as in Hogwild!; the learning-rate schedule is not affected.
+    if (checkpoints && nextEpoch < args_->epoch &&
+        tokenCount_ >= int64_t(nextEpoch) * ntokens) {
+      epochCheckpoint(nextEpoch++);
+    }
   }
   for (int32_t i = 0; i < threads.size(); i++) {
     threads[i].join();
+  }
+  if (checkpoints && nextEpoch < args_->epoch && !trainException_) {
+    std::cerr << "\nno checkpoint for epochs " << nextEpoch << "-" << args_->epoch - 1
+              << ": training finished before they were seen" << std::endl;
   }
   if (trainException_) {
     std::exception_ptr exception = trainException_;
@@ -890,6 +904,29 @@ void ByteFast::startThreads(const TrainCallback& callback) {
     std::cerr << "\r";
     printInfo(1.0, loss_, std::cerr);
     std::cerr << std::endl;
+  }
+  if (!args_->validation.empty()) {
+    epochCheckpoint(args_->epoch);
+  }
+}
+
+// After epoch `epoch` (of args_->epoch): save OUTPUT.epN.bin with
+// -saveEpochs (not after the last epoch, whose model is saved as usual) and
+// print precision@1 on -validation.
+void ByteFast::epochCheckpoint(int32_t epoch) {
+  if (args_->saveEpochs && epoch < args_->epoch) {
+    saveModel(args_->output + ".ep" + std::to_string(epoch) + ".bin");
+  }
+  if (!args_->validation.empty()) {
+    std::ifstream ifs(args_->validation);
+    if (!ifs.is_open()) {
+      throw std::invalid_argument(args_->validation + " cannot be opened for validation!");
+    }
+    Meter meter(false);
+    test(ifs, 1, 0.0, meter);
+    std::cerr << "\nepoch " << epoch << "/" << args_->epoch << " validation: N "
+              << meter.nexamples() << "  P@1 " << std::fixed << std::setprecision(4)
+              << meter.precision() << std::endl;
   }
 }
 

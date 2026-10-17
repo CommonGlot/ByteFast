@@ -121,6 +121,8 @@ PYBIND11_MODULE(_core_pybind, m) {
       .def_readwrite("cropMax", &bytefast::Args::cropMax)
       .def_readwrite("cropUnit", &bytefast::Args::cropUnit)
       .def_readwrite("normProb", &bytefast::Args::normProb)
+      .def_readwrite("saveEpochs", &bytefast::Args::saveEpochs)
+      .def_readwrite("validation", &bytefast::Args::validation)
       .def_readwrite("thread", &bytefast::Args::thread)
       .def_readwrite("t", &bytefast::Args::t)
       .def_readwrite("label", &bytefast::Args::label)

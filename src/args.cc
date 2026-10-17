@@ -49,6 +49,8 @@ Args::Args() {
   cropMax = 0;
   cropUnit = "char";
   normProb = 0.0;
+  saveEpochs = false;
+  validation = "";
   thread = 12;
   lrUpdateRate = 100;
   t = 1e-4;
@@ -247,6 +249,11 @@ void Args::parseArgs(const std::vector<std::string>& args) {
         cropMax = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-normProb") {
         normProb = std::stod(args.at(ai + 1));
+      } else if (args[ai] == "-saveEpochs") {
+        saveEpochs = true;
+        ai--;
+      } else if (args[ai] == "-validation") {
+        validation = std::string(args.at(ai + 1));
       } else if (args[ai] == "-cropUnit") {
         cropUnit = std::string(args.at(ai + 1));
       } else if (args[ai] == "-thread") {
@@ -461,6 +468,13 @@ void Args::printTrainingHelp() {
       << "                      and architecture are kept, -lr/-epoch/-thread "
          "are new ["
       << inputModel << "]\n"
+      << "  -saveEpochs         also save the model after every epoch but the "
+         "last, as\n"
+      << "                      OUTPUT.epN.bin (needs -thread > 1) ["
+      << boolToString(saveEpochs) << "]\n"
+      << "  -validation         print precision@1 on this labeled file after "
+         "every epoch ["
+      << validation << "]\n"
       << "  -saveOutput         whether output params should be saved ["
       << boolToString(saveOutput) << "]\n"
       << "  -seed               random generator seed  [" << seed << "]\n";

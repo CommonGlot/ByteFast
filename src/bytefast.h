@@ -56,6 +56,7 @@ class ByteFast {
   void signModel(std::ostream&);
   bool checkModel(std::istream&);
   void startThreads(const TrainCallback& callback = {});
+  void epochCheckpoint(int32_t epoch);
   void addInputVector(Vector&, int32_t) const;
   void trainThread(int32_t, const TrainCallback& callback);
   std::vector<std::pair<real, std::string>> getNN(

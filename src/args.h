@@ -73,6 +73,8 @@ class Args {
   int cropMax;
   std::string cropUnit;
   double normProb;
+  bool saveEpochs;
+  std::string validation;
   int thread;
   double t;
   std::string label;

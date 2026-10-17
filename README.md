@@ -116,6 +116,11 @@ data and with staged training:
   and the normalized form of the data. It runs after the crop. The removed set
   is generated from the `regex` module by `tools/gen_norm_table.py`; on 50,000
   CommonLID lines the output equals the Python cleaner's.
+- `-saveEpochs` and `-validation dev.txt`: after every epoch, save the model so
+  far as `OUTPUT.epN.bin` and print precision@1 on a labeled file, to see when
+  more epochs stop helping. The learning-rate schedule is unchanged (it still
+  decays over all `-epoch` epochs); the snapshots are written while training
+  continues and need `-thread` above 1.
 - `-inputModel model.bin`: continue training a saved supervised model on new
   data, for example a mix of short and long lines. The model's features and
   architecture are kept; `-lr`, `-epoch`, `-thread`, `-seed` and the crop
