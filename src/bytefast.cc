@@ -375,6 +375,7 @@ void ByteFast::quantize(const Args& qargs, const TrainCallback& callback) {
       args_->verbose = qargs.verbose;
       auto loss = createLoss(output_);
       model_ = std::make_shared<Model>(input, output, loss, normalizeGradient);
+      trainTokens_ = dict_->ntokens();
       startThreads(callback);
     }
   }
@@ -658,7 +659,7 @@ void ByteFast::trainThread(int32_t threadId, const TrainCallback& callback) {
 
   Model::State state(args_->dim, output_->size(0), threadId + args_->seed);
 
-  const int64_t ntokens = dict_->ntokens();
+  const int64_t ntokens = trainTokens_;
   int64_t localTokenCount = 0;
   std::vector<int32_t> line, labels;
   uint64_t callbackCounter = 0;
@@ -675,7 +676,7 @@ void ByteFast::trainThread(int32_t threadId, const TrainCallback& callback) {
       }
       real lr = args_->lr * (1.0 - progress);
       if (args_->model == model_name::sup) {
-        localTokenCount += dict_->getLine(ifs, line, labels);
+        localTokenCount += dict_->getLine(ifs, line, labels, state.rng);
         supervised(state, lr, line, labels);
       } else if (args_->model == model_name::cbow) {
         localTokenCount += dict_->getLine(ifs, line, state.rng);
@@ -765,6 +766,10 @@ std::shared_ptr<Matrix> ByteFast::createTrainOutputMatrix() const {
 
 void ByteFast::train(const Args& args, const TrainCallback& callback) {
   args.validate();
+  if (!args.inputModel.empty()) {
+    continueTraining(args, callback);
+    return;
+  }
   args_ = std::make_shared<Args>(args);
   dict_ = std::make_shared<Dictionary>(args_);
   if (args_->input == "-") {
@@ -778,6 +783,7 @@ void ByteFast::train(const Args& args, const TrainCallback& callback) {
   }
   dict_->readFromFile(ifs);
   ifs.close();
+  trainTokens_ = dict_->ntokens();
 
   if (!args_->pretrainedVectors.empty()) {
     input_ = getInputMatrixFromFile(args_->pretrainedVectors);
@@ -789,6 +795,53 @@ void ByteFast::train(const Args& args, const TrainCallback& callback) {
   auto loss = createLoss(output_);
   bool normalizeGradient = (args_->model == model_name::sup);
   model_ = std::make_shared<Model>(input_, output_, loss, normalizeGradient);
+  startThreads(callback);
+}
+
+// Continue training a saved supervised model on args.input. The model's
+// dictionary, features and architecture are kept; the training schedule
+// (input, lr, epoch, threads, seed, cropping) comes from args. Lines whose
+// labels the model does not know are skipped.
+void ByteFast::continueTraining(const Args& args, const TrainCallback& callback) {
+  loadModel(args.inputModel);
+  if (quant_) {
+    throw std::invalid_argument("-inputModel cannot be a quantized model");
+  }
+  if (args_->model != model_name::sup || args.model != model_name::sup) {
+    throw std::invalid_argument("-inputModel only applies to supervised models");
+  }
+  // The dictionary shares args_, so update it in place.
+  args_->input = args.input;
+  args_->output = args.output;
+  args_->lr = args.lr;
+  args_->lrUpdateRate = args.lrUpdateRate;
+  args_->epoch = args.epoch;
+  args_->thread = args.thread;
+  args_->seed = args.seed;
+  args_->verbose = args.verbose;
+  args_->saveOutput = args.saveOutput;
+  args_->inputModel = args.inputModel;
+  args_->cropProb = args.cropProb;
+  args_->cropMin = args.cropMin;
+  args_->cropMax = args.cropMax;
+  args_->cropUnit = args.cropUnit;
+  if (args_->input == "-") {
+    throw std::invalid_argument("Cannot use stdin for training!");
+  }
+  std::ifstream ifs(args_->input);
+  if (!ifs.is_open()) {
+    throw std::invalid_argument(
+        args_->input + " cannot be opened for training!");
+  }
+  trainTokens_ = dict_->countTokens(ifs);
+  ifs.close();
+  if (trainTokens_ == 0) {
+    throw std::invalid_argument(args_->input + " is empty");
+  }
+  if (args_->verbose > 0) {
+    std::cerr << "Continuing " << args_->inputModel << " on "
+              << trainTokens_ / 1000000 << "M tokens" << std::endl;
+  }
   startThreads(callback);
 }
 
@@ -814,7 +867,7 @@ void ByteFast::startThreads(const TrainCallback& callback) {
     // webassembly can't instantiate `std::thread`
     trainThread(0, callback);
   }
-  const int64_t ntokens = dict_->ntokens();
+  const int64_t ntokens = trainTokens_;
   // Same condition as trainThread
   while (keepTraining(ntokens)) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));

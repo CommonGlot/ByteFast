@@ -435,15 +435,21 @@ void Dictionary::addHashedWord(
 void Dictionary::addTextNgrams(
     std::vector<int32_t>& line,
     const std::vector<std::string>& tokens) const {
-  if ((args_->maxb <= 0 && args_->maxc <= 0) || tokens.empty()) {
+  if (args_->maxb <= 0 && args_->maxc <= 0) {
     return;
   }
   std::string joined;
   for (const auto& token : tokens) {
+    if (token == EOS) {
+      continue;
+    }
     if (!joined.empty()) {
       joined.push_back(' ');
     }
     joined += token;
+  }
+  if (joined.empty()) {
+    return;
   }
   std::string padded = " ";
   padded += text::truncateUtf8(joined, args_->maxBytes);
@@ -494,86 +500,164 @@ int32_t Dictionary::getLine(
   return ntokens;
 }
 
-int32_t Dictionary::getLine(
+// Reads one supervised line: folded non-label tokens (ending with EOS when
+// the line ends with a newline) and the ids of its known labels.
+int32_t Dictionary::readLine(
     std::istream& in,
-    std::vector<int32_t>& words,
+    std::vector<std::string>& tokens,
     std::vector<int32_t>& labels) const {
-  std::vector<int32_t> word_hashes;
-  std::vector<std::string> tokens;
-  const bool textNgrams = args_->maxb > 0 || args_->maxc > 0;
   std::string token;
   int32_t ntokens = 0;
 
   reset(in);
-  words.clear();
+  tokens.clear();
   labels.clear();
   while (readWord(in, token)) {
     normalize(token);
-    uint32_t h = hash(token);
-    int32_t wid = getId(token, h);
-    entry_type type = wid < 0 ? getType(token) : getType(wid);
-
     ntokens++;
-    if (type == entry_type::word) {
-      addSubwords(words, token, wid);
-      if (wid < 0) {
-        addHashedWord(words, token);
-      }
-      word_hashes.push_back(h);
-      if (textNgrams && token != EOS) {
-        tokens.push_back(token);
-      }
-    } else if (type == entry_type::label && wid >= 0) {
-      labels.push_back(wid - nwords_);
-    }
+    addToken(token, tokens, labels);
     if (token == EOS) {
       break;
     }
   }
+  return ntokens;
+}
+
+void Dictionary::addToken(
+    const std::string& token,
+    std::vector<std::string>& tokens,
+    std::vector<int32_t>& labels) const {
+  if (getType(token) == entry_type::label) {
+    int32_t wid = getId(token);
+    if (wid >= 0) {
+      labels.push_back(wid - nwords_);
+    }
+  } else {
+    tokens.push_back(token);
+  }
+}
+
+void Dictionary::addFeatures(
+    const std::vector<std::string>& tokens,
+    std::vector<int32_t>& words) const {
+  std::vector<int32_t> word_hashes;
+  words.clear();
+  for (const auto& token : tokens) {
+    uint32_t h = hash(token);
+    int32_t wid = getId(token, h);
+    addSubwords(words, token, wid);
+    if (wid < 0) {
+      addHashedWord(words, token);
+    }
+    word_hashes.push_back(h);
+  }
   addWordNgrams(words, word_hashes, args_->wordNgrams);
   addTextNgrams(words, tokens);
+}
+
+int32_t Dictionary::getLine(
+    std::istream& in,
+    std::vector<int32_t>& words,
+    std::vector<int32_t>& labels) const {
+  std::vector<std::string> tokens;
+  int32_t ntokens = readLine(in, tokens, labels);
+  addFeatures(tokens, words);
   return ntokens;
+}
+
+// Training variant: with probability -cropProb, keep only a random
+// contiguous span of -cropMin..-cropMax characters or words of the line.
+int32_t Dictionary::getLine(
+    std::istream& in,
+    std::vector<int32_t>& words,
+    std::vector<int32_t>& labels,
+    std::minstd_rand& rng) const {
+  std::vector<std::string> tokens;
+  int32_t ntokens = readLine(in, tokens, labels);
+  if (args_->cropProb > 0 &&
+      std::uniform_real_distribution<>(0, 1)(rng) < args_->cropProb) {
+    cropTokens(tokens, rng);
+  }
+  addFeatures(tokens, words);
+  return ntokens;
+}
+
+void Dictionary::cropTokens(
+    std::vector<std::string>& tokens,
+    std::minstd_rand& rng) const {
+  const bool eos = !tokens.empty() && tokens.back() == EOS;
+  if (eos) {
+    tokens.pop_back();
+  }
+  const int32_t length =
+      std::uniform_int_distribution<int32_t>(args_->cropMin, args_->cropMax)(rng);
+  if (args_->cropUnit == "word") {
+    if (length < static_cast<int32_t>(tokens.size())) {
+      auto first = tokens.begin() +
+          std::uniform_int_distribution<size_t>(0, tokens.size() - length)(rng);
+      tokens = std::vector<std::string>(first, first + length);
+    }
+  } else {
+    std::string joined;
+    for (const auto& token : tokens) {
+      if (!joined.empty()) {
+        joined.push_back(' ');
+      }
+      joined += token;
+    }
+    std::vector<size_t> starts;
+    for (size_t i = 0; i < joined.size(); i++) {
+      if (!text::isContinuation(static_cast<uint8_t>(joined[i]))) {
+        starts.push_back(i);
+      }
+    }
+    if (length < static_cast<int32_t>(starts.size())) {
+      const size_t first =
+          std::uniform_int_distribution<size_t>(0, starts.size() - length)(rng);
+      const size_t begin = starts[first];
+      const size_t end = first + length < starts.size() ? starts[first + length]
+                                                        : joined.size();
+      std::string_view span(joined.data() + begin, end - begin), word;
+      tokens.clear();
+      while (readWordNoNewline(span, word)) {
+        tokens.emplace_back(word);
+      }
+    }
+  }
+  if (eos) {
+    tokens.push_back(EOS);
+  }
+}
+
+int64_t Dictionary::countTokens(std::istream& in) const {
+  std::string word;
+  int64_t n = 0;
+  while (readWord(in, word)) {
+    n++;
+  }
+  return n;
 }
 
 int32_t Dictionary::getStringNoNewline(
     std::string_view in,
     std::vector<int32_t>& words,
     std::vector<int32_t>& labels) const {
-  std::vector<int32_t> word_hashes;
   std::vector<std::string> tokens;
-  const bool textNgrams = args_->maxb > 0 || args_->maxc > 0;
   std::string_view view;
   std::string token;
   int32_t ntokens = 0;
 
-  words.clear();
   labels.clear();
   while (readWordNoNewline(in, view)) {
     token.assign(view.data(), view.size());
     normalize(token);
-    uint32_t h = hash(token);
-    int32_t wid = getId(token, h);
-    entry_type type = wid < 0 ? getType(token) : getType(wid);
-
     ntokens++;
-    if (type == entry_type::word) {
-      addSubwords(words, token, wid);
-      if (wid < 0) {
-        addHashedWord(words, token);
-      }
-      word_hashes.push_back(h);
-      if (textNgrams && token != EOS) {
-        tokens.push_back(token);
-      }
-    } else if (type == entry_type::label && wid >= 0) {
-      labels.push_back(wid - nwords_);
-    }
+    addToken(token, tokens, labels);
     if (token == EOS) {
       break;
     }
   }
-  addWordNgrams(words, word_hashes, args_->wordNgrams);
-  addTextNgrams(words, tokens);
+  addFeatures(tokens, words);
   return ntokens;
 }
 

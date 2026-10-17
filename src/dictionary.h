@@ -50,6 +50,13 @@ class Dictionary {
       const;
   void applyWordlist();
   void applyMaxVocab();
+  int32_t readLine(std::istream&, std::vector<std::string>&,
+      std::vector<int32_t>&) const;
+  void addToken(const std::string&, std::vector<std::string>&,
+      std::vector<int32_t>&) const;
+  void addFeatures(const std::vector<std::string>&, std::vector<int32_t>&)
+      const;
+  void cropTokens(std::vector<std::string>&, std::minstd_rand&) const;
 
   std::shared_ptr<Args> args_;
   std::vector<int32_t> word2int_;
@@ -106,6 +113,9 @@ class Dictionary {
       const;
   int32_t getLine(std::istream&, std::vector<int32_t>&, std::minstd_rand&)
       const;
+  int32_t getLine(std::istream&, std::vector<int32_t>&, std::vector<int32_t>&,
+      std::minstd_rand&) const;
+  int64_t countTokens(std::istream&) const;
   int32_t getStringNoNewline(std::string_view, std::vector<int32_t>&,
       std::vector<int32_t>&) const;
   void threshold(int64_t, int64_t);

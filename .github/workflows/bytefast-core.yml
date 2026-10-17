@@ -64,6 +64,17 @@ jobs:
             ./bytefast test /tmp/core.ftz /tmp/core-test.txt
           done
           head -c 4 /tmp/core.bin | od -c | head -1
+      - name: Span cropping and continued training
+        run: |
+          set -e
+          ./bytefast supervised -input /tmp/core-train.txt -output /tmp/base -minb 2 -maxb 5 -bucket 100000 \
+            -dim 16 -epoch 5 -lr 0.5 -thread 2 -verbose 0 -cropProb 0.5 -cropMin 1 -cropMax 3 -cropUnit word
+          ./bytefast supervised -input /tmp/core-train.txt -output /tmp/base-char -minc 1 -maxc 4 -bucket 100000 \
+            -minCount 1000000000 -dim 16 -epoch 5 -lr 0.5 -thread 2 -verbose 0 -cropProb 0.5 -cropMin 3 -cropMax 20
+          ./bytefast supervised -input /tmp/core-test.txt -output /tmp/continued -inputModel /tmp/base.bin \
+            -epoch 2 -lr 0.05 -thread 2 -verbose 1 -cropProb 0.7 -cropMax 2 -cropUnit word
+          ./bytefast dump /tmp/continued.bin args | grep -x "dim 16"
+          ./bytefast test /tmp/continued.bin /tmp/core-test.txt
       - name: Build Python package
         run: |
           python -m pip install --upgrade pip

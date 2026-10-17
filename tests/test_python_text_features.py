@@ -84,9 +84,31 @@ def main():
         capped = train(data, max_vocab=5, minn=2, maxn=4)
         assert len(capped.get_words()) == 5
 
+        # Span cropping during training, and continued training from a model.
+        cropped = train(data, minb=2, maxb=5, bucket=50000, crop_prob=0.5,
+                        crop_min=1, crop_max=3, crop_unit="word")
+        assert cropped.predict("goal")[0][0].startswith("__label__")
+        chars = train(data, minc=1, maxc=4, bucket=50000, minCount=10 ** 9,
+                      crop_prob=0.5, crop_min=5, crop_max=30, crop_unit="char")
+        assert chars.predict("telescope")[0][0].startswith("__label__")
+        base_path = root / "base.bin"
+        cropped.save_model(str(base_path))
+        continued = bytefast.train_supervised(
+            input=str(data), input_model=str(base_path), epoch=2, lr=0.05,
+            dim=99, bucket=7, crop_prob=0.7, crop_max=2, crop_unit="word",
+            thread=1, verbose=0)
+        args = continued.f.getArgs()
+        # Architecture and features come from the input model.
+        assert (args.dim, args.bucket, args.minb, args.maxb) == (16, 50000, 2, 5)
+        assert continued.get_labels() == cropped.get_labels()
+        assert continued.predict(query)[0] == ("__label__sports",)
+
         for bad in ({"fold": "upper"}, {"minb": 3, "maxb": 2},
                     {"minc": 0, "maxc": 3}, {"maxb": 4, "minb": 1, "bucket": 0},
-                    {"max_bytes": -1}):
+                    {"max_bytes": -1}, {"crop_prob": 1.5},
+                    {"crop_prob": 0.5, "crop_max": 0},
+                    {"crop_prob": 0.5, "crop_max": 3, "crop_unit": "token"},
+                    {"input_model": str(root / "missing.bin")}):
             try:
                 train(data, **bad)
             except ValueError:

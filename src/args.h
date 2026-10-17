@@ -64,6 +64,12 @@ class Args {
   bool hashWords;
   std::string wordlist;
   int maxVocab;
+  // Training only (not stored in models).
+  std::string inputModel;
+  double cropProb;
+  int cropMin;
+  int cropMax;
+  std::string cropUnit;
   int thread;
   double t;
   std::string label;

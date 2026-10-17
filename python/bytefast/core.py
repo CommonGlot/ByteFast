@@ -500,6 +500,11 @@ unsupervised_default = {
     "hashWords": False,
     "wordlist": "",
     "maxVocab": 0,
+    "inputModel": "",
+    "cropProb": 0.0,
+    "cropMin": 1,
+    "cropMax": 0,
+    "cropUnit": "char",
     "autotuneValidationFile": "",
     "autotuneMetric": "f1",
     "autotunePredictions": 1,
@@ -519,6 +524,11 @@ def read_args(arg_list, arg_dict, arg_names, default_values):
         "max_bytes": "maxBytes",
         "hash_words": "hashWords",
         "max_vocab": "maxVocab",
+        "input_model": "inputModel",
+        "crop_prob": "cropProb",
+        "crop_min": "cropMin",
+        "crop_max": "cropMax",
+        "crop_unit": "cropUnit",
     }
 
     ret = {}
@@ -563,6 +573,15 @@ def train_supervised(*kargs, **kwargs):
     Set maxb/maxc to 0 to disable text n-grams, and minCount above the corpus
     size to disable word vectors. Models that use only fastText features are
     saved in the original fastText format.
+
+    Training options:
+
+    - crop_prob/crop_min/crop_max/crop_unit: with probability crop_prob, train
+      on a random contiguous span of crop_min..crop_max characters ('char')
+      or words ('word') of a line instead of the whole line
+    - input_model: continue training a saved supervised model on input; the
+      model's features and architecture are kept, and lr, epoch, thread,
+      seed and the crop options apply to the new run
     """
     supervised_default = unsupervised_default.copy()
     supervised_default.update(
@@ -606,6 +625,11 @@ def train_supervised(*kargs, **kwargs):
         "hashWords",
         "wordlist",
         "maxVocab",
+        "inputModel",
+        "cropProb",
+        "cropMin",
+        "cropMax",
+        "cropUnit",
         "autotuneValidationFile",
         "autotuneMetric",
         "autotunePredictions",

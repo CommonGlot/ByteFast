@@ -48,6 +48,8 @@ class ByteFast {
   bool quant_;
   int32_t version;
   bool textFeatures_ = false;
+  // Tokens per epoch of the current training input.
+  int64_t trainTokens_ = 0;
   std::unique_ptr<DenseMatrix> wordVectors_;
   std::exception_ptr trainException_;
 
@@ -156,6 +158,7 @@ class ByteFast {
       const std::string& wordC);
 
   void train(const Args& args, const TrainCallback& callback = {});
+  void continueTraining(const Args& args, const TrainCallback& callback = {});
 
   void abort();
 

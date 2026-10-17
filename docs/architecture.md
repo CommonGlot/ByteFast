@@ -49,6 +49,11 @@ word and subword hashes are unchanged, so fastText models keep working.
   can be combined. `-hashWords` gives every other word a hashed vector, so
   the vocabulary decides which words get their own row, not which words are
   seen.
+- **Training-only options.** `-cropProb/-cropMin/-cropMax/-cropUnit` change
+  what a training step sees, never prediction. `-inputModel` reloads the
+  dictionary, features and weights of a supervised model and only takes the
+  training schedule from the command line; the learning-rate schedule is
+  computed from the new input's token count.
 - **File format.** A model is written in the fastText format unless it uses
   a ByteFast-only feature. Otherwise the header is `BFCM` and a versioned
   block with the text-feature settings follows the fastText arguments.
@@ -66,6 +71,7 @@ Each axis is a set of flags; nothing else changes between runs.
 | E. Capacity | `-bucket` 2^18 / 2^20 / 2^22 × `-dim` 32 / 64 / 128 / 256 |
 | F. Loss | `softmax` / `one-vs-all` / `hs` |
 | G. Compression | `quantize` with `-cutoff`, `-qnorm`, `-qout`; accuracy against model size |
+| I. Short inputs | `-cropProb` 0 / 0.3 / 0.7 with `-cropUnit char` (`-cropMax` 20) or `word` (`-cropMax` 5); from scratch, or as a second stage with `-inputModel` |
 | H. Prototype | `bytefast.proto` byte model ± statistical lexicon and learned fusion, against the same budget in the core |
 
 Training settings (`-epoch`, `-lr`, `-thread`) are tuned per variant on the

@@ -41,6 +41,11 @@ Args::Args() {
   hashWords = false;
   wordlist = "";
   maxVocab = 0;
+  inputModel = "";
+  cropProb = 0.0;
+  cropMin = 1;
+  cropMax = 0;
+  cropUnit = "char";
   thread = 12;
   lrUpdateRate = 100;
   t = 1e-4;
@@ -225,6 +230,16 @@ void Args::parseArgs(const std::vector<std::string>& args) {
         wordlist = std::string(args.at(ai + 1));
       } else if (args[ai] == "-maxVocab") {
         maxVocab = std::stoi(args.at(ai + 1));
+      } else if (args[ai] == "-inputModel") {
+        inputModel = std::string(args.at(ai + 1));
+      } else if (args[ai] == "-cropProb") {
+        cropProb = std::stod(args.at(ai + 1));
+      } else if (args[ai] == "-cropMin") {
+        cropMin = std::stoi(args.at(ai + 1));
+      } else if (args[ai] == "-cropMax") {
+        cropMax = std::stoi(args.at(ai + 1));
+      } else if (args[ai] == "-cropUnit") {
+        cropUnit = std::string(args.at(ai + 1));
       } else if (args[ai] == "-thread") {
         thread = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-t") {
@@ -324,6 +339,18 @@ void Args::validate() const {
     throw std::invalid_argument(
         "-minb/-maxb, -minc/-maxc and -hashWords need -bucket > 0");
   }
+  if (!(cropProb >= 0.0 && cropProb <= 1.0)) {
+    throw std::invalid_argument("-cropProb must be in [0, 1]");
+  }
+  if (cropProb > 0.0 && (cropMin < 1 || cropMax < cropMin)) {
+    throw std::invalid_argument("-cropProb needs 1 <= cropMin <= cropMax");
+  }
+  if (cropUnit != "char" && cropUnit != "word") {
+    throw std::invalid_argument("-cropUnit must be char or word");
+  }
+  if (!inputModel.empty() && hasAutotune()) {
+    throw std::invalid_argument("-inputModel cannot be combined with autotune");
+  }
 }
 
 void Args::printHelp() {
@@ -373,6 +400,11 @@ void Args::printDictionaryHelp() {
             << wordlist << "]\n"
             << "  -maxVocab           keep at most this many words, 0 = no limit ["
             << maxVocab << "]\n"
+            << "  -cropProb           probability of training on a random span of a line ["
+            << cropProb << "]\n"
+            << "  -cropMin            min span length [" << cropMin << "]\n"
+            << "  -cropMax            max span length [" << cropMax << "]\n"
+            << "  -cropUnit           span unit: char or word [" << cropUnit << "]\n"
             << "  -t                  sampling threshold [" << t << "]\n"
             << "  -label              labels prefix [" << label << "]\n";
 }
@@ -396,6 +428,11 @@ void Args::printTrainingHelp() {
       << "  -pretrainedVectors  pretrained word vectors for supervised "
          "learning ["
       << pretrainedVectors << "]\n"
+      << "  -inputModel         continue training this supervised model; its "
+         "features\n"
+      << "                      and architecture are kept, -lr/-epoch/-thread "
+         "are new ["
+      << inputModel << "]\n"
       << "  -saveOutput         whether output params should be saved ["
       << boolToString(saveOutput) << "]\n"
       << "  -seed               random generator seed  [" << seed << "]\n";

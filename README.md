@@ -99,6 +99,17 @@ layer maps that average to the labels.
 - **Hashed features** (`-hashWords`, subwords, word n-grams and text n-grams)
   share the `-bucket` table.
 
+Two training options help with inputs shorter than the training data and with
+staged training:
+
+- `-cropProb P -cropMin N -cropMax M -cropUnit char|word`: with probability `P`,
+  a training line is replaced by a random contiguous span of `N`–`M`
+  characters or words (prediction is unaffected).
+- `-inputModel model.bin`: continue training a saved supervised model on new
+  data, for example a mix of short and long lines. The model's features and
+  architecture are kept; `-lr`, `-epoch`, `-thread`, `-seed` and the crop
+  options apply to the new run.
+
 `./bytefast supervised -h` lists every option. In Python the same names are
 keyword arguments of `bytefast.train_supervised`, with snake_case aliases
 such as `hash_words`, `max_bytes` and `max_vocab`.
