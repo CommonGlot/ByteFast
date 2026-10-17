@@ -65,12 +65,14 @@ class Args {
   std::string wordlist;
   int maxVocab;
   int posBins;
+  std::string textScope;
   // Training only (not stored in models).
   std::string inputModel;
   double cropProb;
   int cropMin;
   int cropMax;
   std::string cropUnit;
+  double normProb;
   int thread;
   double t;
   std::string label;

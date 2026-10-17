@@ -29,6 +29,7 @@ set(HEADER_FILES
     src/matrix.h
     src/meter.h
     src/model.h
+    src/norm_table.h
     src/productquantizer.h
     src/quantmatrix.h
     src/real.h

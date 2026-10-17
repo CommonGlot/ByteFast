@@ -42,11 +42,13 @@ Args::Args() {
   wordlist = "";
   maxVocab = 0;
   posBins = 0;
+  textScope = "line";
   inputModel = "";
   cropProb = 0.0;
   cropMin = 1;
   cropMax = 0;
   cropUnit = "char";
+  normProb = 0.0;
   thread = 12;
   lrUpdateRate = 100;
   t = 1e-4;
@@ -231,6 +233,8 @@ void Args::parseArgs(const std::vector<std::string>& args) {
         wordlist = std::string(args.at(ai + 1));
       } else if (args[ai] == "-maxVocab") {
         maxVocab = std::stoi(args.at(ai + 1));
+      } else if (args[ai] == "-textScope") {
+        textScope = std::string(args.at(ai + 1));
       } else if (args[ai] == "-posBins") {
         posBins = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-inputModel") {
@@ -241,6 +245,8 @@ void Args::parseArgs(const std::vector<std::string>& args) {
         cropMin = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-cropMax") {
         cropMax = std::stoi(args.at(ai + 1));
+      } else if (args[ai] == "-normProb") {
+        normProb = std::stod(args.at(ai + 1));
       } else if (args[ai] == "-cropUnit") {
         cropUnit = std::string(args.at(ai + 1));
       } else if (args[ai] == "-thread") {
@@ -318,7 +324,7 @@ void Args::parseArgs(const std::vector<std::string>& args) {
 
 bool Args::usesTextFeatures() const {
   return maxb > 0 || maxc > 0 || maxBytes > 0 || fold != fold_name::none ||
-      hashWords || posBins > 0;
+      hashWords || posBins > 0 || textScope != "line";
 }
 
 bool Args::usesHashedFeatures() const {
@@ -348,14 +354,20 @@ void Args::validate() const {
     throw std::invalid_argument(
         "-minb/-maxb, -minc/-maxc and -hashWords need -bucket > 0");
   }
+  if (!(normProb >= 0.0 && normProb <= 1.0)) {
+    throw std::invalid_argument("-normProb must be in [0, 1]");
+  }
   if (!(cropProb >= 0.0 && cropProb <= 1.0)) {
     throw std::invalid_argument("-cropProb must be in [0, 1]");
   }
   if (cropProb > 0.0 && (cropMin < 1 || cropMax < cropMin)) {
     throw std::invalid_argument("-cropProb needs 1 <= cropMin <= cropMax");
   }
-  if (cropUnit != "char" && cropUnit != "word") {
-    throw std::invalid_argument("-cropUnit must be char or word");
+  if (cropUnit != "char" && cropUnit != "word" && cropUnit != "byte") {
+    throw std::invalid_argument("-cropUnit must be char, word or byte");
+  }
+  if (textScope != "line" && textScope != "word") {
+    throw std::invalid_argument("-textScope must be line or word");
   }
   if (!inputModel.empty() && hasAutotune()) {
     throw std::invalid_argument("-inputModel cannot be combined with autotune");
@@ -411,11 +423,16 @@ void Args::printDictionaryHelp() {
             << maxVocab << "]\n"
             << "  -posBins            also hash text n-grams with their position bin, 0 = off ["
             << posBins << "]\n"
+            << "  -textScope          text n-grams over the line (with spaces) or inside words ["
+            << textScope << "]\n"
             << "  -cropProb           probability of training on a random span of a line ["
             << cropProb << "]\n"
             << "  -cropMin            min span length [" << cropMin << "]\n"
             << "  -cropMax            max span length [" << cropMax << "]\n"
-            << "  -cropUnit           span unit: char or word [" << cropUnit << "]\n"
+            << "  -cropUnit           span unit: char, word or byte [" << cropUnit << "]\n"
+            << "  -normProb           probability of training on the CommonLID-style\n"
+            << "                      normalized line (lowercase, no digits/punctuation) ["
+            << normProb << "]\n"
             << "  -t                  sampling threshold [" << t << "]\n"
             << "  -label              labels prefix [" << label << "]\n";
 }
@@ -515,7 +532,7 @@ void Args::load(std::istream& in) {
 // Text-feature settings, stored after the fastText fields in ByteFast
 // model files. The leading version allows the block to grow.
 void Args::saveTextFeatures(std::ostream& out) const {
-  const int32_t version = 2;
+  const int32_t version = 3;
   const int32_t foldValue = static_cast<int32_t>(fold);
   const int32_t hashWordsValue = hashWords ? 1 : 0;
   out.write((char*)&(version), sizeof(int32_t));
@@ -528,12 +545,14 @@ void Args::saveTextFeatures(std::ostream& out) const {
   out.write((char*)&(hashWordsValue), sizeof(int32_t));
   out.write((char*)&(maxVocab), sizeof(int));
   out.write((char*)&(posBins), sizeof(int));
+  const int32_t scopeValue = textScope == "word" ? 1 : 0;
+  out.write((char*)&(scopeValue), sizeof(int32_t));
 }
 
 void Args::loadTextFeatures(std::istream& in) {
   int32_t version, foldValue, hashWordsValue;
   in.read((char*)&(version), sizeof(int32_t));
-  if (!in || version < 1 || version > 2) {
+  if (!in || version < 1 || version > 3) {
     throw std::invalid_argument("Unsupported ByteFast text feature block");
   }
   in.read((char*)&(minb), sizeof(int));
@@ -547,6 +566,12 @@ void Args::loadTextFeatures(std::istream& in) {
   posBins = 0;
   if (version >= 2) {
     in.read((char*)&(posBins), sizeof(int));
+  }
+  textScope = "line";
+  if (version >= 3) {
+    int32_t scopeValue = 0;
+    in.read((char*)&(scopeValue), sizeof(int32_t));
+    textScope = scopeValue == 1 ? "word" : "line";
   }
   if (!in || foldValue < 0 || foldValue > 2) {
     throw std::invalid_argument("Corrupt ByteFast text feature block");
@@ -593,6 +618,7 @@ void Args::dump(std::ostream& out) const {
     out << "hashWords " << boolToString(hashWords) << std::endl;
     out << "maxVocab " << maxVocab << std::endl;
     out << "posBins " << posBins << std::endl;
+    out << "textScope " << textScope << std::endl;
   }
 }
 

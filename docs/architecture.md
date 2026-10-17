@@ -49,7 +49,8 @@ word and subword hashes are unchanged, so fastText models keep working.
   can be combined. `-hashWords` gives every other word a hashed vector, so
   the vocabulary decides which words get their own row, not which words are
   seen.
-- **Training-only options.** `-cropProb/-cropMin/-cropMax/-cropUnit` change
+- **Training-only options.** `-cropProb/-cropMin/-cropMax/-cropUnit` and
+  `-normProb` change
   what a training step sees, never prediction. `-inputModel` reloads the
   dictionary, features and weights of a supervised model and only takes the
   training schedule from the command line; the learning-rate schedule is

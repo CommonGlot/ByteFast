@@ -88,11 +88,13 @@ layer maps that average to the labels.
 | Bytes of text read by text n-grams | `-maxBytes N` | 0 (all) |
 | Case folding | `-fold none\|ascii\|unicode` | `none` |
 | Position bins for text n-grams | `-posBins K` | 0 (off) |
+| Scope of text n-grams | `-textScope line\|word` | `line` |
 
 - **Text n-grams** read the words of a line joined by single spaces, with one
   space added at each end. So an n-gram can span the end of one word and the
   start of the next, and the first and last words get the same boundary
-  n-grams as the others.
+  n-grams as the others. With `-textScope word`, text n-grams are taken
+  inside each word only, with no padding, so none of them contains a space.
 - **`-wordlist FILE`** restricts the vocabulary to the first field of each line
   in `FILE`, folded like the input. Words outside it can still contribute
   through `-hashWords`, subwords or text n-grams.
@@ -100,16 +102,24 @@ layer maps that average to the labels.
 - **Hashed features** (`-hashWords`, subwords, word n-grams and text n-grams)
   share the `-bucket` table.
 
-Two training options help with inputs shorter than the training data and with
-staged training:
+These training options help with inputs shorter or noisier than the training
+data and with staged training:
 
-- `-cropProb P -cropMin N -cropMax M -cropUnit char|word`: with probability `P`,
-  a training line is replaced by a random contiguous span of `N`–`M`
-  characters or words (prediction is unaffected).
+- `-cropProb P -cropMin N -cropMax M -cropUnit char|word|byte`: with
+  probability `P`, a training line is replaced by a random contiguous span of
+  `N`–`M` characters, words or bytes (prediction is unaffected). Byte crops
+  never split a UTF-8 character.
+- `-normProb P`: with probability `P`, a training line is normalized like the
+  OpenLID-v2 / CommonLID input cleaner: Unicode lowercase, then digits and
+  every character matching `[^\p{Word}\p{Zs}]` removed. Lines are drawn
+  again every epoch, so the model sees both the original (cased, punctuated)
+  and the normalized form of the data. It runs after the crop. The removed set
+  is generated from the `regex` module by `tools/gen_norm_table.py`; on 50,000
+  CommonLID lines the output equals the Python cleaner's.
 - `-inputModel model.bin`: continue training a saved supervised model on new
   data, for example a mix of short and long lines. The model's features and
   architecture are kept; `-lr`, `-epoch`, `-thread`, `-seed` and the crop
-  options apply to the new run.
+  and `-normProb` options apply to the new run.
 
 `./bytefast supervised -h` lists every option. In Python the same names are
 keyword arguments of `bytefast.train_supervised`, with snake_case aliases

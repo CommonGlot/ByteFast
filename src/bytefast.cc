@@ -825,6 +825,7 @@ void ByteFast::continueTraining(const Args& args, const TrainCallback& callback)
   args_->cropMin = args.cropMin;
   args_->cropMax = args.cropMax;
   args_->cropUnit = args.cropUnit;
+  args_->normProb = args.normProb;
   if (args_->input == "-") {
     throw std::invalid_argument("Cannot use stdin for training!");
   }

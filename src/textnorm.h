@@ -11,6 +11,7 @@
 #include <string>
 #include <string_view>
 
+#include "norm_table.h"
 #include "unicode_fold.h"
 
 namespace bytefast {
@@ -123,6 +124,57 @@ inline void fold(std::string& s, fold_name mode) {
       out.append(s, i, len);
     } else {
       appendUtf8(lower, out);
+    }
+    i += len;
+  }
+  s.swap(out);
+}
+
+// Whether the OpenLID-v2 / CommonLID cleaner deletes code point cp
+// (non-word characters and digits; see tools/gen_norm_table.py).
+inline bool normRemoved(uint32_t cp) {
+  int lo = 0, hi = unicode::kNormRemovedSize - 1;
+  while (lo <= hi) {
+    const int mid = (lo + hi) / 2;
+    if (cp < unicode::kNormRemoved[mid].first) {
+      hi = mid - 1;
+    } else if (cp > unicode::kNormRemoved[mid].last) {
+      lo = mid + 1;
+    } else {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Normalize one token like the CommonLID input cleaner: lowercase, then drop
+// non-word characters and digits. Malformed UTF-8 bytes are dropped too.
+inline void normalizeToken(std::string& s) {
+  // Python lowercases U+0130 (capital I with dot) to "i" + U+0307; match it.
+  for (size_t pos = s.find("\xC4\xB0"); pos != std::string::npos;
+       pos = s.find("\xC4\xB0", pos + 3)) {
+    s.replace(pos, 2, "i\xCC\x87");
+  }
+  fold(s, fold_name::unicode);
+  std::string out;
+  out.reserve(s.size());
+  for (size_t i = 0; i < s.size();) {
+    const uint8_t b = static_cast<uint8_t>(s[i]);
+    if (b < 0x80) {
+      if (!normRemoved(b)) {
+        out.push_back(s[i]);
+      }
+      i++;
+      continue;
+    }
+    uint32_t cp = 0;
+    const size_t len = utf8Length(s, i, cp);
+    if (len == 0) {
+      i++;
+      continue;
+    }
+    if (!normRemoved(cp)) {
+      out.append(s, i, len);
     }
     i += len;
   }

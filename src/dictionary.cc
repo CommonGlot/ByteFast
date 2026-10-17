@@ -438,6 +438,24 @@ void Dictionary::addTextNgrams(
   if (args_->maxb <= 0 && args_->maxc <= 0) {
     return;
   }
+  const uint32_t buckets = static_cast<uint32_t>(args_->bucket);
+  if (args_->textScope == "word") {
+    // N-grams inside each word only: no feature contains a space.
+    auto emitWord = [&](uint32_t h, size_t) { pushHash(line, h % buckets); };
+    for (const auto& token : tokens) {
+      if (token == EOS) {
+        continue;
+      }
+      std::string_view word = text::truncateUtf8(token, args_->maxBytes);
+      if (args_->maxb > 0) {
+        text::byteNgrams(word, args_->minb, args_->maxb, emitWord);
+      }
+      if (args_->maxc > 0) {
+        text::charNgrams(word, args_->minc, args_->maxc, emitWord);
+      }
+    }
+    return;
+  }
   std::string joined;
   for (const auto& token : tokens) {
     if (token == EOS) {
@@ -454,7 +472,6 @@ void Dictionary::addTextNgrams(
   std::string padded = " ";
   padded += text::truncateUtf8(joined, args_->maxBytes);
   padded.push_back(' ');
-  const uint32_t buckets = static_cast<uint32_t>(args_->bucket);
   const int bins = args_->posBins;
   const size_t length = padded.size();
   auto emit = [&](uint32_t h, size_t start) {
@@ -586,6 +603,21 @@ int32_t Dictionary::getLine(
       std::uniform_real_distribution<>(0, 1)(rng) < args_->cropProb) {
     cropTokens(tokens, rng);
   }
+  // Normalize after cropping, as when a short input is cleaned before
+  // prediction.
+  if (args_->normProb > 0 &&
+      std::uniform_real_distribution<>(0, 1)(rng) < args_->normProb) {
+    std::vector<std::string> kept;
+    for (auto& token : tokens) {
+      if (token != EOS) {
+        text::normalizeToken(token);
+      }
+      if (!token.empty()) {
+        kept.push_back(std::move(token));
+      }
+    }
+    tokens.swap(kept);
+  }
   addFeatures(tokens, words);
   return ntokens;
 }
@@ -599,7 +631,32 @@ void Dictionary::cropTokens(
   }
   const int32_t length =
       std::uniform_int_distribution<int32_t>(args_->cropMin, args_->cropMax)(rng);
-  if (args_->cropUnit == "word") {
+  if (args_->cropUnit == "byte") {
+    std::string joined;
+    for (const auto& token : tokens) {
+      if (!joined.empty()) {
+        joined.push_back(' ');
+      }
+      joined += token;
+    }
+    if (static_cast<size_t>(length) < joined.size()) {
+      size_t begin = std::uniform_int_distribution<size_t>(0, joined.size() - length)(rng);
+      size_t end = begin + length;
+      // Snap to character boundaries so that no character is split.
+      while (begin < end && text::isContinuation(static_cast<uint8_t>(joined[begin]))) {
+        begin++;
+      }
+      while (end < joined.size() && end > begin &&
+             text::isContinuation(static_cast<uint8_t>(joined[end]))) {
+        end--;
+      }
+      std::string_view span(joined.data() + begin, end - begin), word;
+      tokens.clear();
+      while (readWordNoNewline(span, word)) {
+        tokens.emplace_back(word);
+      }
+    }
+  } else if (args_->cropUnit == "word") {
     if (length < static_cast<int32_t>(tokens.size())) {
       auto first = tokens.begin() +
           std::uniform_int_distribution<size_t>(0, tokens.size() - length)(rng);

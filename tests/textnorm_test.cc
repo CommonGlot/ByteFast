@@ -95,6 +95,26 @@ int main() {
   // Malformed UTF-8 is copied byte by byte.
   assert(folded("A\xFF\xC3", fold_name::unicode) == "a\xFF\xC3");
 
+  // CommonLID-style normalization (expected values from the evaluator's
+  // regex cleaner, applied per whitespace token).
+  auto norm = [](std::string s) {
+    text::normalizeToken(s);
+    return s;
+  };
+  assert(norm("Hello\xE2\x80\x94World,") == "helloworld");
+  assert(norm("Caf\xC3\xA9!") == "caf\xC3\xA9");
+  assert(norm("123").empty());
+  assert(norm("2024!!").empty());
+  assert(norm("\xD0\x9C\xD0\x98\xD0\xA0") == "\xD0\xBC\xD0\xB8\xD1\x80");
+  assert(norm("snake_case") == "snake_case");
+  assert(norm("\xE2\x80\x98quotes\xE2\x80\x99") == "quotes");
+  assert(norm("&").empty());
+  assert(norm("\xD9\xA1\xD9\xA2\xD9\xA3").empty());  // Arabic-Indic digits
+  assert(norm("\xE6\x97\xA5\xE6\x9C\xAC\xE3\x80\x82") == "\xE6\x97\xA5\xE6\x9C\xAC");
+  assert(norm("a\xE2\x80\x8D" "b") == "a\xE2\x80\x8D" "b");  // zero-width joiner is kept
+  assert(norm("x\xCC\x81y") == "x\xCC\x81y");  // combining marks are kept
+  assert(norm("\xC4\xB0zmir") == "i\xCC\x87zmir");  // as Python's str.lower()
+
   // Truncation never splits a character.
   assert(text::truncateUtf8("abcdef", 0) == "abcdef");
   assert(text::truncateUtf8("abcdef", 4) == "abcd");
