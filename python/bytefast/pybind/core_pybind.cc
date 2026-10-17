@@ -113,6 +113,7 @@ PYBIND11_MODULE(_core_pybind, m) {
       .def_readwrite("hashWords", &bytefast::Args::hashWords)
       .def_readwrite("wordlist", &bytefast::Args::wordlist)
       .def_readwrite("maxVocab", &bytefast::Args::maxVocab)
+      .def_readwrite("posBins", &bytefast::Args::posBins)
       .def_readwrite("inputModel", &bytefast::Args::inputModel)
       .def_readwrite("cropProb", &bytefast::Args::cropProb)
       .def_readwrite("cropMin", &bytefast::Args::cropMin)

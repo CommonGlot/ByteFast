@@ -157,7 +157,7 @@ inline uint32_t hashBytes(std::string_view s, uint32_t seed) {
   return fmix32(h);
 }
 
-// Calls emit(hash) for every byte n-gram of length [minN, maxN].
+// Calls emit(hash, start) for every byte n-gram of length [minN, maxN].
 template <typename Emit>
 void byteNgrams(std::string_view s, int minN, int maxN, Emit emit) {
   for (size_t i = 0; i < s.size(); i++) {
@@ -166,13 +166,13 @@ void byteNgrams(std::string_view s, int minN, int maxN, Emit emit) {
       h ^= static_cast<uint8_t>(s[i + n - 1]);
       h *= kFnvPrime;
       if (n >= minN) {
-        emit(fmix32(h ^ static_cast<uint32_t>(n)));
+        emit(fmix32(h ^ static_cast<uint32_t>(n)), i);
       }
     }
   }
 }
 
-// Calls emit(hash) for every n-gram of [minN, maxN] UTF-8 characters.
+// Calls emit(hash, start) for every n-gram of [minN, maxN] UTF-8 characters.
 // A character is a lead byte plus its continuation bytes, so n-grams never
 // start or end inside a multi-byte character.
 template <typename Emit>
@@ -189,10 +189,16 @@ void charNgrams(std::string_view s, int minN, int maxN, Emit emit) {
         h *= kFnvPrime;
       } while (j < s.size() && isContinuation(static_cast<uint8_t>(s[j])));
       if (n >= minN) {
-        emit(fmix32(h ^ static_cast<uint32_t>(n)));
+        emit(fmix32(h ^ static_cast<uint32_t>(n)), i);
       }
     }
   }
+}
+
+// Hash of an n-gram combined with the bin of its start position, so that
+// the same n-gram at the start and at the end of a text are separate features.
+inline uint32_t positionHash(uint32_t h, int bin) {
+  return fmix32(h ^ (0x27D4EB2Fu * static_cast<uint32_t>(bin + 1)));
 }
 
 // Longest prefix of s with at most maxBytes bytes that does not split a

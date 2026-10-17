@@ -20,13 +20,13 @@ namespace {
 
 std::vector<uint32_t> bytes(const std::string& s, int minN, int maxN) {
   std::vector<uint32_t> out;
-  text::byteNgrams(s, minN, maxN, [&](uint32_t h) { out.push_back(h); });
+  text::byteNgrams(s, minN, maxN, [&](uint32_t h, size_t) { out.push_back(h); });
   return out;
 }
 
 std::vector<uint32_t> chars(const std::string& s, int minN, int maxN) {
   std::vector<uint32_t> out;
-  text::charNgrams(s, minN, maxN, [&](uint32_t h) { out.push_back(h); });
+  text::charNgrams(s, minN, maxN, [&](uint32_t h, size_t) { out.push_back(h); });
   return out;
 }
 
@@ -66,6 +66,16 @@ int main() {
          text::hashBytes("bytefast", text::kWordSeed));
   assert(text::hashBytes("a", text::kByteSeed) !=
          text::hashBytes("a", text::kCharSeed));
+
+  // Positions: start offsets are reported, and position hashes differ by bin.
+  std::vector<size_t> starts;
+  text::byteNgrams("abc", 2, 2, [&](uint32_t, size_t i) { starts.push_back(i); });
+  assert((starts == std::vector<size_t>{0, 1}));
+  starts.clear();
+  text::charNgrams(nihongo, 1, 1, [&](uint32_t, size_t i) { starts.push_back(i); });
+  assert((starts == std::vector<size_t>{0, 3, 6}));
+  assert(text::positionHash(42, 0) != text::positionHash(42, 1));
+  assert(text::positionHash(42, 0) != 42u);
 
   // Folding.
   assert(folded("Hello WORLD", fold_name::ascii) == "hello world");

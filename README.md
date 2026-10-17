@@ -87,6 +87,7 @@ layer maps that average to the labels.
 | Character n-grams over the text | `-minc N -maxc N` | off (`maxc 0`) |
 | Bytes of text read by text n-grams | `-maxBytes N` | 0 (all) |
 | Case folding | `-fold none\|ascii\|unicode` | `none` |
+| Position bins for text n-grams | `-posBins K` | 0 (off) |
 
 - **Text n-grams** read the words of a line joined by single spaces, with one
   space added at each end. So an n-gram can span the end of one word and the

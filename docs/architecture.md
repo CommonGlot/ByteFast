@@ -68,6 +68,7 @@ Each axis is a set of flags; nothing else changes between runs.
 | B. Word vectors | none (`-minCount` > corpus); `-minCount` 1 / 5 / 100 / 1000; `-maxVocab` 50k / 200k / 1M; `-wordlist` (frequency or class-discriminative lists); with and without `-hashWords` |
 | C. Word context | `-wordNgrams` 1 / 2 |
 | D. Normalization | `-fold none` / `ascii` / `unicode`; `-maxBytes` 0 / 256 / 512 |
+| D2. Position | `-posBins` 0 / 2 / 4: each text n-gram also emits a feature hashed with the bin of its start position |
 | E. Capacity | `-bucket` 2^18 / 2^20 / 2^22 × `-dim` 32 / 64 / 128 / 256 |
 | F. Loss | `softmax` / `one-vs-all` / `hs` |
 | G. Compression | `quantize` with `-cutoff`, `-qnorm`, `-qout`; accuracy against model size |

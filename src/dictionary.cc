@@ -455,7 +455,15 @@ void Dictionary::addTextNgrams(
   padded += text::truncateUtf8(joined, args_->maxBytes);
   padded.push_back(' ');
   const uint32_t buckets = static_cast<uint32_t>(args_->bucket);
-  auto emit = [&](uint32_t h) { pushHash(line, h % buckets); };
+  const int bins = args_->posBins;
+  const size_t length = padded.size();
+  auto emit = [&](uint32_t h, size_t start) {
+    pushHash(line, h % buckets);
+    if (bins > 0) {
+      const int bin = static_cast<int>(start * bins / length);
+      pushHash(line, text::positionHash(h, bin) % buckets);
+    }
+  };
   if (args_->maxb > 0) {
     text::byteNgrams(padded, args_->minb, args_->maxb, emit);
   }

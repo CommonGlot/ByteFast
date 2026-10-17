@@ -64,6 +64,7 @@ class Args {
   bool hashWords;
   std::string wordlist;
   int maxVocab;
+  int posBins;
   // Training only (not stored in models).
   std::string inputModel;
   double cropProb;
