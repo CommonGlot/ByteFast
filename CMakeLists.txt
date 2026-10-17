@@ -32,6 +32,8 @@ set(HEADER_FILES
     src/productquantizer.h
     src/quantmatrix.h
     src/real.h
+    src/textnorm.h
+    src/unicode_fold.h
     src/utils.h
     src/vector.h)
 

@@ -47,6 +47,7 @@ class ByteFast {
   std::chrono::steady_clock::time_point start_;
   bool quant_;
   int32_t version;
+  bool textFeatures_ = false;
   std::unique_ptr<DenseMatrix> wordVectors_;
   std::exception_ptr trainException_;
 

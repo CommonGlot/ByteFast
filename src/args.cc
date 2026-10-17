@@ -32,6 +32,15 @@ Args::Args() {
   bucket = 2000000;
   minn = 3;
   maxn = 6;
+  minb = 0;
+  maxb = 0;
+  minc = 0;
+  maxc = 0;
+  maxBytes = 0;
+  fold = fold_name::none;
+  hashWords = false;
+  wordlist = "";
+  maxVocab = 0;
   thread = 12;
   lrUpdateRate = 100;
   t = 1e-4;
@@ -52,6 +61,29 @@ Args::Args() {
   autotunePredictions = 1;
   autotuneDuration = 60 * 5; // 5 minutes
   autotuneModelSize = "";
+}
+
+std::string Args::foldToString(fold_name fn) const {
+  switch (fn) {
+    case fold_name::none:
+      return "none";
+    case fold_name::ascii:
+      return "ascii";
+    case fold_name::unicode:
+      return "unicode";
+  }
+  return "Unknown fold!"; // should never happen
+}
+
+fold_name Args::parseFold(const std::string& value) {
+  if (value == "none" || value == "0") {
+    return fold_name::none;
+  } else if (value == "ascii" || value == "1") {
+    return fold_name::ascii;
+  } else if (value == "unicode" || value == "2") {
+    return fold_name::unicode;
+  }
+  throw std::invalid_argument("Unknown fold: " + value);
 }
 
 std::string Args::lossToString(loss_name ln) const {
@@ -174,6 +206,25 @@ void Args::parseArgs(const std::vector<std::string>& args) {
         minn = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-maxn") {
         maxn = std::stoi(args.at(ai + 1));
+      } else if (args[ai] == "-minb") {
+        minb = std::stoi(args.at(ai + 1));
+      } else if (args[ai] == "-maxb") {
+        maxb = std::stoi(args.at(ai + 1));
+      } else if (args[ai] == "-minc") {
+        minc = std::stoi(args.at(ai + 1));
+      } else if (args[ai] == "-maxc") {
+        maxc = std::stoi(args.at(ai + 1));
+      } else if (args[ai] == "-maxBytes") {
+        maxBytes = std::stoi(args.at(ai + 1));
+      } else if (args[ai] == "-fold") {
+        fold = parseFold(args.at(ai + 1));
+      } else if (args[ai] == "-hashWords") {
+        hashWords = true;
+        ai--;
+      } else if (args[ai] == "-wordlist") {
+        wordlist = std::string(args.at(ai + 1));
+      } else if (args[ai] == "-maxVocab") {
+        maxVocab = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-thread") {
         thread = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-t") {
@@ -223,6 +274,11 @@ void Args::parseArgs(const std::vector<std::string>& args) {
       std::cerr << args[ai] << " is missing an argument" << std::endl;
       printHelp();
       exit(EXIT_FAILURE);
+    } catch (const std::invalid_argument& e) {
+      std::cerr << args[ai] << ": invalid value (" << e.what() << ")"
+                << std::endl;
+      printHelp();
+      exit(EXIT_FAILURE);
     }
   }
   if (input.empty() || output.empty()) {
@@ -230,8 +286,43 @@ void Args::parseArgs(const std::vector<std::string>& args) {
     printHelp();
     exit(EXIT_FAILURE);
   }
-  if (wordNgrams <= 1 && maxn == 0 && !hasAutotune()) {
+  try {
+    validate();
+  } catch (const std::invalid_argument& e) {
+    std::cerr << e.what() << std::endl;
+    printHelp();
+    exit(EXIT_FAILURE);
+  }
+  if (!usesHashedFeatures() && !hasAutotune()) {
     bucket = 0;
+  }
+}
+
+bool Args::usesTextFeatures() const {
+  return maxb > 0 || maxc > 0 || maxBytes > 0 || fold != fold_name::none ||
+      hashWords;
+}
+
+bool Args::usesHashedFeatures() const {
+  return wordNgrams > 1 || maxn > 0 || maxb > 0 || maxc > 0 || hashWords;
+}
+
+void Args::validate() const {
+  if (maxb < 0 || minb < 0 || (maxb > 0 && (minb < 1 || minb > maxb))) {
+    throw std::invalid_argument("-minb/-maxb need 1 <= minb <= maxb (maxb 0 = off)");
+  }
+  if (maxc < 0 || minc < 0 || (maxc > 0 && (minc < 1 || minc > maxc))) {
+    throw std::invalid_argument("-minc/-maxc need 1 <= minc <= maxc (maxc 0 = off)");
+  }
+  if (maxBytes < 0) {
+    throw std::invalid_argument("-maxBytes must be >= 0 (0 = no limit)");
+  }
+  if (maxVocab < 0) {
+    throw std::invalid_argument("-maxVocab must be >= 0 (0 = no limit)");
+  }
+  if ((maxb > 0 || maxc > 0 || hashWords) && bucket <= 0) {
+    throw std::invalid_argument(
+        "-minb/-maxb, -minc/-maxc and -hashWords need -bucket > 0");
   }
 }
 
@@ -264,6 +355,24 @@ void Args::printDictionaryHelp() {
             << "]\n"
             << "  -maxn               max length of char ngram [" << maxn
             << "]\n"
+            << "  -minb               min length of text byte ngram [" << minb
+            << "]\n"
+            << "  -maxb               max length of text byte ngram, 0 = off ["
+            << maxb << "]\n"
+            << "  -minc               min length of text character ngram ["
+            << minc << "]\n"
+            << "  -maxc               max length of text character ngram, 0 = off ["
+            << maxc << "]\n"
+            << "  -maxBytes           bytes of text used for text ngrams, 0 = all ["
+            << maxBytes << "]\n"
+            << "  -fold               case folding: none, ascii or unicode ["
+            << foldToString(fold) << "]\n"
+            << "  -hashWords          hash words that are not in the vocabulary ["
+            << boolToString(hashWords) << "]\n"
+            << "  -wordlist           file with the allowed vocabulary, one word per line ["
+            << wordlist << "]\n"
+            << "  -maxVocab           keep at most this many words, 0 = no limit ["
+            << maxVocab << "]\n"
             << "  -t                  sampling threshold [" << t << "]\n"
             << "  -label              labels prefix [" << label << "]\n";
 }
@@ -355,6 +464,45 @@ void Args::load(std::istream& in) {
   in.read((char*)&(t), sizeof(double));
 }
 
+// Text-feature settings, stored after the fastText fields in ByteFast
+// model files. The leading version allows the block to grow.
+void Args::saveTextFeatures(std::ostream& out) const {
+  const int32_t version = 1;
+  const int32_t foldValue = static_cast<int32_t>(fold);
+  const int32_t hashWordsValue = hashWords ? 1 : 0;
+  out.write((char*)&(version), sizeof(int32_t));
+  out.write((char*)&(minb), sizeof(int));
+  out.write((char*)&(maxb), sizeof(int));
+  out.write((char*)&(minc), sizeof(int));
+  out.write((char*)&(maxc), sizeof(int));
+  out.write((char*)&(maxBytes), sizeof(int));
+  out.write((char*)&(foldValue), sizeof(int32_t));
+  out.write((char*)&(hashWordsValue), sizeof(int32_t));
+  out.write((char*)&(maxVocab), sizeof(int));
+}
+
+void Args::loadTextFeatures(std::istream& in) {
+  int32_t version, foldValue, hashWordsValue;
+  in.read((char*)&(version), sizeof(int32_t));
+  if (!in || version != 1) {
+    throw std::invalid_argument("Unsupported ByteFast text feature block");
+  }
+  in.read((char*)&(minb), sizeof(int));
+  in.read((char*)&(maxb), sizeof(int));
+  in.read((char*)&(minc), sizeof(int));
+  in.read((char*)&(maxc), sizeof(int));
+  in.read((char*)&(maxBytes), sizeof(int));
+  in.read((char*)&(foldValue), sizeof(int32_t));
+  in.read((char*)&(hashWordsValue), sizeof(int32_t));
+  in.read((char*)&(maxVocab), sizeof(int));
+  if (!in || foldValue < 0 || foldValue > 2) {
+    throw std::invalid_argument("Corrupt ByteFast text feature block");
+  }
+  fold = static_cast<fold_name>(foldValue);
+  hashWords = hashWordsValue != 0;
+  validate();
+}
+
 void Args::dump(std::ostream& out) const {
   out << "dim"
       << " " << dim << std::endl;
@@ -382,6 +530,16 @@ void Args::dump(std::ostream& out) const {
       << " " << lrUpdateRate << std::endl;
   out << "t"
       << " " << t << std::endl;
+  if (usesTextFeatures()) {
+    out << "minb " << minb << std::endl;
+    out << "maxb " << maxb << std::endl;
+    out << "minc " << minc << std::endl;
+    out << "maxc " << maxc << std::endl;
+    out << "maxBytes " << maxBytes << std::endl;
+    out << "fold " << foldToString(fold) << std::endl;
+    out << "hashWords " << boolToString(hashWords) << std::endl;
+    out << "maxVocab " << maxVocab << std::endl;
+  }
 }
 
 bool Args::hasAutotune() const {

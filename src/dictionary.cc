@@ -16,8 +16,24 @@
 #include <iostream>
 #include <iterator>
 #include <stdexcept>
+#include <unordered_set>
 
 namespace bytefast {
+
+namespace {
+bool readWordNoNewline(std::string_view& in, std::string_view& word) {
+  const std::string_view spaces(" \n\r\t\v\f\0");
+  std::string_view::size_type begin = in.find_first_not_of(spaces);
+  if (begin == std::string_view::npos) {
+    in.remove_prefix(in.size());
+    return false;
+  }
+  in.remove_prefix(begin);
+  word = in.substr(0, in.find_first_of(spaces));
+  in.remove_prefix(word.size());
+  return true;
+}
+} // namespace
 
 const std::string Dictionary::EOS = "</s>";
 const std::string Dictionary::BOW = "<";
@@ -235,6 +251,7 @@ void Dictionary::readFromFile(std::istream& in) {
   std::string word;
   int64_t minThreshold = 1;
   while (readWord(in, word)) {
+    normalize(word);
     add(word);
     if (ntokens_ % 1000000 == 0 && args_->verbose > 1) {
       std::cerr << "\rRead " << ntokens_ / 1000000 << "M words" << std::flush;
@@ -244,7 +261,9 @@ void Dictionary::readFromFile(std::istream& in) {
       threshold(minThreshold, minThreshold);
     }
   }
+  applyWordlist();
   threshold(args_->minCount, args_->minCountLabel);
+  applyMaxVocab();
   initTableDiscard();
   initNgrams();
   if (args_->verbose > 0) {
@@ -256,6 +275,54 @@ void Dictionary::readFromFile(std::istream& in) {
     throw std::invalid_argument(
         "Empty vocabulary. Try a smaller -minCount value.");
   }
+}
+
+// Keep only words listed in -wordlist (first field of each line, folded like
+// the input). Labels and the end-of-sentence token are always kept.
+void Dictionary::applyWordlist() {
+  if (args_->wordlist.empty()) {
+    return;
+  }
+  std::ifstream ifs(args_->wordlist);
+  if (!ifs.is_open()) {
+    throw std::invalid_argument(args_->wordlist + " cannot be opened!");
+  }
+  std::unordered_set<std::string> allowed;
+  std::string line;
+  while (std::getline(ifs, line)) {
+    std::string_view rest(line), word;
+    if (readWordNoNewline(rest, word)) {
+      std::string w(word);
+      normalize(w);
+      allowed.insert(std::move(w));
+    }
+  }
+  words_.erase(
+      remove_if(
+          words_.begin(),
+          words_.end(),
+          [&](const entry& e) {
+            return e.type == entry_type::word && e.word != EOS &&
+                allowed.count(e.word) == 0;
+          }),
+      words_.end());
+  if (args_->verbose > 0) {
+    std::cerr << "Wordlist entries: " << allowed.size() << std::endl;
+  }
+}
+
+// Keep the -maxVocab most frequent words; ties are broken by the word itself
+// so that the selected vocabulary does not depend on sort order.
+void Dictionary::applyMaxVocab() {
+  if (args_->maxVocab <= 0 || nwords_ <= args_->maxVocab) {
+    return;
+  }
+  auto wordsEnd = words_.begin() + nwords_;
+  std::sort(words_.begin(), wordsEnd, [](const entry& a, const entry& b) {
+    return a.count != b.count ? a.count > b.count : a.word < b.word;
+  });
+  words_.erase(words_.begin() + args_->maxVocab, wordsEnd);
+  threshold(1, 1);
 }
 
 void Dictionary::threshold(int64_t t, int64_t tl) {
@@ -345,6 +412,52 @@ void Dictionary::addSubwords(
   }
 }
 
+void Dictionary::normalize(std::string& token) const {
+  if (args_->fold == fold_name::none ||
+      token.compare(0, args_->label.size(), args_->label) == 0) {
+    return;
+  }
+  text::fold(token, args_->fold);
+}
+
+void Dictionary::addHashedWord(
+    std::vector<int32_t>& line,
+    const std::string_view token) const {
+  if (args_->hashWords && token != EOS) {
+    const uint32_t h = text::hashBytes(token, text::kWordSeed);
+    pushHash(line, h % static_cast<uint32_t>(args_->bucket));
+  }
+}
+
+// Byte and character n-grams over the words of the line joined by single
+// spaces, so n-grams cross word boundaries. The text is padded with a space
+// on each side, which makes the first and last words look like the others.
+void Dictionary::addTextNgrams(
+    std::vector<int32_t>& line,
+    const std::vector<std::string>& tokens) const {
+  if ((args_->maxb <= 0 && args_->maxc <= 0) || tokens.empty()) {
+    return;
+  }
+  std::string joined;
+  for (const auto& token : tokens) {
+    if (!joined.empty()) {
+      joined.push_back(' ');
+    }
+    joined += token;
+  }
+  std::string padded = " ";
+  padded += text::truncateUtf8(joined, args_->maxBytes);
+  padded.push_back(' ');
+  const uint32_t buckets = static_cast<uint32_t>(args_->bucket);
+  auto emit = [&](uint32_t h) { pushHash(line, h % buckets); };
+  if (args_->maxb > 0) {
+    text::byteNgrams(padded, args_->minb, args_->maxb, emit);
+  }
+  if (args_->maxc > 0) {
+    text::charNgrams(padded, args_->minc, args_->maxc, emit);
+  }
+}
+
 void Dictionary::reset(std::istream& in) const {
   if (in.eof()) {
     in.clear();
@@ -363,6 +476,7 @@ int32_t Dictionary::getLine(
   reset(in);
   words.clear();
   while (readWord(in, token)) {
+    normalize(token);
     int32_t h = find(token);
     int32_t wid = word2int_[h];
     if (wid < 0) {
@@ -385,6 +499,8 @@ int32_t Dictionary::getLine(
     std::vector<int32_t>& words,
     std::vector<int32_t>& labels) const {
   std::vector<int32_t> word_hashes;
+  std::vector<std::string> tokens;
+  const bool textNgrams = args_->maxb > 0 || args_->maxc > 0;
   std::string token;
   int32_t ntokens = 0;
 
@@ -392,6 +508,7 @@ int32_t Dictionary::getLine(
   words.clear();
   labels.clear();
   while (readWord(in, token)) {
+    normalize(token);
     uint32_t h = hash(token);
     int32_t wid = getId(token, h);
     entry_type type = wid < 0 ? getType(token) : getType(wid);
@@ -399,7 +516,13 @@ int32_t Dictionary::getLine(
     ntokens++;
     if (type == entry_type::word) {
       addSubwords(words, token, wid);
+      if (wid < 0) {
+        addHashedWord(words, token);
+      }
       word_hashes.push_back(h);
+      if (textNgrams && token != EOS) {
+        tokens.push_back(token);
+      }
     } else if (type == entry_type::label && wid >= 0) {
       labels.push_back(wid - nwords_);
     }
@@ -408,35 +531,26 @@ int32_t Dictionary::getLine(
     }
   }
   addWordNgrams(words, word_hashes, args_->wordNgrams);
+  addTextNgrams(words, tokens);
   return ntokens;
 }
-
-namespace {
-bool readWordNoNewline(std::string_view& in, std::string_view& word) {
-  const std::string_view spaces(" \n\r\t\v\f\0");
-  std::string_view::size_type begin = in.find_first_not_of(spaces);
-  if (begin == std::string_view::npos) {
-    in.remove_prefix(in.size());
-    return false;
-  }
-  in.remove_prefix(begin);
-  word = in.substr(0, in.find_first_of(spaces));
-  in.remove_prefix(word.size());
-  return true;
-}
-} // namespace
 
 int32_t Dictionary::getStringNoNewline(
     std::string_view in,
     std::vector<int32_t>& words,
     std::vector<int32_t>& labels) const {
   std::vector<int32_t> word_hashes;
-  std::string_view token;
+  std::vector<std::string> tokens;
+  const bool textNgrams = args_->maxb > 0 || args_->maxc > 0;
+  std::string_view view;
+  std::string token;
   int32_t ntokens = 0;
 
   words.clear();
   labels.clear();
-  while (readWordNoNewline(in, token)) {
+  while (readWordNoNewline(in, view)) {
+    token.assign(view.data(), view.size());
+    normalize(token);
     uint32_t h = hash(token);
     int32_t wid = getId(token, h);
     entry_type type = wid < 0 ? getType(token) : getType(wid);
@@ -444,7 +558,13 @@ int32_t Dictionary::getStringNoNewline(
     ntokens++;
     if (type == entry_type::word) {
       addSubwords(words, token, wid);
+      if (wid < 0) {
+        addHashedWord(words, token);
+      }
       word_hashes.push_back(h);
+      if (textNgrams && token != EOS) {
+        tokens.push_back(token);
+      }
     } else if (type == entry_type::label && wid >= 0) {
       labels.push_back(wid - nwords_);
     }
@@ -453,6 +573,7 @@ int32_t Dictionary::getStringNoNewline(
     }
   }
   addWordNgrams(words, word_hashes, args_->wordNgrams);
+  addTextNgrams(words, tokens);
   return ntokens;
 }
 

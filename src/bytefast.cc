@@ -24,6 +24,10 @@ namespace bytefast {
 
 constexpr int32_t FASTTEXT_VERSION = 12; /* Version 1b */
 constexpr int32_t FASTTEXT_FILEFORMAT_MAGIC_INT32 = 793712314;
+// Models that use ByteFast text features ("BFCM" on disk). Others are
+// written in the fastText format above, so upstream fastText reads them.
+constexpr int32_t BYTEFAST_FILEFORMAT_MAGIC_INT32 = 0x4D434642;
+constexpr int32_t BYTEFAST_VERSION = 1;
 
 bool comparePairs(
     const std::pair<real, std::string>& l,
@@ -172,6 +176,16 @@ void ByteFast::saveOutput(const std::string& filename) {
 bool ByteFast::checkModel(std::istream& in) {
   int32_t magic;
   in.read((char*)&(magic), sizeof(int32_t));
+  if (magic == BYTEFAST_FILEFORMAT_MAGIC_INT32) {
+    int32_t bytefastVersion;
+    in.read((char*)&(bytefastVersion), sizeof(int32_t));
+    if (!in || bytefastVersion != BYTEFAST_VERSION) {
+      return false;
+    }
+    version = FASTTEXT_VERSION;
+    textFeatures_ = true;
+    return true;
+  }
   if (magic != FASTTEXT_FILEFORMAT_MAGIC_INT32) {
     return false;
   }
@@ -179,12 +193,15 @@ bool ByteFast::checkModel(std::istream& in) {
   if (version > FASTTEXT_VERSION) {
     return false;
   }
+  textFeatures_ = false;
   return true;
 }
 
 void ByteFast::signModel(std::ostream& out) {
-  const int32_t magic = FASTTEXT_FILEFORMAT_MAGIC_INT32;
-  const int32_t version = FASTTEXT_VERSION;
+  const bool textFeatures = args_->usesTextFeatures();
+  const int32_t magic = textFeatures ? BYTEFAST_FILEFORMAT_MAGIC_INT32
+                                     : FASTTEXT_FILEFORMAT_MAGIC_INT32;
+  const int32_t version = textFeatures ? BYTEFAST_VERSION : FASTTEXT_VERSION;
   out.write((char*)&(magic), sizeof(int32_t));
   out.write((char*)&(version), sizeof(int32_t));
 }
@@ -199,6 +216,9 @@ void ByteFast::saveModel(const std::string& filename) {
   }
   signModel(ofs);
   args_->save(ofs);
+  if (args_->usesTextFeatures()) {
+    args_->saveTextFeatures(ofs);
+  }
   dict_->save(ofs);
 
   ofs.write((char*)&(quant_), sizeof(bool));
@@ -241,6 +261,9 @@ void ByteFast::loadModel(std::istream& in) {
   input_ = std::make_shared<DenseMatrix>();
   output_ = std::make_shared<DenseMatrix>();
   args_->load(in);
+  if (textFeatures_) {
+    args_->loadTextFeatures(in);
+  }
   if (version == 11 && args_->model == model_name::sup) {
     // backward compatibility: old supervised models do not use char ngrams.
     args_->maxn = 0;
@@ -741,6 +764,7 @@ std::shared_ptr<Matrix> ByteFast::createTrainOutputMatrix() const {
 }
 
 void ByteFast::train(const Args& args, const TrainCallback& callback) {
+  args.validate();
   args_ = std::make_shared<Args>(args);
   dict_ = std::make_shared<Dictionary>(args_);
   if (args_->input == "-") {

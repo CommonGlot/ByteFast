@@ -44,6 +44,12 @@ class Dictionary {
   void reset(std::istream&) const;
   void pushHash(std::vector<int32_t>&, int32_t) const;
   void addSubwords(std::vector<int32_t>&, const std::string_view, int32_t) const;
+  void normalize(std::string&) const;
+  void addHashedWord(std::vector<int32_t>&, const std::string_view) const;
+  void addTextNgrams(std::vector<int32_t>&, const std::vector<std::string>&)
+      const;
+  void applyWordlist();
+  void applyMaxVocab();
 
   std::shared_ptr<Args> args_;
   std::vector<int32_t> word2int_;
