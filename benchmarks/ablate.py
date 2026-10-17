@@ -8,7 +8,8 @@ bytefast binary, so differences come only from the flags. For each variant:
 1. grid search over --grid on dev.txt (first seed), select by dev macro F1;
 2. retrain the selected setting with every seed and score test.txt once;
 3. for the first seed, measure model size, model load time and warm
-   prediction throughput (load time is subtracted, see --throughput-lines).
+   single-thread prediction throughput (load time is subtracted, see
+   --throughput-lines). Scoring dev and test uses --threads.
 
 DATA must contain train.txt, dev.txt and test.txt in ByteFast format.
 VARIANTS is a JSON file:
@@ -75,16 +76,17 @@ def run(cmd, stdout=subprocess.DEVNULL):
     return time.perf_counter() - start
 
 
-def predict(binary, model, path):
-    out = subprocess.run([binary, "predict", model, str(path)], check=True,
+def predict(binary, model, path, threads=1):
+    out = subprocess.run([binary, "predict", model, str(path), "1", "0.0", str(threads)],
+                         check=True,
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     lines = out.stdout.decode("utf-8", "replace").split("\n")[:-1]
     return [l.split()[0][len("__label__"):] if l.strip() else "" for l in lines]
 
 
-def evaluate(binary, model, path):
+def evaluate(binary, model, path, threads=1):
     gold = labels_of(path)
-    pred = predict(binary, model, path)
+    pred = predict(binary, model, path, threads)
     if len(pred) != len(gold):
         raise RuntimeError("prediction count %d != %d for %s" % (len(pred), len(gold), path))
     return score(gold, pred)
@@ -164,7 +166,7 @@ def main():
                     log.write(json.dumps(record) + "\n"); log.flush()
                     print("%-24s dev %s FAILED: %s" % (v["name"], record["grid"], error), flush=True)
                     continue
-                dev = evaluate(a.bin, model + ".bin", a.data / "dev.txt")
+                dev = evaluate(a.bin, model + ".bin", a.data / "dev.txt", a.threads)
                 record = {"stage": "dev", "variant": v["name"], "grid": dict(zip(names, combo)),
                           "dev_macro_f1": dev["macro_f1"], "dev_accuracy": dev["accuracy"],
                           "train_seconds": seconds}
@@ -183,7 +185,7 @@ def main():
                     log.write(json.dumps({"stage": "test", "variant": v["name"], "grid": best[2],
                                           "seed": seed, "error": error}) + "\n"); log.flush()
                     continue
-                test = evaluate(a.bin, model + ".bin", a.data / "test.txt")
+                test = evaluate(a.bin, model + ".bin", a.data / "test.txt", a.threads)
                 record = {"stage": "test", "variant": v["name"], "flags": " ".join(flags),
                           "grid": best[2], "seed": seed, "dev_macro_f1": best[0],
                           "test_macro_f1": test["macro_f1"], "test_accuracy": test["accuracy"],
