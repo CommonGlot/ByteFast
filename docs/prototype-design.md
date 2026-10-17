@@ -1,7 +1,9 @@
-# ByteFast byte-level classifier design
+# Prototype byte classifier design (bytefast.proto)
 
-ByteFast extends the original fastText implementation with byte-level
-features for supervised text classification. The input label names and their
+This describes the earlier stand-alone byte classifier in `src/proto`
+(`bytefast-proto`, `bytefast.proto`). The main ByteFast model is described
+in [architecture.md](architecture.md); the prototype is kept as an ablation
+baseline. The input label names and their
 meanings are determined by the training dataset.
 
 ## Input handling
