@@ -100,14 +100,14 @@ Build the original fastText executable:
 
 ```bash
 make -j2 opt
-./fasttext supervised -input train.txt -output classic-model
+./bytefast supervised -input train.txt -output classic-model
 ```
 
 Build the ByteFast executables:
 
 ```bash
-make bytefast bytefast-lexical bytefast-calibrated
-./bytefast train train.txt byte-model.bin -dim 32 -bucket 16384 -epoch 10
+make bytefast-proto bytefast-lexical bytefast-calibrated
+./bytefast-proto train train.txt byte-model.bin -dim 32 -bucket 16384 -epoch 10
 ```
 
 The `fasttext` executable retains its original commands and model format.

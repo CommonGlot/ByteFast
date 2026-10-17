@@ -7,15 +7,15 @@
 #
 
 cmake_minimum_required(VERSION 2.8.9)
-project(fasttext)
+project(bytefast)
 
 set(CMAKE_CXX_STANDARD 17)
 
 # The version number.
-set (fasttext_VERSION_MAJOR 0)
-set (fasttext_VERSION_MINOR 1)
+set (bytefast_VERSION_MAJOR 0)
+set (bytefast_VERSION_MINOR 1)
 
-include_directories(fasttext)
+include_directories(bytefast)
 
 set(CMAKE_CXX_FLAGS " -pthread -std=c++17 -funroll-loops -O3 -march=native")
 
@@ -24,7 +24,7 @@ set(HEADER_FILES
     src/autotune.h
     src/densematrix.h
     src/dictionary.h
-    src/fasttext.h
+    src/bytefast.h
     src/loss.h
     src/matrix.h
     src/meter.h
@@ -40,7 +40,7 @@ set(SOURCE_FILES
     src/autotune.cc
     src/densematrix.cc
     src/dictionary.cc
-    src/fasttext.cc
+    src/bytefast.cc
     src/loss.cc
     src/main.cc
     src/matrix.cc
@@ -54,27 +54,27 @@ set(SOURCE_FILES
 
 if (NOT MSVC)
   include(GNUInstallDirs)
-  configure_file("fasttext.pc.in" "fasttext.pc" @ONLY)
-  install(FILES "${CMAKE_BINARY_DIR}/fasttext.pc" DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+  configure_file("bytefast.pc.in" "bytefast.pc" @ONLY)
+  install(FILES "${CMAKE_BINARY_DIR}/bytefast.pc" DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 endif()
 
-add_library(fasttext-shared SHARED ${SOURCE_FILES} ${HEADER_FILES})
-add_library(fasttext-static STATIC ${SOURCE_FILES} ${HEADER_FILES})
-add_library(fasttext-static_pic STATIC ${SOURCE_FILES} ${HEADER_FILES})
-set_target_properties(fasttext-shared PROPERTIES OUTPUT_NAME fasttext
-  SOVERSION "${fasttext_VERSION_MAJOR}")
-set_target_properties(fasttext-static PROPERTIES OUTPUT_NAME fasttext)
-set_target_properties(fasttext-static_pic PROPERTIES OUTPUT_NAME fasttext_pic
+add_library(bytefast-shared SHARED ${SOURCE_FILES} ${HEADER_FILES})
+add_library(bytefast-static STATIC ${SOURCE_FILES} ${HEADER_FILES})
+add_library(bytefast-static_pic STATIC ${SOURCE_FILES} ${HEADER_FILES})
+set_target_properties(bytefast-shared PROPERTIES OUTPUT_NAME bytefast
+  SOVERSION "${bytefast_VERSION_MAJOR}")
+set_target_properties(bytefast-static PROPERTIES OUTPUT_NAME bytefast)
+set_target_properties(bytefast-static_pic PROPERTIES OUTPUT_NAME bytefast_pic
   POSITION_INDEPENDENT_CODE True)
-add_executable(fasttext-bin src/main.cc)
-target_link_libraries(fasttext-bin pthread fasttext-static)
-set_target_properties(fasttext-bin PROPERTIES PUBLIC_HEADER "${HEADER_FILES}" OUTPUT_NAME fasttext)
-install (TARGETS fasttext-shared
+add_executable(bytefast-bin src/main.cc)
+target_link_libraries(bytefast-bin pthread bytefast-static)
+set_target_properties(bytefast-bin PROPERTIES PUBLIC_HEADER "${HEADER_FILES}" OUTPUT_NAME bytefast)
+install (TARGETS bytefast-shared
     LIBRARY DESTINATION lib)
-install (TARGETS fasttext-static
+install (TARGETS bytefast-static
     ARCHIVE DESTINATION lib)
-install (TARGETS fasttext-static_pic
+install (TARGETS bytefast-static_pic
     ARCHIVE DESTINATION lib)
-install (TARGETS fasttext-bin
+install (TARGETS bytefast-bin
     RUNTIME DESTINATION bin
- PUBLIC_HEADER DESTINATION include/fasttext)
+ PUBLIC_HEADER DESTINATION include/bytefast)

@@ -17,8 +17,8 @@ import os
 import re
 import sys
 
-import fasttext
-import fasttext.util
+import bytefast
+import bytefast.util
 
 args = None
 
@@ -50,7 +50,7 @@ def command_reduce(model_file, target_dim, if_exists):
     """
     eprint("Loading model")
 
-    ft = fasttext.load_model(model_file)
+    ft = bytefast.load_model(model_file)
     initial_dim = ft.get_dimension()
     if target_dim >= initial_dim:
         raise Exception("Target dimension (%d) should be less than initial dimension (%d)." % (
@@ -67,7 +67,7 @@ def command_reduce(model_file, target_dim, if_exists):
             return result_filename
 
     eprint("Reducing matrix dimensions")
-    fasttext.util.reduce_model(ft, target_dim)
+    bytefast.util.reduce_model(ft, target_dim)
 
     eprint("Saving model")
     ft.save_model(result_filename)

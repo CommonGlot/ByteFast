@@ -23,7 +23,7 @@ jobs:
       - name: Build original fastText and separate native ByteFast executables
         run: |
           make -j2 opt
-          make bytefast bytefast-lexical bytefast-calibrated
+          make bytefast-proto bytefast-lexical bytefast-calibrated
       - name: Prepare synthetic three-language classifier training
         run: |
           python - <<'PY'

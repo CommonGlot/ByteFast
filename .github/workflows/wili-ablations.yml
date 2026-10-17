@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build CPU classifier
-        run: make bytefast
+        run: make bytefast-proto
       - name: Restore official WiLI archive
         uses: actions/cache@v4
         with:
@@ -42,15 +42,15 @@ jobs:
                 bloompos) opts="-hashCount 2 -positionBins 4" ;;
               esac
               echo "::group::ABLATE samples=$cap variant=$variant"
-              ./bytefast train /tmp/wili/train-$cap.txt \
+              ./bytefast-proto train /tmp/wili/train-$cap.txt \
                 /tmp/wili/model-$cap-$variant.bin \
                 -bucket 16384 -dim 32 -epoch 5 -lr 0.3 $opts
-              ./bytefast predict /tmp/wili/model-$cap-$variant.bin \
+              ./bytefast-proto predict /tmp/wili/model-$cap-$variant.bin \
                 /tmp/wili/test.txt > /tmp/wili/pred-$cap-$variant.txt
               python3 benchmarks/score_lid.py /tmp/wili/test.fasttext \
                 /tmp/wili/pred-$cap-$variant.txt
               /usr/bin/time -f "ABLATE_PERF samples=$cap variant=$variant wall=%e rss_kb=%M" \
-                sh -c "./bytefast predict /tmp/wili/model-$cap-$variant.bin /tmp/wili/test.txt >/dev/null"
+                sh -c "./bytefast-proto predict /tmp/wili/model-$cap-$variant.bin /tmp/wili/test.txt >/dev/null"
               stat -c "ABLATE_SIZE %n %s bytes" /tmp/wili/model-$cap-$variant.bin
               echo "::endgroup::"
             done

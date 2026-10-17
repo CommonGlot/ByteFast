@@ -84,7 +84,7 @@ def main():
 
     reference = [
         ("base_byte", [
-            "./bytefast", "predict", str(base), str(testtxt),
+            "./bytefast-proto", "predict", str(base), str(testtxt),
         ], base.stat().st_size),
         ("selected_learned_words", [
             "./bytefast-wordemb", "predict", str(base),
@@ -100,7 +100,7 @@ def main():
     fasttext = root / "word-fasttext.bin"
     if fasttext.is_file():
         reference.append(("ordinary_fasttext", [
-            "./fasttext", "predict", str(fasttext), str(testtxt),
+            "./bytefast", "predict", str(fasttext), str(testtxt),
         ], fasttext.stat().st_size))
 
     test = []

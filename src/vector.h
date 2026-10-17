@@ -15,7 +15,7 @@
 #include "aligned.h"
 #include "real.h"
 
-namespace fasttext {
+namespace bytefast {
 
 class Matrix;
 
@@ -59,4 +59,4 @@ class Vector {
 
 std::ostream& operator<<(std::ostream&, const Vector&);
 
-} // namespace fasttext
+} // namespace bytefast

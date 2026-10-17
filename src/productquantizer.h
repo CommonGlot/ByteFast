@@ -17,7 +17,7 @@
 #include "real.h"
 #include "vector.h"
 
-namespace fasttext {
+namespace bytefast {
 
 class ProductQuantizer {
  protected:
@@ -60,4 +60,4 @@ class ProductQuantizer {
   void load(std::istream&);
 };
 
-} // namespace fasttext
+} // namespace bytefast

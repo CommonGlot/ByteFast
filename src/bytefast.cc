@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "fasttext.h"
+#include "bytefast.h"
 #include "loss.h"
 #include "quantmatrix.h"
 
@@ -20,7 +20,7 @@
 #include <thread>
 #include <vector>
 
-namespace fasttext {
+namespace bytefast {
 
 constexpr int32_t FASTTEXT_VERSION = 12; /* Version 1b */
 constexpr int32_t FASTTEXT_FILEFORMAT_MAGIC_INT32 = 793712314;
@@ -29,7 +29,7 @@ bool comparePairs(
     const std::pair<real, std::string>& l,
     const std::pair<real, std::string>& r);
 
-std::shared_ptr<Loss> FastText::createLoss(std::shared_ptr<Matrix>& output) {
+std::shared_ptr<Loss> ByteFast::createLoss(std::shared_ptr<Matrix>& output) {
   loss_name lossName = args_->loss;
   switch (lossName) {
     case loss_name::hs:
@@ -47,22 +47,22 @@ std::shared_ptr<Loss> FastText::createLoss(std::shared_ptr<Matrix>& output) {
   }
 }
 
-FastText::FastText()
+ByteFast::ByteFast()
     : quant_(false), wordVectors_(nullptr), trainException_(nullptr) {}
 
-void FastText::addInputVector(Vector& vec, int32_t ind) const {
+void ByteFast::addInputVector(Vector& vec, int32_t ind) const {
   vec.addRow(*input_, ind);
 }
 
-std::shared_ptr<const Dictionary> FastText::getDictionary() const {
+std::shared_ptr<const Dictionary> ByteFast::getDictionary() const {
   return dict_;
 }
 
-const Args FastText::getArgs() const {
+const Args ByteFast::getArgs() const {
   return *args_.get();
 }
 
-std::shared_ptr<const DenseMatrix> FastText::getInputMatrix() const {
+std::shared_ptr<const DenseMatrix> ByteFast::getInputMatrix() const {
   if (quant_) {
     throw std::runtime_error("Can't export quantized matrix");
   }
@@ -70,7 +70,7 @@ std::shared_ptr<const DenseMatrix> FastText::getInputMatrix() const {
   return std::dynamic_pointer_cast<DenseMatrix>(input_);
 }
 
-void FastText::setMatrices(
+void ByteFast::setMatrices(
     const std::shared_ptr<DenseMatrix>& inputMatrix,
     const std::shared_ptr<DenseMatrix>& outputMatrix) {
   assert(input_->size(1) == output_->size(1));
@@ -83,7 +83,7 @@ void FastText::setMatrices(
   buildModel();
 }
 
-std::shared_ptr<const DenseMatrix> FastText::getOutputMatrix() const {
+std::shared_ptr<const DenseMatrix> ByteFast::getOutputMatrix() const {
   if (quant_ && args_->qout) {
     throw std::runtime_error("Can't export quantized matrix");
   }
@@ -91,16 +91,16 @@ std::shared_ptr<const DenseMatrix> FastText::getOutputMatrix() const {
   return std::dynamic_pointer_cast<DenseMatrix>(output_);
 }
 
-int32_t FastText::getWordId(const std::string& word) const {
+int32_t ByteFast::getWordId(const std::string& word) const {
   return dict_->getId(word);
 }
 
-int32_t FastText::getSubwordId(const std::string& subword) const {
+int32_t ByteFast::getSubwordId(const std::string& subword) const {
   int32_t h = dict_->hash(subword) % args_->bucket;
   return dict_->nwords() + h;
 }
 
-int32_t FastText::getLabelId(const std::string& label) const {
+int32_t ByteFast::getLabelId(const std::string& label) const {
   int32_t labelId = dict_->getId(label);
   if (labelId != -1) {
     labelId -= dict_->nwords();
@@ -108,7 +108,7 @@ int32_t FastText::getLabelId(const std::string& label) const {
   return labelId;
 }
 
-void FastText::getWordVector(Vector& vec, const std::string& word) const {
+void ByteFast::getWordVector(Vector& vec, const std::string& word) const {
   const std::vector<int32_t>& ngrams = dict_->getSubwords(word);
   vec.zero();
   for (int i = 0; i < ngrams.size(); i++) {
@@ -119,14 +119,14 @@ void FastText::getWordVector(Vector& vec, const std::string& word) const {
   }
 }
 
-void FastText::getSubwordVector(Vector& vec, const std::string& subword) const {
+void ByteFast::getSubwordVector(Vector& vec, const std::string& subword) const {
   vec.zero();
   int32_t h = dict_->hash(subword) % args_->bucket;
   h = h + dict_->nwords();
   addInputVector(vec, h);
 }
 
-void FastText::saveVectors(const std::string& filename) {
+void ByteFast::saveVectors(const std::string& filename) {
   if (!input_ || !output_) {
     throw std::runtime_error("Model never trained");
   }
@@ -145,7 +145,7 @@ void FastText::saveVectors(const std::string& filename) {
   ofs.close();
 }
 
-void FastText::saveOutput(const std::string& filename) {
+void ByteFast::saveOutput(const std::string& filename) {
   std::ofstream ofs(filename);
   if (!ofs.is_open()) {
     throw std::invalid_argument(
@@ -169,7 +169,7 @@ void FastText::saveOutput(const std::string& filename) {
   ofs.close();
 }
 
-bool FastText::checkModel(std::istream& in) {
+bool ByteFast::checkModel(std::istream& in) {
   int32_t magic;
   in.read((char*)&(magic), sizeof(int32_t));
   if (magic != FASTTEXT_FILEFORMAT_MAGIC_INT32) {
@@ -182,14 +182,14 @@ bool FastText::checkModel(std::istream& in) {
   return true;
 }
 
-void FastText::signModel(std::ostream& out) {
+void ByteFast::signModel(std::ostream& out) {
   const int32_t magic = FASTTEXT_FILEFORMAT_MAGIC_INT32;
   const int32_t version = FASTTEXT_VERSION;
   out.write((char*)&(magic), sizeof(int32_t));
   out.write((char*)&(version), sizeof(int32_t));
 }
 
-void FastText::saveModel(const std::string& filename) {
+void ByteFast::saveModel(const std::string& filename) {
   std::ofstream ofs(filename, std::ofstream::binary);
   if (!ofs.is_open()) {
     throw std::invalid_argument(filename + " cannot be opened for saving!");
@@ -210,7 +210,7 @@ void FastText::saveModel(const std::string& filename) {
   ofs.close();
 }
 
-void FastText::loadModel(const std::string& filename) {
+void ByteFast::loadModel(const std::string& filename) {
   std::ifstream ifs(filename, std::ifstream::binary);
   if (!ifs.is_open()) {
     throw std::invalid_argument(filename + " cannot be opened for loading!");
@@ -222,7 +222,7 @@ void FastText::loadModel(const std::string& filename) {
   ifs.close();
 }
 
-std::vector<int64_t> FastText::getTargetCounts() const {
+std::vector<int64_t> ByteFast::getTargetCounts() const {
   if (args_->model == model_name::sup) {
     return dict_->getCounts(entry_type::label);
   } else {
@@ -230,13 +230,13 @@ std::vector<int64_t> FastText::getTargetCounts() const {
   }
 }
 
-void FastText::buildModel() {
+void ByteFast::buildModel() {
   auto loss = createLoss(output_);
   bool normalizeGradient = (args_->model == model_name::sup);
   model_ = std::make_shared<Model>(input_, output_, loss, normalizeGradient);
 }
 
-void FastText::loadModel(std::istream& in) {
+void ByteFast::loadModel(std::istream& in) {
   args_ = std::make_shared<Args>();
   input_ = std::make_shared<DenseMatrix>();
   output_ = std::make_shared<DenseMatrix>();
@@ -271,7 +271,7 @@ void FastText::loadModel(std::istream& in) {
   buildModel();
 }
 
-std::tuple<int64_t, double, double> FastText::progressInfo(real progress) {
+std::tuple<int64_t, double, double> ByteFast::progressInfo(real progress) {
   double t = utils::getDuration(start_, std::chrono::steady_clock::now());
   double lr = args_->lr * (1.0 - progress);
   double wst = 0;
@@ -286,7 +286,7 @@ std::tuple<int64_t, double, double> FastText::progressInfo(real progress) {
   return std::tuple<double, double, int64_t>(wst, lr, eta);
 }
 
-void FastText::printInfo(real progress, real loss, std::ostream& log_stream) {
+void ByteFast::printInfo(real progress, real loss, std::ostream& log_stream) {
   double wst;
   double lr;
   int64_t eta;
@@ -302,7 +302,7 @@ void FastText::printInfo(real progress, real loss, std::ostream& log_stream) {
   log_stream << std::flush;
 }
 
-std::vector<int32_t> FastText::selectEmbeddings(int32_t cutoff) const {
+std::vector<int32_t> ByteFast::selectEmbeddings(int32_t cutoff) const {
   std::shared_ptr<DenseMatrix> input =
       std::dynamic_pointer_cast<DenseMatrix>(input_);
   Vector norms(input->size(0));
@@ -320,7 +320,7 @@ std::vector<int32_t> FastText::selectEmbeddings(int32_t cutoff) const {
   return idx;
 }
 
-void FastText::quantize(const Args& qargs, const TrainCallback& callback) {
+void ByteFast::quantize(const Args& qargs, const TrainCallback& callback) {
   if (args_->model != model_name::sup) {
     throw std::invalid_argument(
         "For now we only support quantization of supervised models");
@@ -367,7 +367,7 @@ void FastText::quantize(const Args& qargs, const TrainCallback& callback) {
   model_ = std::make_shared<Model>(input_, output_, loss, normalizeGradient);
 }
 
-void FastText::supervised(
+void ByteFast::supervised(
     Model::State& state,
     real lr,
     const std::vector<int32_t>& line,
@@ -384,7 +384,7 @@ void FastText::supervised(
   }
 }
 
-void FastText::cbow(
+void ByteFast::cbow(
     Model::State& state,
     real lr,
     const std::vector<int32_t>& line) {
@@ -403,7 +403,7 @@ void FastText::cbow(
   }
 }
 
-void FastText::skipgram(
+void ByteFast::skipgram(
     Model::State& state,
     real lr,
     const std::vector<int32_t>& line) {
@@ -420,7 +420,7 @@ void FastText::skipgram(
 }
 
 std::tuple<int64_t, double, double>
-FastText::test(std::istream& in, int32_t k, real threshold) {
+ByteFast::test(std::istream& in, int32_t k, real threshold) {
   Meter meter(false);
   test(in, k, threshold, meter);
 
@@ -428,7 +428,7 @@ FastText::test(std::istream& in, int32_t k, real threshold) {
       meter.nexamples(), meter.precision(), meter.recall());
 }
 
-void FastText::test(std::istream& in, int32_t k, real threshold, Meter& meter)
+void ByteFast::test(std::istream& in, int32_t k, real threshold, Meter& meter)
     const {
   std::vector<int32_t> line;
   std::vector<int32_t> labels;
@@ -450,7 +450,7 @@ void FastText::test(std::istream& in, int32_t k, real threshold, Meter& meter)
   }
 }
 
-void FastText::predict(
+void ByteFast::predict(
     int32_t k,
     const std::vector<int32_t>& words,
     Predictions& predictions,
@@ -465,7 +465,7 @@ void FastText::predict(
   model_->predict(words, k, threshold, predictions, state);
 }
 
-bool FastText::predictLine(
+bool ByteFast::predictLine(
     std::istream& in,
     std::vector<std::pair<real, std::string>>& predictions,
     int32_t k,
@@ -487,7 +487,7 @@ bool FastText::predictLine(
   return true;
 }
 
-void FastText::getSentenceVector(std::istream& in, fasttext::Vector& svec) {
+void ByteFast::getSentenceVector(std::istream& in, bytefast::Vector& svec) {
   svec.zero();
   if (args_->model == model_name::sup) {
     std::vector<int32_t> line, labels;
@@ -520,7 +520,7 @@ void FastText::getSentenceVector(std::istream& in, fasttext::Vector& svec) {
   }
 }
 
-std::vector<std::pair<std::string, Vector>> FastText::getNgramVectors(
+std::vector<std::pair<std::string, Vector>> ByteFast::getNgramVectors(
     const std::string& word) const {
   std::vector<std::pair<std::string, Vector>> result;
   std::vector<int32_t> ngrams;
@@ -537,7 +537,7 @@ std::vector<std::pair<std::string, Vector>> FastText::getNgramVectors(
   return result;
 }
 
-void FastText::precomputeWordVectors(DenseMatrix& wordVectors) {
+void ByteFast::precomputeWordVectors(DenseMatrix& wordVectors) {
   Vector vec(args_->dim);
   wordVectors.zero();
   for (int32_t i = 0; i < dict_->nwords(); i++) {
@@ -550,7 +550,7 @@ void FastText::precomputeWordVectors(DenseMatrix& wordVectors) {
   }
 }
 
-void FastText::lazyComputeWordVectors() {
+void ByteFast::lazyComputeWordVectors() {
   if (!wordVectors_) {
     wordVectors_ = std::unique_ptr<DenseMatrix>(
         new DenseMatrix(dict_->nwords(), args_->dim));
@@ -558,7 +558,7 @@ void FastText::lazyComputeWordVectors() {
   }
 }
 
-std::vector<std::pair<real, std::string>> FastText::getNN(
+std::vector<std::pair<real, std::string>> ByteFast::getNN(
     const std::string& word,
     int32_t k) {
   Vector query(args_->dim);
@@ -570,7 +570,7 @@ std::vector<std::pair<real, std::string>> FastText::getNN(
   return getNN(*wordVectors_, query, k, {word});
 }
 
-std::vector<std::pair<real, std::string>> FastText::getNN(
+std::vector<std::pair<real, std::string>> ByteFast::getNN(
     const DenseMatrix& wordVectors,
     const Vector& query,
     int32_t k,
@@ -604,7 +604,7 @@ std::vector<std::pair<real, std::string>> FastText::getNN(
   return heap;
 }
 
-std::vector<std::pair<real, std::string>> FastText::getAnalogies(
+std::vector<std::pair<real, std::string>> ByteFast::getAnalogies(
     int32_t k,
     const std::string& wordA,
     const std::string& wordB,
@@ -625,11 +625,11 @@ std::vector<std::pair<real, std::string>> FastText::getAnalogies(
   return getNN(*wordVectors_, query, k, {wordA, wordB, wordC});
 }
 
-bool FastText::keepTraining(const int64_t ntokens) const {
+bool ByteFast::keepTraining(const int64_t ntokens) const {
   return tokenCount_ < args_->epoch * ntokens && !trainException_;
 }
 
-void FastText::trainThread(int32_t threadId, const TrainCallback& callback) {
+void ByteFast::trainThread(int32_t threadId, const TrainCallback& callback) {
   std::ifstream ifs(args_->input);
   utils::seek(ifs, threadId * utils::size(ifs) / args_->thread);
 
@@ -677,7 +677,7 @@ void FastText::trainThread(int32_t threadId, const TrainCallback& callback) {
   ifs.close();
 }
 
-std::shared_ptr<Matrix> FastText::getInputMatrixFromFile(
+std::shared_ptr<Matrix> ByteFast::getInputMatrixFromFile(
     const std::string& filename) const {
   std::ifstream in(filename);
   std::vector<std::string> words;
@@ -722,7 +722,7 @@ std::shared_ptr<Matrix> FastText::getInputMatrixFromFile(
   return input;
 }
 
-std::shared_ptr<Matrix> FastText::createRandomMatrix() const {
+std::shared_ptr<Matrix> ByteFast::createRandomMatrix() const {
   std::shared_ptr<DenseMatrix> input = std::make_shared<DenseMatrix>(
       dict_->nwords() + args_->bucket, args_->dim);
   input->uniform(1.0 / args_->dim, args_->thread, args_->seed);
@@ -730,7 +730,7 @@ std::shared_ptr<Matrix> FastText::createRandomMatrix() const {
   return input;
 }
 
-std::shared_ptr<Matrix> FastText::createTrainOutputMatrix() const {
+std::shared_ptr<Matrix> ByteFast::createTrainOutputMatrix() const {
   int64_t m =
       (args_->model == model_name::sup) ? dict_->nlabels() : dict_->nwords();
   std::shared_ptr<DenseMatrix> output =
@@ -740,7 +740,7 @@ std::shared_ptr<Matrix> FastText::createTrainOutputMatrix() const {
   return output;
 }
 
-void FastText::train(const Args& args, const TrainCallback& callback) {
+void ByteFast::train(const Args& args, const TrainCallback& callback) {
   args_ = std::make_shared<Args>(args);
   dict_ = std::make_shared<Dictionary>(args_);
   if (args_->input == "-") {
@@ -768,7 +768,7 @@ void FastText::train(const Args& args, const TrainCallback& callback) {
   startThreads(callback);
 }
 
-void FastText::abort() {
+void ByteFast::abort() {
   try {
     throw AbortError();
   } catch (AbortError&) {
@@ -776,7 +776,7 @@ void FastText::abort() {
   }
 }
 
-void FastText::startThreads(const TrainCallback& callback) {
+void ByteFast::startThreads(const TrainCallback& callback) {
   start_ = std::chrono::steady_clock::now();
   tokenCount_ = 0;
   loss_ = -1;
@@ -815,11 +815,11 @@ void FastText::startThreads(const TrainCallback& callback) {
   }
 }
 
-int FastText::getDimension() const {
+int ByteFast::getDimension() const {
   return args_->dim;
 }
 
-bool FastText::isQuant() const {
+bool ByteFast::isQuant() const {
   return quant_;
 }
 
@@ -829,4 +829,4 @@ bool comparePairs(
   return l.first > r.first;
 }
 
-} // namespace fasttext
+} // namespace bytefast

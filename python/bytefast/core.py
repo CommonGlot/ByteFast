@@ -9,13 +9,13 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-from . import _legacy_pybind as fasttext
+from . import _core_pybind as _core
 import numpy as np
 import multiprocessing
 from itertools import chain
 
-loss_name = fasttext.loss_name
-model_name = fasttext.model_name
+loss_name = _core.loss_name
+model_name = _core.model_name
 EOS = "</s>"
 BOW = "<"
 EOW = ">"
@@ -76,7 +76,7 @@ class _Meter:
         return recall
 
 
-class _FastText:
+class _ByteFast:
     """
     This class defines the API to inspect models and should not be used to
     create objects. It will be returned by functions such as load_model or
@@ -88,7 +88,7 @@ class _FastText:
     """
 
     def __init__(self, model_path=None, args=None):
-        self.f = fasttext.fasttext()
+        self.f = _core.bytefast()
         if model_path is not None:
             self.f.loadModel(model_path)
         self._words = None
@@ -131,7 +131,7 @@ class _FastText:
     def get_word_vector(self, word):
         """Get the vector representation of word."""
         dim = self.get_dimension()
-        b = fasttext.Vector(dim)
+        b = _core.Vector(dim)
         self.f.getWordVector(b, word)
         return np.array(b)
 
@@ -146,7 +146,7 @@ class _FastText:
             raise ValueError("predict processes one line at a time (remove '\\n')")
         text += "\n"
         dim = self.get_dimension()
-        b = fasttext.Vector(dim)
+        b = _core.Vector(dim)
         self.f.getSentenceVector(b, text)
         return np.array(b)
 
@@ -188,7 +188,7 @@ class _FastText:
         Given an index, get the corresponding vector of the Input Matrix.
         """
         dim = self.get_dimension()
-        b = fasttext.Vector(dim)
+        b = _core.Vector(dim)
         self.f.getInputVector(b, ind)
         return np.array(b)
 
@@ -422,7 +422,7 @@ def _build_args(args, manually_set_args):
     if type(args["autotuneModelSize"]) == int:
         args["autotuneModelSize"] = str(args["autotuneModelSize"])
 
-    a = fasttext.args()
+    a = _core.args()
     for (k, v) in args.items():
         setattr(a, k, v)
         if k in manually_set_args:
@@ -436,13 +436,13 @@ def _build_args(args, manually_set_args):
 
 def tokenize(text):
     """Given a string of text, tokenize it and return a list of tokens"""
-    f = fasttext.fasttext()
+    f = _core.bytefast()
     return f.tokenize(text)
 
 
 def load_model(path):
     """Load a model given a filepath and return a model object."""
-    return _FastText(model_path=path)
+    return _ByteFast(model_path=path)
 
 
 unsupervised_default = {
@@ -556,8 +556,8 @@ def train_supervised(*kargs, **kwargs):
     ]
     args, manually_set_args = read_args(kargs, kwargs, arg_names, supervised_default)
     a = _build_args(args, manually_set_args)
-    ft = _FastText(args=a)
-    fasttext.train(ft.f, a)
+    ft = _ByteFast(args=a)
+    _core.train(ft.f, a)
     ft.set_args(ft.f.getArgs())
     return ft
 
@@ -600,8 +600,8 @@ def train_unsupervised(*kargs, **kwargs):
     ]
     args, manually_set_args = read_args(kargs, kwargs, arg_names, unsupervised_default)
     a = _build_args(args, manually_set_args)
-    ft = _FastText(args=a)
-    fasttext.train(ft.f, a)
+    ft = _ByteFast(args=a)
+    _core.train(ft.f, a)
     ft.set_args(ft.f.getArgs())
     return ft
 

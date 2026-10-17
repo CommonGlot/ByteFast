@@ -17,7 +17,7 @@ jobs:
       - name: Build CPU classifiers
         run: |
           make -j2 opt
-          make bytefast
+          make bytefast-proto
       - name: Cache official WiLI-2018 data
         uses: actions/cache@v4
         with:
@@ -29,15 +29,15 @@ jobs:
           python3 benchmarks/prepare_open_set.py --workdir /tmp/wili --known 200 --train-per-language 400 --dev-per-language 50 --seed 731
       - name: Train ByteFast 200-label classifier
         run: |
-          ./bytefast train /tmp/wili/open-train.txt /tmp/wili/open-bytefast.bin -bucket 16384 -dim 32 -epoch 10 -lr 0.3 -hashCount 1
+          ./bytefast-proto train /tmp/wili/open-train.txt /tmp/wili/open-bytefast.bin -bucket 16384 -dim 32 -epoch 10 -lr 0.3 -hashCount 1
       - name: Train tuned fastText comparator
         run: |
-          ./fasttext supervised -input /tmp/wili/open-train.txt -output /tmp/wili/open-fasttext -bucket 16384 -dim 32 -epoch 40 -lr 0.3 -minn 2 -maxn 5 -thread 2 -verbose 0
+          ./bytefast supervised -input /tmp/wili/open-train.txt -output /tmp/wili/open-fasttext -bucket 16384 -dim 32 -epoch 40 -lr 0.3 -minn 2 -maxn 5 -thread 2 -verbose 0
       - name: Produce scores on validation and test
         run: |
           for sample in dev-known dev-unknown dev-noise test-known test-unknown test-noise; do
-            ./bytefast predict-scores /tmp/wili/open-bytefast.bin /tmp/wili/open-$sample-text.txt > /tmp/wili/bf-$sample.scores
-            ./fasttext predict-prob /tmp/wili/open-fasttext.bin /tmp/wili/open-$sample-text.txt 2 > /tmp/wili/ft-$sample.scores
+            ./bytefast-proto predict-scores /tmp/wili/open-bytefast.bin /tmp/wili/open-$sample-text.txt > /tmp/wili/bf-$sample.scores
+            ./bytefast predict-prob /tmp/wili/open-fasttext.bin /tmp/wili/open-$sample-text.txt 2 > /tmp/wili/ft-$sample.scores
           done
       - name: Choose rejection thresholds on validation, evaluate test
         run: |
@@ -48,7 +48,7 @@ jobs:
           stat -c "MODEL_SIZE %n %s" /tmp/wili/open-bytefast.bin /tmp/wili/open-fasttext.bin
           for i in 1 2 3; do
             /usr/bin/time -f "MODEL_SPEED bytefast trial=$i seconds=%e rss_kb=%M" \
-              sh -c './bytefast predict /tmp/wili/open-bytefast.bin /tmp/wili/open-test-known-text.txt > /dev/null'
+              sh -c './bytefast-proto predict /tmp/wili/open-bytefast.bin /tmp/wili/open-test-known-text.txt > /dev/null'
             /usr/bin/time -f "MODEL_SPEED fasttext trial=$i seconds=%e rss_kb=%M" \
-              sh -c './fasttext predict /tmp/wili/open-fasttext.bin /tmp/wili/open-test-known-text.txt > /dev/null'
+              sh -c './bytefast predict /tmp/wili/open-fasttext.bin /tmp/wili/open-test-known-text.txt > /dev/null'
           done

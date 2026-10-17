@@ -3,10 +3,10 @@ on:
   push:
     branches: ["feature/python-lexical-training", "main"]
     paths:
-      - "python/fasttext_module/fasttext/api.py"
-      - "python/fasttext_module/fasttext/pybind/bytefast_pybind.cc"
-      - "src/bytefast_calibrated.h"
-      - "src/bytefast_lexical.h"
+      - "python/bytefast/api.py"
+      - "python/bytefast/pybind/proto_pybind.cc"
+      - "src/proto/bytefast_calibrated.h"
+      - "src/proto/bytefast_lexical.h"
       - "tests/test_python_lexical_training.py"
       - ".github/workflows/python-lexical-training.yml"
   pull_request:

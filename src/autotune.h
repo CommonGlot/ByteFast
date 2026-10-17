@@ -15,9 +15,9 @@
 #include <vector>
 
 #include "args.h"
-#include "fasttext.h"
+#include "bytefast.h"
 
-namespace fasttext {
+namespace bytefast {
 
 class AutotuneStrategy {
  private:
@@ -42,7 +42,7 @@ class AutotuneStrategy {
 
 class Autotune {
  protected:
-  std::shared_ptr<FastText> fastText_;
+  std::shared_ptr<ByteFast> fastText_;
   double elapsed_;
   double bestScore_;
   int32_t trials_;
@@ -76,7 +76,7 @@ class Autotune {
 
  public:
   Autotune() = delete;
-  explicit Autotune(const std::shared_ptr<FastText>& fastText);
+  explicit Autotune(const std::shared_ptr<ByteFast>& fastText);
   Autotune(const Autotune&) = delete;
   Autotune(Autotune&&) = delete;
   Autotune& operator=(const Autotune&) = delete;
@@ -86,4 +86,4 @@ class Autotune {
   void train(const Args& args);
 };
 
-} // namespace fasttext
+} // namespace bytefast

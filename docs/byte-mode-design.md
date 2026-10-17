@@ -40,7 +40,7 @@ fitted on separate calibration data and selected using validation data.
 ## Existing fastText components
 
 ByteFast retains the original fastText training algorithms, word
-representations, and binary-model reader. The `./fasttext` command remains
+representations, and binary-model reader. The `./bytefast` command remains
 available alongside the `./bytefast` commands.
 
 The Python `bytefast.load_model()` function detects original fastText models

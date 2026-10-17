@@ -80,8 +80,8 @@ with longer records may require a larger `max_bytes` setting than its default.
 For additional lexical evidence, use the separate native C++ tools:
 
 ```bash
-make bytefast bytefast-lexical bytefast-calibrated
-./bytefast train train.txt base.bin -dim 32 -bucket 16384 -epoch 10
+make bytefast-proto bytefast-lexical bytefast-calibrated
+./bytefast-proto train train.txt base.bin -dim 32 -bucket 16384 -epoch 10
 ./bytefast-lexical build base.bin train.txt words.lex 200000 1
 ./bytefast-calibrated fit base.bin words.lex \
     calibration.txt validation.txt weights.fuse
@@ -114,7 +114,7 @@ vectors = bytefast.train_unsupervised(input="corpus.txt")
 
 They are also accessible through `bytefast.legacy`.
 
-The native C++ programs remain separate: `./fasttext` retains the original
+The native C++ programs remain separate: `./bytefast` retains the original
 fastText commands; `./bytefast` uses its own model format.
 
 ## Limitations

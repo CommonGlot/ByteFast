@@ -16,8 +16,8 @@ from pathlib import Path
 
 import numpy as np
 
-from . import _byte_pybind
-from . import FastText as legacy
+from . import _proto_pybind
+from . import core as legacy
 
 BYTEFAST_MAGIC = 0x42594654
 FASTTEXT_MAGIC = 793712314
@@ -85,7 +85,7 @@ def _magic(path):
 
 
 def _calibrated_model(base_path, words_path, fusion_path, backing=None):
-    native = _byte_pybind.CalibratedByteFastModel()
+    native = _proto_pybind.CalibratedByteFastModel()
     native.load_model(
         os.fspath(base_path), os.fspath(words_path),
         os.fspath(fusion_path))
@@ -114,7 +114,7 @@ def load_model(path, *, lexicon=None, fusion=None):
             raise ValueError("Pass both lexicon= and fusion=, or neither")
         if lexicon is not None:
             return _calibrated_model(path, lexicon, fusion)
-        native = _byte_pybind.ByteFastModel()
+        native = _proto_pybind.ByteFastModel()
         native.load_model(str(path))
         return ByteFastModel(native)
 
@@ -288,7 +288,7 @@ def train_supervised(
         if (lexical_calibration_data is not None or
                 lexical_validation_data is not None):
             raise ValueError("lexical=True is required for calibration data")
-        native = _byte_pybind.ByteFastModel()
+        native = _proto_pybind.ByteFastModel()
         native.train(os.fspath(input), dim, bucket, minn, maxn, epoch, lr,
                      bool(ascii_fold), max_bytes, hash_count, position_bins)
         model = ByteFastModel(native)
@@ -340,12 +340,12 @@ def train_supervised(
         base = Path(workdir.name) / "base.bin"
         lexicon = Path(workdir.name) / "words.lex"
         fusion = Path(workdir.name) / "weights.fuse"
-        native = _byte_pybind.ByteFastModel()
+        native = _proto_pybind.ByteFastModel()
         native.train(os.fspath(fit_path), dim, bucket, minn, maxn,
                      epoch, lr, bool(ascii_fold), max_bytes,
                      hash_count, position_bins)
         native.save_model(str(base))
-        _byte_pybind.fit_lexical_sidecars(
+        _proto_pybind.fit_lexical_sidecars(
             str(base), os.fspath(fit_path),
             os.fspath(calibration_path), os.fspath(validation_path),
             str(lexicon), str(fusion), lexical_vocab, lexical_min_df,

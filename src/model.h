@@ -18,7 +18,7 @@
 #include "utils.h"
 #include "vector.h"
 
-namespace fasttext {
+namespace bytefast {
 
 class Loss;
 
@@ -76,4 +76,4 @@ class Model {
   static const int32_t kAllLabelsAsTarget = -1;
 };
 
-} // namespace fasttext
+} // namespace bytefast

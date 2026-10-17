@@ -19,7 +19,7 @@
 #include "matrix.h"
 #include "real.h"
 
-namespace fasttext {
+namespace bytefast {
 
 class Vector;
 
@@ -82,4 +82,4 @@ class DenseMatrix : public Matrix {
     EncounteredNaNError() : std::runtime_error("Encountered NaN.") {}
   };
 };
-} // namespace fasttext
+} // namespace bytefast

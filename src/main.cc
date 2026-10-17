@@ -12,14 +12,14 @@
 #include <stdexcept>
 #include "args.h"
 #include "autotune.h"
-#include "fasttext.h"
+#include "bytefast.h"
 
-using namespace fasttext;
+using namespace bytefast;
 
 void printUsage() {
   std::cerr
-      << "usage: fasttext <command> <args>\n\n"
-      << "The commands supported by fasttext are:\n\n"
+      << "usage: bytefast <command> <args>\n\n"
+      << "The commands supported by bytefast are:\n\n"
       << "  supervised              train a supervised classifier\n"
       << "  quantize                quantize a model to reduce the memory "
          "usage\n"
@@ -44,12 +44,12 @@ void printUsage() {
 }
 
 void printQuantizeUsage() {
-  std::cerr << "usage: fasttext quantize <args>" << std::endl;
+  std::cerr << "usage: bytefast quantize <args>" << std::endl;
 }
 
 void printTestUsage() {
   std::cerr
-      << "usage: fasttext test <model> <test-data> [<k>] [<th>]\n\n"
+      << "usage: bytefast test <model> <test-data> [<k>] [<th>]\n\n"
       << "  <model>      model filename\n"
       << "  <test-data>  test data filename (if -, read from stdin)\n"
       << "  <k>          (optional; 1 by default) predict top k labels\n"
@@ -59,7 +59,7 @@ void printTestUsage() {
 
 void printPredictUsage() {
   std::cerr
-      << "usage: fasttext predict[-prob] <model> <test-data> [<k>] [<th>]\n\n"
+      << "usage: bytefast predict[-prob] <model> <test-data> [<k>] [<th>]\n\n"
       << "  <model>      model filename\n"
       << "  <test-data>  test data filename (if -, read from stdin)\n"
       << "  <k>          (optional; 1 by default) predict top k labels\n"
@@ -69,7 +69,7 @@ void printPredictUsage() {
 
 void printTestLabelUsage() {
   std::cerr
-      << "usage: fasttext test-label <model> <test-data> [<k>] [<th>]\n\n"
+      << "usage: bytefast test-label <model> <test-data> [<k>] [<th>]\n\n"
       << "  <model>      model filename\n"
       << "  <test-data>  test data filename\n"
       << "  <k>          (optional; 1 by default) predict top k labels\n"
@@ -78,19 +78,19 @@ void printTestLabelUsage() {
 }
 
 void printPrintWordVectorsUsage() {
-  std::cerr << "usage: fasttext print-word-vectors <model>\n\n"
+  std::cerr << "usage: bytefast print-word-vectors <model>\n\n"
             << "  <model>      model filename\n"
             << std::endl;
 }
 
 void printPrintSentenceVectorsUsage() {
-  std::cerr << "usage: fasttext print-sentence-vectors <model>\n\n"
+  std::cerr << "usage: bytefast print-sentence-vectors <model>\n\n"
             << "  <model>      model filename\n"
             << std::endl;
 }
 
 void printPrintNgramsUsage() {
-  std::cerr << "usage: fasttext print-ngrams <model> <word>\n\n"
+  std::cerr << "usage: bytefast print-ngrams <model> <word>\n\n"
             << "  <model>      model filename\n"
             << "  <word>       word to print\n"
             << std::endl;
@@ -104,7 +104,7 @@ void quantize(const std::vector<std::string>& args) {
     exit(EXIT_FAILURE);
   }
   a.parseArgs(args);
-  FastText fasttext;
+  ByteFast fasttext;
   // parseArgs checks if a->output is given.
   fasttext.loadModel(a.output + ".bin");
   fasttext.quantize(a);
@@ -113,21 +113,21 @@ void quantize(const std::vector<std::string>& args) {
 }
 
 void printNNUsage() {
-  std::cout << "usage: fasttext nn <model> <k>\n\n"
+  std::cout << "usage: bytefast nn <model> <k>\n\n"
             << "  <model>      model filename\n"
             << "  <k>          (optional; 10 by default) predict top k labels\n"
             << std::endl;
 }
 
 void printAnalogiesUsage() {
-  std::cout << "usage: fasttext analogies <model> <k>\n\n"
+  std::cout << "usage: bytefast analogies <model> <k>\n\n"
             << "  <model>      model filename\n"
             << "  <k>          (optional; 10 by default) predict top k labels\n"
             << std::endl;
 }
 
 void printDumpUsage() {
-  std::cout << "usage: fasttext dump <model> <option>\n\n"
+  std::cout << "usage: bytefast dump <model> <option>\n\n"
             << "  <model>      model filename\n"
             << "  <option>     option from args,dict,input,output" << std::endl;
 }
@@ -145,7 +145,7 @@ void test(const std::vector<std::string>& args) {
   int32_t k = args.size() > 4 ? std::stoi(args[4]) : 1;
   real threshold = args.size() > 5 ? std::stof(args[5]) : 0.0;
 
-  FastText fasttext;
+  ByteFast fasttext;
   fasttext.loadModel(model);
 
   Meter meter(false);
@@ -224,7 +224,7 @@ void predict(const std::vector<std::string>& args) {
   }
 
   bool printProb = args[1] == "predict-prob";
-  FastText fasttext;
+  ByteFast fasttext;
   fasttext.loadModel(std::string(args[2]));
 
   std::ifstream ifs;
@@ -254,7 +254,7 @@ void printWordVectors(const std::vector<std::string> args) {
     printPrintWordVectorsUsage();
     exit(EXIT_FAILURE);
   }
-  FastText fasttext;
+  ByteFast fasttext;
   fasttext.loadModel(std::string(args[2]));
   std::string word;
   Vector vec(fasttext.getDimension());
@@ -270,7 +270,7 @@ void printSentenceVectors(const std::vector<std::string> args) {
     printPrintSentenceVectorsUsage();
     exit(EXIT_FAILURE);
   }
-  FastText fasttext;
+  ByteFast fasttext;
   fasttext.loadModel(std::string(args[2]));
   Vector svec(fasttext.getDimension());
   while (std::cin.peek() != EOF) {
@@ -286,7 +286,7 @@ void printNgrams(const std::vector<std::string> args) {
     printPrintNgramsUsage();
     exit(EXIT_FAILURE);
   }
-  FastText fasttext;
+  ByteFast fasttext;
   fasttext.loadModel(std::string(args[2]));
 
   std::string word(args[3]);
@@ -310,7 +310,7 @@ void nn(const std::vector<std::string> args) {
     printNNUsage();
     exit(EXIT_FAILURE);
   }
-  FastText fasttext;
+  ByteFast fasttext;
   fasttext.loadModel(std::string(args[2]));
   std::string prompt("Query word? ");
   std::cout << prompt;
@@ -336,7 +336,7 @@ void analogies(const std::vector<std::string> args) {
   if (k <= 0) {
     throw std::invalid_argument("k needs to be 1 or higher!");
   }
-  FastText fasttext;
+  ByteFast fasttext;
   std::string model(args[2]);
   std::cout << "Loading model " << model << std::endl;
   fasttext.loadModel(model);
@@ -358,7 +358,7 @@ void analogies(const std::vector<std::string> args) {
 void train(const std::vector<std::string> args) {
   Args a = Args();
   a.parseArgs(args);
-  std::shared_ptr<FastText> fasttext = std::make_shared<FastText>();
+  std::shared_ptr<ByteFast> fasttext = std::make_shared<ByteFast>();
   std::string outputFileName;
 
   if (a.hasAutotune() &&
@@ -395,7 +395,7 @@ void dump(const std::vector<std::string>& args) {
   std::string modelPath = args[2];
   std::string option = args[3];
 
-  FastText fasttext;
+  ByteFast fasttext;
   fasttext.loadModel(modelPath);
   if (option == "args") {
     fasttext.getArgs().dump(std::cout);

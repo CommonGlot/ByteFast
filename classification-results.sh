@@ -86,9 +86,9 @@ make
 for i in {0..7}
 do
   echo "Working on dataset ${DATASET[i]}"
-  ./fasttext supervised -input "${DATADIR}/${DATASET[i]}.train" \
+  ./bytefast supervised -input "${DATADIR}/${DATASET[i]}.train" \
     -output "${RESULTDIR}/${DATASET[i]}" -dim 10 -lr "${LR[i]}" -wordNgrams 2 \
     -minCount 1 -bucket 10000000 -epoch 5 -thread 4 > /dev/null
-  ./fasttext test "${RESULTDIR}/${DATASET[i]}.bin" \
+  ./bytefast test "${RESULTDIR}/${DATASET[i]}.bin" \
     "${DATADIR}/${DATASET[i]}.test"
 done

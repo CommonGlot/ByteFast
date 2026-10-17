@@ -19,8 +19,8 @@ from __future__ import unicode_literals
 
 import unittest
 import argparse
-from fasttext.tests import gen_tests
-from fasttext.tests import gen_unit_tests
+from bytefast.tests import gen_tests
+from bytefast.tests import gen_unit_tests
 
 
 def run_tests(tests):

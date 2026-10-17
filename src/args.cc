@@ -16,7 +16,7 @@
 #include <string>
 #include <unordered_map>
 
-namespace fasttext {
+namespace bytefast {
 
 Args::Args() {
   lr = 0.05;
@@ -491,4 +491,4 @@ int64_t Args::getAutotuneModelSize() const {
   return size * multiplier;
 }
 
-} // namespace fasttext
+} // namespace bytefast

@@ -22,7 +22,7 @@ jobs:
       - name: Build original fastText and ByteFast
         run: |
           make -j2 opt
-          make bytefast
+          make bytefast-proto
       - name: Cache official WiLI archive
         uses: actions/cache@v4
         with:
@@ -55,17 +55,17 @@ jobs:
             python3 benchmarks/prepare_budgets.py /tmp/wili/train.fasttext \
               /tmp/wili/train-$variant.txt --per-language "$cap" --seed 1729 $skew
 
-            ./fasttext supervised -input /tmp/wili/train-$variant.txt \
+            ./bytefast supervised -input /tmp/wili/train-$variant.txt \
               -output /tmp/wili/ft-$variant -dim 32 -epoch 5 -lr 0.3 \
               -minn 2 -maxn 5 -bucket 16384 -thread 1 -verbose 0
-            ./fasttext predict /tmp/wili/ft-$variant.bin /tmp/wili/test.txt > /tmp/wili/ft-$variant.pred
+            ./bytefast predict /tmp/wili/ft-$variant.bin /tmp/wili/test.txt > /tmp/wili/ft-$variant.pred
             echo "RESULT $variant fasttext:"
             python3 benchmarks/score_lid.py /tmp/wili/test.fasttext /tmp/wili/ft-$variant.pred
 
-            ./bytefast train /tmp/wili/train-$variant.txt \
+            ./bytefast-proto train /tmp/wili/train-$variant.txt \
               /tmp/wili/bf-$variant.bin -bucket 16384 -dim 32 \
               -epoch 5 -lr 0.3 -hashCount 1
-            ./bytefast predict /tmp/wili/bf-$variant.bin /tmp/wili/test.txt > /tmp/wili/bf-$variant.pred
+            ./bytefast-proto predict /tmp/wili/bf-$variant.bin /tmp/wili/test.txt > /tmp/wili/bf-$variant.pred
             echo "RESULT $variant bytefast:"
             python3 benchmarks/score_lid.py /tmp/wili/test.fasttext /tmp/wili/bf-$variant.pred
 
@@ -82,10 +82,10 @@ jobs:
               for trial in 1 2 3; do
                 if [[ $model == ft ]]; then
                   /usr/bin/time -f "PERF $variant fasttext trial=$trial wall=%e rss_kb=%M" \
-                    sh -c "./fasttext predict /tmp/wili/ft-$variant.bin /tmp/wili/test.txt >/dev/null"
+                    sh -c "./bytefast predict /tmp/wili/ft-$variant.bin /tmp/wili/test.txt >/dev/null"
                 else
                   /usr/bin/time -f "PERF $variant bytefast trial=$trial wall=%e rss_kb=%M" \
-                    sh -c "./bytefast predict /tmp/wili/bf-$variant.bin /tmp/wili/test.txt >/dev/null"
+                    sh -c "./bytefast-proto predict /tmp/wili/bf-$variant.bin /tmp/wili/test.txt >/dev/null"
                 fi
               done
             done

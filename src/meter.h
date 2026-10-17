@@ -15,7 +15,7 @@
 #include "real.h"
 #include "utils.h"
 
-namespace fasttext {
+namespace bytefast {
 
 class Meter {
   struct Metrics {
@@ -88,4 +88,4 @@ class Meter {
   bool falseNegativeLabels_;
 };
 
-} // namespace fasttext
+} // namespace bytefast

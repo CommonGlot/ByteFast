@@ -111,7 +111,7 @@ def main():
     oldlex=ROOT/"words-min3.lex"
     old=["./bytefast-lexical","predict",str(BASE),
          str(oldlex),str(testTxt),"-weight","3.0","-gateMargin","0.75"]
-    byte=["./bytefast","predict",str(BASE),str(testTxt)]
+    byte=["./bytefast-proto","predict",str(BASE),str(testTxt)]
     fasttext=ROOT/"word-fasttext.bin"
     compare=[
         ("learned_fusion",chosen,selected["bytes"]),
@@ -119,7 +119,7 @@ def main():
         ("byte_only",byte,BASE.stat().st_size),
     ]
     if fasttext.exists():
-        compare.append(("fasttext",["./fasttext","predict",
+        compare.append(("fasttext",["./bytefast","predict",
                        str(fasttext),str(testTxt)],fasttext.stat().st_size))
     results=[]
     for name,cmd,size in compare:

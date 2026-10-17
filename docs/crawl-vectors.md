@@ -7,29 +7,22 @@ We distribute pre-trained word vectors for 157 languages, trained on [*Common Cr
 These models were trained using CBOW with position-weights, in dimension 300, with character n-grams of length 5, a window of size 5 and 10 negatives.
 We also distribute three new word analogy datasets, for French, Hindi and Polish.
 
-### Download directly with command line or from python
+### Download and load
 
-In order to download with command line or from python code, you must have installed the python package as [described here](/docs/en/support.html#building-fasttext-python-module).
+These are Facebook's published fastText vectors. ByteFast does not bundle a
+downloader for them; fetch a file directly, for example
+`https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.en.300.bin.gz`,
+decompress it, and load it like any other model:
 
-<!--DOCUSAURUS_CODE_TABS-->
-<!--Command line-->
 ```bash
-$ ./download_model.py en     # English
-Downloading https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.en.300.bin.gz
- (19.78%) [=========>                                         ]
-```
-Once the download is finished, use the model as usual:
-```bash
-$ ./fasttext nn cc.en.300.bin 10
+$ ./bytefast nn cc.en.300.bin 10
 Query word?
 ```
-<!--Python-->
+
 ```py
->>> import fasttext.util
->>> fasttext.util.download_model('en', if_exists='ignore')  # English
->>> ft = fasttext.load_model('cc.en.300.bin')
+>>> import bytefast
+>>> ft = bytefast.load_model('cc.en.300.bin')
 ```
-<!--END_DOCUSAURUS_CODE_TABS-->
 
 #### 🤗 HuggingFace Integration
 Word vectors for 157 languages available on the Hugging Face Hub under the [`fasttext`](https://huggingface.co/models?library=fasttext) tag and more documentation is available [here](https://huggingface.co/facebook/fasttext-en-vectors/blob/main/README.md).
@@ -91,7 +84,7 @@ The word vectors are available in both binary and text formats.
 
 Using the binary models, vectors for out-of-vocabulary words can be obtained with
 ```
-$ ./fasttext print-word-vectors wiki.it.300.bin < oov_words.txt
+$ ./bytefast print-word-vectors wiki.it.300.bin < oov_words.txt
 ```
 where the file oov_words.txt contains out-of-vocabulary words.
 

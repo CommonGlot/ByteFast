@@ -83,7 +83,7 @@ Inside that folder, create `test.html` file containing:
 </head>
 <body>
     <script type="module">
-        import {FastText, addOnPostRun} from "./fasttext.js";
+        import {FastText, addOnPostRun} from "./bytefast.js";
 
         addOnPostRun(() => {
             let ft = new FastText();
@@ -116,7 +116,7 @@ In order to load a fastText model that was already trained, we can use `loadMode
 
 Place the model file you want to load inside the same directory than the HTML file, and inside the script part:
 ```javascript
-import {FastText, addOnPostRun} from "./fasttext.js";
+import {FastText, addOnPostRun} from "./bytefast.js";
 
 const printVector = function(predictions) {
     for (let i=0; i<predictions.size(); i++){
@@ -170,7 +170,7 @@ It is also possible to train a model inside the browser with fastText's WebAssem
 Place the `cooking.train` file (as described [here](/docs/en/supervised-tutorial.html)) inside the same directory:
 
 ```javascript
-import {FastText, addOnPostRun} from "./fasttext.js";
+import {FastText, addOnPostRun} from "./bytefast.js";
 
 const trainCallback = (progress, loss, wst, lr, eta) => {
     console.log([progress, loss, wst, lr, eta]);
@@ -200,7 +200,7 @@ addOnPostRun(() => {
 Place the `fil9` file (as described [here](/docs/en/unsupervised-tutorial.html)) inside the same directory:
 
 ```javascript
-import {FastText, addOnPostRun} from "./fasttext.js";
+import {FastText, addOnPostRun} from "./bytefast.js";
 
 const trainCallback = (progress, loss, wst, lr, eta) => {
     console.log([progress, loss, wst, lr, eta]);

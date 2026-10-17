@@ -8,7 +8,7 @@
 
 #pragma once
 
-namespace fasttext {
+namespace bytefast {
 
 typedef float real;
 }

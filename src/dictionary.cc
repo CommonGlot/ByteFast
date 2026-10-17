@@ -17,7 +17,7 @@
 #include <iterator>
 #include <stdexcept>
 
-namespace fasttext {
+namespace bytefast {
 
 const std::string Dictionary::EOS = "</s>";
 const std::string Dictionary::BOW = "<";
@@ -587,4 +587,4 @@ void Dictionary::dump(std::ostream& out) const {
   }
 }
 
-} // namespace fasttext
+} // namespace bytefast

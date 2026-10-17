@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build standalone CPU classifier
-        run: c++ -std=c++17 -O3 -Wall -Wextra -Werror -Isrc src/bytefast_cli.cc -o /tmp/bytefast
+        run: c++ -std=c++17 -O3 -Wall -Wextra -Werror -Isrc/proto src/proto/bytefast_cli.cc -o /tmp/bytefast
       - name: Make reproducible small multilingual data
         run: |
           python3 - <<'PY'
@@ -45,9 +45,9 @@ jobs:
         run: make -j2 opt
       - name: Run original fastText control on same samples
         run: |
-          ./fasttext supervised -input /tmp/bytefast-train.txt -output /tmp/legacy-lid -dim 32 -epoch 15 -lr 0.3 -bucket 4096 -minn 2 -maxn 5 -thread 1 -verbose 0
-          ./fasttext test /tmp/legacy-lid.bin /tmp/bytefast-test.txt
-          /usr/bin/time -f 'legacy_fasttext_seconds=%e' sh -c './fasttext predict /tmp/legacy-lid.bin /tmp/bytefast-bench.txt >/dev/null'
+          ./bytefast supervised -input /tmp/bytefast-train.txt -output /tmp/legacy-lid -dim 32 -epoch 15 -lr 0.3 -bucket 4096 -minn 2 -maxn 5 -thread 1 -verbose 0
+          ./bytefast test /tmp/legacy-lid.bin /tmp/bytefast-test.txt
+          /usr/bin/time -f 'legacy_fasttext_seconds=%e' sh -c './bytefast predict /tmp/legacy-lid.bin /tmp/bytefast-bench.txt >/dev/null'
           ls -lh /tmp/legacy-lid.bin
       - name: Train, reload, and evaluate the baseline
         run: |

@@ -1,8 +1,8 @@
 # ByteFast Python package; original fastText algorithms are preserved under
 # bytefast.legacy, using the original Facebook Research sources and MIT license.
 # Copyright (c) 2017-present, Facebook, Inc., and 2026 CommonGlot contributors.
-from . import FastText as legacy
-from .FastText import cbow, skipgram, supervised, tokenize, EOS, BOW, EOW
+from . import core as legacy
+from .core import cbow, skipgram, supervised, tokenize, EOS, BOW, EOW
 from .api import (
     ByteFastModel,
     train_supervised,

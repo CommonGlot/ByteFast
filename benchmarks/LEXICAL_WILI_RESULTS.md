@@ -38,8 +38,8 @@ Caveats: Wikipedia is not noisy web text, labels/domains can carry lexical signa
 ## How to build
 
 ```bash
-make bytefast bytefast-lexical
-./bytefast train train.fasttext base.bin -dim 32 -bucket 16384 -epoch 10 -asciiFold 1
+make bytefast-proto bytefast-lexical
+./bytefast-proto train train.fasttext base.bin -dim 32 -bucket 16384 -epoch 10 -asciiFold 1
 ./bytefast-lexical build base.bin train.fasttext words.lex 50000 3
 ./bytefast-lexical predict base.bin words.lex unlabeled.txt -weight 1.0
 ```
@@ -74,7 +74,7 @@ Gate thresholds 0–2 were selected on the same 23,500-example development split
 | Test BCMS F1 | 0.445980 | 0.687268 | **0.688549** |
 | Median CLI wall time (11,750 examples) | **0.3015 s** | 0.4378 s | 0.3276 s |
 
-Timing here is measured through the **same lexical CLI**, including base/sidecar model loading, so it differs from the earlier direct ByteFast `./bytefast predict` time. The sidecar file is 5,079,199 bytes, the base 2,129,882 bytes, total 7,209,081 bytes.
+Timing here is measured through the **same lexical CLI**, including base/sidecar model loading, so it differs from the earlier direct ByteFast `./bytefast-proto predict` time. The sidecar file is 5,079,199 bytes, the base 2,129,882 bytes, total 7,209,081 bytes.
 
 **Source:** [confidence gate action run](https://github.com/CommonGlot/ByteFast/actions/runs/38480834079).
 

@@ -38,7 +38,7 @@ $ pip install .
 Running the binary without any argument will print the high level documentation, showing the different use cases supported by fastText:
 
 ```bash
->> ./fasttext
+>> ./bytefast
 usage: fasttext <command> <args>
 
 The commands supported by fasttext are:
@@ -147,7 +147,7 @@ We are now ready to train our first classifier:
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
->> ./fasttext supervised -input cooking.train -output model_cooking
+>> ./bytefast supervised -input cooking.train -output model_cooking
 Read 0M words
 Number of words:  14598
 Number of labels: 734
@@ -178,7 +178,7 @@ Now, we can test our classifier, by :
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
->> ./fasttext predict model_cooking.bin -
+>> ./bytefast predict model_cooking.bin -
 ```
 
 and then typing a sentence.  Let's first try the sentence:
@@ -211,7 +211,7 @@ To get a better sense of its quality, let's test it on the validation data by ru
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
->> ./fasttext test model_cooking.bin cooking.valid
+>> ./bytefast test model_cooking.bin cooking.valid
 N  3000
 P@1  0.124
 R@1  0.0541
@@ -232,7 +232,7 @@ We can also compute the precision at five and recall at five with:
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
->> ./fasttext test model_cooking.bin cooking.valid 5
+>> ./bytefast test model_cooking.bin cooking.valid 5
 N  3000
 P@5  0.0668
 R@5  0.146
@@ -257,7 +257,7 @@ On Stack Exchange, this sentence is labeled with three tags: `equipment`, `clean
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
->> ./fasttext predict model_cooking.bin - 5
+>> ./bytefast predict model_cooking.bin - 5
 ```
 <!--Python-->
 ```py
@@ -291,13 +291,13 @@ Let's train a new model on the pre-processed data:
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
->> ./fasttext supervised -input cooking.train -output model_cooking
+>> ./bytefast supervised -input cooking.train -output model_cooking
 Read 0M words
 Number of words:  9012
 Number of labels: 734
 Progress: 100.0%  words/sec/thread: 82041  lr: 0.000000  loss: 5.671649  eta: 0h0m
 
->> ./fasttext test model_cooking.bin cooking.valid
+>> ./bytefast test model_cooking.bin cooking.valid
 N  3000
 P@1  0.164
 R@1  0.0717
@@ -326,7 +326,7 @@ By default, fastText sees each training example only five times during training,
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
->> ./fasttext supervised -input cooking.train -output model_cooking -epoch 25
+>> ./bytefast supervised -input cooking.train -output model_cooking -epoch 25
 Read 0M words
 Number of words:  9012
 Number of labels: 734
@@ -348,7 +348,7 @@ Let's test the new model:
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
->> ./fasttext test model_cooking.bin cooking.valid
+>> ./bytefast test model_cooking.bin cooking.valid
 N  3000
 P@1  0.501
 R@1  0.218
@@ -366,13 +366,13 @@ This is much better! Another way to change the learning speed of our model is to
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
->> ./fasttext supervised -input cooking.train -output model_cooking -lr 1.0
+>> ./bytefast supervised -input cooking.train -output model_cooking -lr 1.0
 Read 0M words
 Number of words:  9012
 Number of labels: 734
 Progress: 100.0%  words/sec/thread: 81469  lr: 0.000000  loss: 6.405640  eta: 0h0m
 
->> ./fasttext test model_cooking.bin cooking.valid
+>> ./bytefast test model_cooking.bin cooking.valid
 N  3000
 P@1  0.563
 R@1  0.245
@@ -396,13 +396,13 @@ Even better! Let's try both together:
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
->> ./fasttext supervised -input cooking.train -output model_cooking -lr 1.0 -epoch 25
+>> ./bytefast supervised -input cooking.train -output model_cooking -lr 1.0 -epoch 25
 Read 0M words
 Number of words:  9012
 Number of labels: 734
 Progress: 100.0%  words/sec/thread: 76394  lr: 0.000000  loss: 4.350277  eta: 0h0m
 
->> ./fasttext test model_cooking.bin cooking.valid
+>> ./bytefast test model_cooking.bin cooking.valid
 N  3000
 P@1  0.585
 R@1  0.255
@@ -430,13 +430,13 @@ Finally, we can improve the performance of a model by using word bigrams, instea
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
->> ./fasttext supervised -input cooking.train -output model_cooking -lr 1.0 -epoch 25 -wordNgrams 2
+>> ./bytefast supervised -input cooking.train -output model_cooking -lr 1.0 -epoch 25 -wordNgrams 2
 Read 0M words
 Number of words:  9012
 Number of labels: 734
 Progress: 100.0%  words/sec/thread: 75366  lr: 0.000000  loss: 3.226064  eta: 0h0m
 
->> ./fasttext test model_cooking.bin cooking.valid
+>> ./bytefast test model_cooking.bin cooking.valid
 N  3000
 P@1  0.599
 R@1  0.261
@@ -482,7 +482,7 @@ Since we are training our model on a few thousands of examples, the training onl
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
->> ./fasttext supervised -input cooking.train -output model_cooking -lr 1.0 -epoch 25 -wordNgrams 2 -bucket 200000 -dim 50 -loss hs
+>> ./bytefast supervised -input cooking.train -output model_cooking -lr 1.0 -epoch 25 -wordNgrams 2 -bucket 200000 -dim 50 -loss hs
 Read 0M words
 Number of words:  9012
 Number of labels: 734
@@ -520,7 +520,7 @@ A convenient way to handle multiple labels is to use independent binary classifi
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
->> ./fasttext supervised -input cooking.train -output model_cooking -lr 0.5 -epoch 25 -wordNgrams 2 -bucket 200000 -dim 50 -loss one-vs-all
+>> ./bytefast supervised -input cooking.train -output model_cooking -lr 0.5 -epoch 25 -wordNgrams 2 -bucket 200000 -dim 50 -loss one-vs-all
 Read 0M words
 Number of words:  14543
 Number of labels: 735
@@ -543,7 +543,7 @@ Now let's have a look on our predictions, we want as many prediction as possible
 <!--DOCUSAURUS_CODE_TABS-->
 <!--Command line-->
 ```bash
->> ./fasttext predict-prob model_cooking.bin - -1 0.5
+>> ./bytefast predict-prob model_cooking.bin - -1 0.5
 ```
 and then type the sentence:
 
@@ -567,7 +567,7 @@ __label__baking 1.00000 __label__bananas 0.939923 __label__bread 0.592677
 <br />
 We can also evaluate our results with the `test` command :
 ```bash
->> ./fasttext test model_cooking.bin cooking.valid -1 0.5
+>> ./bytefast test model_cooking.bin cooking.valid -1 0.5
 N 3000
 P@-1  0.702
 R@-1  0.2
@@ -576,7 +576,7 @@ Number of examples: 3000
 and play with the threshold to obtain desired precision/recall metrics :
 
 ```bash
->> ./fasttext test model_cooking.bin cooking.valid -1 0.1
+>> ./bytefast test model_cooking.bin cooking.valid -1 0.1
 N 3000
 P@-1  0.591
 R@-1  0.272
