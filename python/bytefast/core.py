@@ -111,7 +111,6 @@ class _ByteFast:
                 "minc",
                 "maxc",
                 "maxBytes",
-                "fold",
                 "hashWords",
                 "maxVocab",
                 "neg",
@@ -424,22 +423,9 @@ def _parse_loss_string(string):
         raise ValueError("Unrecognized loss name")
 
 
-def _parse_fold_string(string):
-    if isinstance(string, _core.fold_name):
-        return string
-    folds = {"none": _core.fold_name.none, "ascii": _core.fold_name.ascii,
-             "unicode": _core.fold_name.unicode}
-    if string not in folds:
-        raise ValueError("Unrecognized fold name %r: use 'none', 'ascii' or "
-                         "'unicode'" % (string,))
-    return folds[string]
-
-
 def _build_args(args, manually_set_args):
     args["model"] = _parse_model_string(args["model"])
     args["loss"] = _parse_loss_string(args["loss"])
-    if "fold" in args:
-        args["fold"] = _parse_fold_string(args["fold"])
     if "hashWords" in args:
         args["hashWords"] = bool(args["hashWords"])
     if type(args["autotuneModelSize"]) == int:
@@ -496,12 +482,9 @@ unsupervised_default = {
     "minc": 0,
     "maxc": 0,
     "maxBytes": 0,
-    "fold": "none",
     "hashWords": False,
     "wordlist": "",
     "maxVocab": 0,
-    "posBins": 0,
-    "textScope": "line",
     "inputModel": "",
     "cropProb": 0.0,
     "cropMin": 1,
@@ -529,8 +512,6 @@ def read_args(arg_list, arg_dict, arg_names, default_values):
         "max_bytes": "maxBytes",
         "hash_words": "hashWords",
         "max_vocab": "maxVocab",
-        "pos_bins": "posBins",
-        "text_scope": "textScope",
         "input_model": "inputModel",
         "crop_prob": "cropProb",
         "crop_min": "cropMin",
@@ -577,7 +558,6 @@ def train_supervised(*kargs, **kwargs):
     - minb/maxb: byte n-grams over the whole text, across word boundaries
     - minc/maxc: character n-grams over the whole text, across word
       boundaries; maxBytes limits how much of the text they read
-    - fold: 'none', 'ascii' or 'unicode' lowercasing before all features
 
     Set maxb/maxc to 0 to disable text n-grams, and minCount above the corpus
     size to disable word vectors. Models that use only fastText features are
@@ -630,12 +610,9 @@ def train_supervised(*kargs, **kwargs):
         "minc",
         "maxc",
         "maxBytes",
-        "fold",
         "hashWords",
         "wordlist",
         "maxVocab",
-        "posBins",
-        "textScope",
         "inputModel",
         "cropProb",
         "cropMin",
@@ -693,7 +670,6 @@ def train_unsupervised(*kargs, **kwargs):
         "label",
         "verbose",
         "pretrainedVectors",
-        "fold",
         "wordlist",
         "maxVocab",
     ]

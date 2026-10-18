@@ -118,7 +118,6 @@ def main():
         assert sizes == (72, 24, 24), sizes
         configured = bytefast.proto.train_supervised(
             source, dim=16, bucket=2048, epoch=3, lr=0.2,
-            hash_count=2, position_bins=4,
             lexical=True, lexical_vocab=80, lexical_min_df=1,
             lexical_split=(0.6, 0.2, 0.2), lexical_fusion_epochs=5,
             lexical_fusion_lr=0.05, lexical_fusion_l2=0.0,

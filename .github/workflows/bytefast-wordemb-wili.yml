@@ -33,7 +33,7 @@ jobs:
       - name: Train same 235-language byte classifier as earlier study
         run: |
           ./bytefast-proto train /tmp/wili/lex-train.fasttext /tmp/wili/word-byte.bin \
-            -dim 32 -bucket 16384 -epoch 10 -lr 0.3 -hashCount 1 -asciiFold 1
+            -dim 32 -bucket 16384 -epoch 10 -lr 0.3 -asciiFold 1
       - name: Train compact statistical lexical comparator
         run: |
           ./bytefast-lexical build /tmp/wili/word-byte.bin \

@@ -44,7 +44,7 @@ def main():
             "bytes": dict(minb=2, maxb=5, bucket=50000, minCount=10 ** 9),
             "chars": dict(minc=1, maxc=4, bucket=50000, minCount=10 ** 9),
             "bytes+words": dict(minb=2, maxb=5, bucket=50000, hash_words=True,
-                                fold="unicode", max_bytes=64),
+                                max_bytes=64),
         }
         for name, cfg in configs.items():
             model = train(data, **cfg)
@@ -63,24 +63,17 @@ def main():
                 if attr == "minCount":
                     continue  # a training-time setting
                 got = getattr(args, attr)
-                if attr == "fold":
-                    got = str(got).split(".")[-1]
                 assert got == value, (name, attr, got, value)
-
-        # Case folding makes predictions independent of letter case.
-        folded = train(data, minb=2, maxb=5, bucket=50000, fold="unicode")
-        upper = folded.predict(query.upper(), k=3)
-        lower = folded.predict(query.lower(), k=3)
-        assert upper[0] == lower[0] and abs(upper[1][0] - lower[1][0]) < 1e-6
 
         # Vocabulary control: wordlist and maxVocab.
         wordlist = root / "words.txt"
-        # Entries are folded like the input; text after the word is ignored.
-        wordlist.write_text("Telescope 10\nbank\nINVESTORS\n", encoding="utf-8")
-        listed = train(data, wordlist=str(wordlist), fold="unicode",
-                       minb=2, maxb=4, bucket=20000)
+        # Text after the word is ignored; entries match words exactly, so
+        # "investors" does not match "Investors" and "Telescope" is not in
+        # the data.
+        wordlist.write_text("telescope 10\nbank\ninvestors\nTelescope\n", encoding="utf-8")
+        listed = train(data, wordlist=str(wordlist), minb=2, maxb=4, bucket=20000)
         assert sorted(listed.get_words()) == [
-            "</s>", "bank", "investors", "telescope"], listed.get_words()
+            "</s>", "bank", "telescope"], listed.get_words()
         capped = train(data, max_vocab=5, minn=2, maxn=4)
         assert len(capped.get_words()) == 5
 
@@ -103,7 +96,7 @@ def main():
         assert continued.get_labels() == cropped.get_labels()
         assert continued.predict(query)[0] == ("__label__sports",)
 
-        for bad in ({"fold": "upper"}, {"minb": 3, "maxb": 2},
+        for bad in ({"minb": 3, "maxb": 2},
                     {"minc": 0, "maxc": 3}, {"maxb": 4, "minb": 1, "bucket": 0},
                     {"max_bytes": -1}, {"crop_prob": 1.5},
                     {"crop_prob": 0.5, "crop_max": 0},

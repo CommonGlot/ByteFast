@@ -8,7 +8,7 @@
     {"name": "glotlid-recipe", "flags": "-dim 256 -minCount 1000 -minCountLabel 0 -wordNgrams 1 -bucket 1000000 -minn 2 -maxn 5",
      "grid": {"lr": ["0.8"], "epoch": ["2"]}},
     {"name": "glotlid-recipe-tuned", "flags": "-dim 256 -minCount 1000 -minCountLabel 0 -wordNgrams 1 -bucket 1000000 -minn 2 -maxn 5"},
-    {"name": "bytefast-proto-like", "flags": "-dim 32 -bucket 16384 -minCount 1000000000 -minb 2 -maxb 5 -fold ascii -maxBytes 512"},
+    {"name": "bytefast-proto-like", "flags": "-dim 32 -bucket 16384 -minCount 1000000000 -minb 2 -maxb 5 -maxBytes 512"},
     {"name": "fasttext-proto-baseline", "flags": "-dim 32 -bucket 16384 -minCount 1 -minn 2 -maxn 5",
      "grid": {"lr": ["0.3"], "epoch": ["40"]}}
   ]

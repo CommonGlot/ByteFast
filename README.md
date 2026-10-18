@@ -64,7 +64,6 @@ model = bytefast.train_supervised(
     input="train.txt",
     minb=2, maxb=5,          # byte n-grams over the whole text
     minCount=5,              # word vectors for words seen at least 5 times
-    fold="unicode",          # lowercase before extracting features
     bucket=1_000_000, dim=64, epoch=5, lr=0.5, thread=8,
 )
 labels, probabilities = model.predict("The striker scored twice", k=3)
@@ -86,17 +85,13 @@ layer maps that average to the labels.
 | Byte n-grams over the text | `-minb N -maxb N` | off (`maxb 0`) |
 | Character n-grams over the text | `-minc N -maxc N` | off (`maxc 0`) |
 | Bytes of text read by text n-grams | `-maxBytes N` | 0 (all) |
-| Case folding | `-fold none\|ascii\|unicode` | `none` |
-| Position bins for text n-grams | `-posBins K` | 0 (off) |
-| Scope of text n-grams | `-textScope line\|word` | `line` |
 
 - **Text n-grams** read the words of a line joined by single spaces, with one
   space added at each end. So an n-gram can span the end of one word and the
   start of the next, and the first and last words get the same boundary
-  n-grams as the others. With `-textScope word`, text n-grams are taken
-  inside each word only, with no padding, so none of them contains a space.
+  n-grams as the others.
 - **`-wordlist FILE`** restricts the vocabulary to the first field of each line
-  in `FILE`, folded like the input. Words outside it can still contribute
+  in `FILE`; entries match words exactly. Words outside it can still contribute
   through `-hashWords`, subwords or text n-grams.
 - **Disabling word vectors:** set `-minCount` above the corpus size.
 - **Hashed features** (`-hashWords`, subwords, word n-grams and text n-grams)

@@ -24,14 +24,14 @@ model = bytefast.train_supervised(
     minCount=5, max_vocab=200_000,  # word vectors
     wordlist="",                    # optional allowed vocabulary
     hash_words=True,                # hashed vectors for other words
-    fold="unicode", max_bytes=0,
+    max_bytes=0,
     bucket=1_000_000, dim=64, epoch=5, lr=0.5, thread=8, loss="softmax",
 )
 model.save_model("model.bin")
 ```
 
 `bytefast.train_unsupervised` trains word vectors as in fastText and accepts
-`fold`, `wordlist` and `maxVocab`.
+`wordlist` and `maxVocab`.
 
 Both functions accept fastText's camelCase names and these snake_case
 aliases: `min_count`, `min_count_label`, `word_ngrams`, `lr_update_rate`,

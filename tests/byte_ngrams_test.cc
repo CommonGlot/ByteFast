@@ -30,23 +30,5 @@ int main() {
   assert(byteNgramHashes("x", 2, 5, 100000).empty());
   assert(byteNgramHashes("hi", 2, 5, 0).empty());
   assert(byteNgramHashes("hi", 0, 5, 100000).empty());
-  const auto one = bytefast::proto::byteNgramMultiHashes(
-      "a b", 2, 3, 100000, 1);
-  const auto two = bytefast::proto::byteNgramMultiHashes(
-      "a b", 2, 3, 100000, 2);
-  assert(one == features);
-  assert(two.size() == 2 * features.size());
-  for (size_t i = 0; i < features.size(); ++i) {
-    assert(two[2 * i] == features[i]);
-    assert(two[2 * i + 1] < 100000);
-  }
-  bool rejected = false;
-  try {
-    (void)bytefast::proto::byteNgramMultiHashes(
-        "abc", 2, 3, 100, 0);
-  } catch (const std::invalid_argument&) {
-    rejected = true;
-  }
-  assert(rejected);
   return 0;
 }

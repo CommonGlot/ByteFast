@@ -33,7 +33,7 @@ accepts one label per training line.
 ```bash
 ./bytefast-proto train train.txt classifier.bin \
     -dim 32 -bucket 16384 -epoch 10 -lr 0.15 \
-    -minn 2 -maxn 5 -hashCount 1
+    -minn 2 -maxn 5
 
 ./bytefast-proto test classifier.bin test-labeled.txt
 ./bytefast-proto predict classifier.bin inputs.txt
@@ -42,8 +42,7 @@ accepts one label per training line.
 
 The optional `-asciiFold 1` setting folds ASCII uppercase letters to
 lowercase when hashing features. The default maximum input length is
-512 bytes; change it with `-maxBytes N`. The optional
-`-hashCount 2` and `-positionBins 4` settings are experimental.
+512 bytes; change it with `-maxBytes N`.
 
 The saved model uses ByteFast's own versioned binary format. It is not
 an original fastText `.bin` file.

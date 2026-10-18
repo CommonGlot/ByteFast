@@ -16,19 +16,18 @@ int main() {
   constexpr int repeats = 20000;
   constexpr uint32_t buckets = 524288;
 
-  for (uint32_t hashes : {1u, 2u}) {
+  {
     volatile uint64_t checksum = 0;
     const auto begin = std::chrono::steady_clock::now();
     for (int i = 0; i < repeats; ++i) {
-      auto features = bytefast::proto::byteNgramMultiHashes(
-          sample, 2, 5, buckets, hashes);
+      auto features = bytefast::proto::byteNgramHashes(sample, 2, 5, buckets);
       checksum += features[static_cast<size_t>(i) % features.size()];
     }
     const double seconds = std::chrono::duration<double>(
         std::chrono::steady_clock::now() - begin).count();
-    const size_t featureCount = bytefast::proto::byteNgramMultiHashes(
-        sample, 2, 5, buckets, hashes).size();
-    std::cout << "hashes=" << hashes << " docs=" << repeats
+    const size_t featureCount =
+        bytefast::proto::byteNgramHashes(sample, 2, 5, buckets).size();
+    std::cout << "docs=" << repeats
               << " bytes/doc=" << sample.size()
               << " features/doc=" << featureCount
               << " seconds=" << std::fixed << std::setprecision(4) << seconds

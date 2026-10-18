@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 CommonGlot contributors. MIT License.
-"""Generate src/unicode_fold.h: simple lowercase mappings for -fold unicode.
+"""Generate src/unicode_fold.h: simple lowercase mappings for the CommonLID-style
+normalization (-normProb).
 
-Only one-to-one mappings are kept, so folding never changes the number of
+Only one-to-one mappings are kept, so lowercasing never changes the number of
 code points. U+0130 (capital I with dot above) lowercases to two code points
 in Python; its simple mapping (UnicodeData.txt) is U+0069, which is used here.
 

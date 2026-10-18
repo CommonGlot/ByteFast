@@ -248,7 +248,6 @@ def _split_lexical_training(source, directory, seed, split=(0.8, 0.1, 0.1)):
 def train_supervised(
     input, *, output=None, dim=64, bucket=65536, minn=2, maxn=5,
     epoch=5, lr=0.15, ascii_fold=False, max_bytes=512,
-    hash_count=1, position_bins=0,
     lexical=False, lexical_vocab=200000, lexical_min_df=1,
     lexical_selection="global", lexical_seed=1337,
     lexical_calibration_data=None, lexical_validation_data=None,
@@ -270,8 +269,7 @@ def train_supervised(
     Class-balanced and confusion-aware selection are not implemented yet.
 
     Every training setting is an argument: the byte encoder (dim, bucket,
-    minn, maxn, epoch, lr, ascii_fold, max_bytes, hash_count,
-    position_bins), the word table (lexical_vocab, lexical_min_df), the
+    minn, maxn, epoch, lr, ascii_fold, max_bytes), the word table (lexical_vocab, lexical_min_df), the
     automatic split (lexical_split, lexical_seed) and the fusion optimizer
     (lexical_fusion_epochs, lexical_fusion_lr, lexical_fusion_l2,
     lexical_fusion_patience).
@@ -284,7 +282,7 @@ def train_supervised(
             raise ValueError("lexical=True is required for calibration data")
         native = _proto_pybind.ByteFastModel()
         native.train(os.fspath(input), dim, bucket, minn, maxn, epoch, lr,
-                     bool(ascii_fold), max_bytes, hash_count, position_bins)
+                     bool(ascii_fold), max_bytes)
         model = ProtoModel(native)
         if output is not None:
             model.save_model(output)
@@ -336,8 +334,7 @@ def train_supervised(
         fusion = Path(workdir.name) / "weights.fuse"
         native = _proto_pybind.ByteFastModel()
         native.train(os.fspath(fit_path), dim, bucket, minn, maxn,
-                     epoch, lr, bool(ascii_fold), max_bytes,
-                     hash_count, position_bins)
+                     epoch, lr, bool(ascii_fold), max_bytes)
         native.save_model(str(base))
         _proto_pybind.fit_lexical_sidecars(
             str(base), os.fspath(fit_path),

@@ -14,8 +14,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include "textnorm.h"
-
 namespace bytefast {
 
 enum class model_name : int { cbow = 1, sg, sup };
@@ -60,12 +58,9 @@ class Args {
   int minc;
   int maxc;
   int maxBytes;
-  fold_name fold;
   bool hashWords;
   std::string wordlist;
   int maxVocab;
-  int posBins;
-  std::string textScope;
   // Training only (not stored in models).
   std::string inputModel;
   double cropProb;
@@ -109,8 +104,6 @@ class Args {
   bool usesTextFeatures() const;
   bool usesHashedFeatures() const;
   void validate() const;
-  std::string foldToString(fold_name) const;
-  static fold_name parseFold(const std::string&);
   void dump(std::ostream&) const;
   bool hasAutotune() const;
   bool isManual(const std::string& argName) const;

@@ -14,19 +14,13 @@ int main(int argc,char** argv) {
       else if(flag=="-lr") model.opt.lr=std::stof(argv[i+1]);
       else if(flag=="-minn") model.opt.minN=numeric(argv[i+1]);
       else if(flag=="-maxn") model.opt.maxN=numeric(argv[i+1]);
-      else if(flag=="-hashCount") model.opt.hashes=numeric(argv[i+1]);
-      else if(flag=="-positionBins") {
-        const auto bins=numeric(argv[i+1]);
-        if (bins!=0 && bins!=4) throw std::runtime_error("positionBins must be 0 or 4");
-        model.opt.positions=bins?1:0;
-      }
       else if(flag=="-maxBytes") model.opt.maxBytes=numeric(argv[i+1]);
       else if(flag=="-asciiFold") model.opt.asciiFold=numeric(argv[i+1]);
       else throw std::runtime_error("Unknown option: "+flag);
     }
     if (!model.opt.bucket || !model.opt.dim || !model.opt.minN ||
         model.opt.maxN>16 || model.opt.minN>model.opt.maxN ||
-        !model.opt.hashes || model.opt.hashes>4 || !model.opt.maxBytes ||
+        !model.opt.maxBytes ||
         !model.opt.epochs || model.opt.asciiFold>1 || !(model.opt.lr>0))
       throw std::runtime_error("Invalid hyperparameters");
     const auto records=readRecords(argv[2]);

@@ -64,7 +64,7 @@ jobs:
 
             ./bytefast-proto train /tmp/wili/train-$variant.txt \
               /tmp/wili/bf-$variant.bin -bucket 16384 -dim 32 \
-              -epoch 5 -lr 0.3 -hashCount 1
+              -epoch 5 -lr 0.3
             ./bytefast-proto predict /tmp/wili/bf-$variant.bin /tmp/wili/test.txt > /tmp/wili/bf-$variant.pred
             echo "RESULT $variant bytefast:"
             python3 benchmarks/score_lid.py /tmp/wili/test.fasttext /tmp/wili/bf-$variant.pred

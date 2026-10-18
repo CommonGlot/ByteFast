@@ -18,6 +18,8 @@
 #include <stdexcept>
 #include <unordered_set>
 
+#include "textnorm.h"
+
 namespace bytefast {
 
 namespace {
@@ -251,7 +253,6 @@ void Dictionary::readFromFile(std::istream& in) {
   std::string word;
   int64_t minThreshold = 1;
   while (readWord(in, word)) {
-    normalize(word);
     add(word);
     if (ntokens_ % 1000000 == 0 && args_->verbose > 1) {
       std::cerr << "\rRead " << ntokens_ / 1000000 << "M words" << std::flush;
@@ -292,9 +293,7 @@ void Dictionary::applyWordlist() {
   while (std::getline(ifs, line)) {
     std::string_view rest(line), word;
     if (readWordNoNewline(rest, word)) {
-      std::string w(word);
-      normalize(w);
-      allowed.insert(std::move(w));
+      allowed.emplace(word);
     }
   }
   words_.erase(
@@ -412,14 +411,6 @@ void Dictionary::addSubwords(
   }
 }
 
-void Dictionary::normalize(std::string& token) const {
-  if (args_->fold == fold_name::none ||
-      token.compare(0, args_->label.size(), args_->label) == 0) {
-    return;
-  }
-  text::fold(token, args_->fold);
-}
-
 void Dictionary::addHashedWord(
     std::vector<int32_t>& line,
     const std::string_view token) const {
@@ -439,23 +430,6 @@ void Dictionary::addTextNgrams(
     return;
   }
   const uint32_t buckets = static_cast<uint32_t>(args_->bucket);
-  if (args_->textScope == "word") {
-    // N-grams inside each word only: no feature contains a space.
-    auto emitWord = [&](uint32_t h, size_t) { pushHash(line, h % buckets); };
-    for (const auto& token : tokens) {
-      if (token == EOS) {
-        continue;
-      }
-      std::string_view word = text::truncateUtf8(token, args_->maxBytes);
-      if (args_->maxb > 0) {
-        text::byteNgrams(word, args_->minb, args_->maxb, emitWord);
-      }
-      if (args_->maxc > 0) {
-        text::charNgrams(word, args_->minc, args_->maxc, emitWord);
-      }
-    }
-    return;
-  }
   std::string joined;
   for (const auto& token : tokens) {
     if (token == EOS) {
@@ -472,15 +446,7 @@ void Dictionary::addTextNgrams(
   std::string padded = " ";
   padded += text::truncateUtf8(joined, args_->maxBytes);
   padded.push_back(' ');
-  const int bins = args_->posBins;
-  const size_t length = padded.size();
-  auto emit = [&](uint32_t h, size_t start) {
-    pushHash(line, h % buckets);
-    if (bins > 0) {
-      const int bin = static_cast<int>(start * bins / length);
-      pushHash(line, text::positionHash(h, bin) % buckets);
-    }
-  };
+  auto emit = [&](uint32_t h, size_t) { pushHash(line, h % buckets); };
   if (args_->maxb > 0) {
     text::byteNgrams(padded, args_->minb, args_->maxb, emit);
   }
@@ -507,7 +473,6 @@ int32_t Dictionary::getLine(
   reset(in);
   words.clear();
   while (readWord(in, token)) {
-    normalize(token);
     int32_t h = find(token);
     int32_t wid = word2int_[h];
     if (wid < 0) {
@@ -538,7 +503,6 @@ int32_t Dictionary::readLine(
   tokens.clear();
   labels.clear();
   while (readWord(in, token)) {
-    normalize(token);
     ntokens++;
     addToken(token, tokens, labels);
     if (token == EOS) {
@@ -715,7 +679,6 @@ int32_t Dictionary::getStringNoNewline(
   labels.clear();
   while (readWordNoNewline(in, view)) {
     token.assign(view.data(), view.size());
-    normalize(token);
     ntokens++;
     addToken(token, tokens, labels);
     if (token == EOS) {

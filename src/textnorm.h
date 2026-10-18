@@ -16,8 +16,6 @@
 
 namespace bytefast {
 
-enum class fold_name : int { none = 0, ascii = 1, unicode = 2 };
-
 namespace text {
 
 inline bool isContinuation(uint8_t b) {
@@ -92,18 +90,16 @@ inline size_t utf8Length(std::string_view s, size_t i, uint32_t& cp) {
   return len;
 }
 
-// Lowercase s in place. Unicode folding uses one-to-one mappings only, so
-// the number of code points never changes; malformed bytes are kept as is.
-inline void fold(std::string& s, fold_name mode) {
-  if (mode == fold_name::none) {
-    return;
-  }
+// Lowercase s in place (for normalizeToken). Unicode lowercasing uses
+// one-to-one mappings only, so the number of code points never changes;
+// malformed bytes are kept as is.
+inline void lowercaseUtf8(std::string& s) {
   bool ascii = true;
   for (char& c : s) {
     c = asciiLower(c);
     ascii = ascii && static_cast<uint8_t>(c) < 0x80;
   }
-  if (mode == fold_name::ascii || ascii) {
+  if (ascii) {
     return;
   }
   std::string out;
@@ -155,7 +151,7 @@ inline void normalizeToken(std::string& s) {
        pos = s.find("\xC4\xB0", pos + 3)) {
     s.replace(pos, 2, "i\xCC\x87");
   }
-  fold(s, fold_name::unicode);
+  lowercaseUtf8(s);
   std::string out;
   out.reserve(s.size());
   for (size_t i = 0; i < s.size();) {
@@ -245,12 +241,6 @@ void charNgrams(std::string_view s, int minN, int maxN, Emit emit) {
       }
     }
   }
-}
-
-// Hash of an n-gram combined with the bin of its start position, so that
-// the same n-gram at the start and at the end of a text are separate features.
-inline uint32_t positionHash(uint32_t h, int bin) {
-  return fmix32(h ^ (0x27D4EB2Fu * static_cast<uint32_t>(bin + 1)));
 }
 
 // Longest prefix of s with at most maxBytes bytes that does not split a

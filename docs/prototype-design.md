@@ -22,8 +22,7 @@ meanings are determined by the training dataset.
 - Deterministic hashing into an embedding table.
 - Mean pooling over input byte features.
 - Linear output classifier over the labels present in training data.
-- Single-hash features by default; multi-hash and positional features remain
-  optional experiments.
+- One hash per n-gram, with no position features.
 
 This architecture applies to any labeled classification dataset. Label names
 may represent topics, sentiment categories, document types, languages, or other

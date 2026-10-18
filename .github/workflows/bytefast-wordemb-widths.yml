@@ -35,7 +35,7 @@ jobs:
       - name: Train same byte baseline for every word vector width
         run: |
           ./bytefast-proto train /tmp/wili/lex-train.fasttext /tmp/wili/word-byte.bin \
-            -dim 32 -bucket 16384 -epoch 10 -lr 0.3 -hashCount 1 -asciiFold 1
+            -dim 32 -bucket 16384 -epoch 10 -lr 0.3 -asciiFold 1
       - name: Construct existing statistical lexical comparator
         run: |
           ./bytefast-lexical build /tmp/wili/word-byte.bin \

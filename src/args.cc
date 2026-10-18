@@ -37,12 +37,9 @@ Args::Args() {
   minc = 0;
   maxc = 0;
   maxBytes = 0;
-  fold = fold_name::none;
   hashWords = false;
   wordlist = "";
   maxVocab = 0;
-  posBins = 0;
-  textScope = "line";
   inputModel = "";
   cropProb = 0.0;
   cropMin = 1;
@@ -71,29 +68,6 @@ Args::Args() {
   autotunePredictions = 1;
   autotuneDuration = 60 * 5; // 5 minutes
   autotuneModelSize = "";
-}
-
-std::string Args::foldToString(fold_name fn) const {
-  switch (fn) {
-    case fold_name::none:
-      return "none";
-    case fold_name::ascii:
-      return "ascii";
-    case fold_name::unicode:
-      return "unicode";
-  }
-  return "Unknown fold!"; // should never happen
-}
-
-fold_name Args::parseFold(const std::string& value) {
-  if (value == "none" || value == "0") {
-    return fold_name::none;
-  } else if (value == "ascii" || value == "1") {
-    return fold_name::ascii;
-  } else if (value == "unicode" || value == "2") {
-    return fold_name::unicode;
-  }
-  throw std::invalid_argument("Unknown fold: " + value);
 }
 
 std::string Args::lossToString(loss_name ln) const {
@@ -226,8 +200,6 @@ void Args::parseArgs(const std::vector<std::string>& args) {
         maxc = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-maxBytes") {
         maxBytes = std::stoi(args.at(ai + 1));
-      } else if (args[ai] == "-fold") {
-        fold = parseFold(args.at(ai + 1));
       } else if (args[ai] == "-hashWords") {
         hashWords = true;
         ai--;
@@ -235,10 +207,6 @@ void Args::parseArgs(const std::vector<std::string>& args) {
         wordlist = std::string(args.at(ai + 1));
       } else if (args[ai] == "-maxVocab") {
         maxVocab = std::stoi(args.at(ai + 1));
-      } else if (args[ai] == "-textScope") {
-        textScope = std::string(args.at(ai + 1));
-      } else if (args[ai] == "-posBins") {
-        posBins = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-inputModel") {
         inputModel = std::string(args.at(ai + 1));
       } else if (args[ai] == "-cropProb") {
@@ -330,8 +298,7 @@ void Args::parseArgs(const std::vector<std::string>& args) {
 }
 
 bool Args::usesTextFeatures() const {
-  return maxb > 0 || maxc > 0 || maxBytes > 0 || fold != fold_name::none ||
-      hashWords || posBins > 0 || textScope != "line";
+  return maxb > 0 || maxc > 0 || maxBytes > 0 || hashWords;
 }
 
 bool Args::usesHashedFeatures() const {
@@ -347,12 +314,6 @@ void Args::validate() const {
   }
   if (maxBytes < 0) {
     throw std::invalid_argument("-maxBytes must be >= 0 (0 = no limit)");
-  }
-  if (posBins < 0 || posBins > 64) {
-    throw std::invalid_argument("-posBins must be in [0, 64]");
-  }
-  if (posBins > 0 && maxb <= 0 && maxc <= 0) {
-    throw std::invalid_argument("-posBins needs -maxb or -maxc text n-grams");
   }
   if (maxVocab < 0) {
     throw std::invalid_argument("-maxVocab must be >= 0 (0 = no limit)");
@@ -372,9 +333,6 @@ void Args::validate() const {
   }
   if (cropUnit != "char" && cropUnit != "word" && cropUnit != "byte") {
     throw std::invalid_argument("-cropUnit must be char, word or byte");
-  }
-  if (textScope != "line" && textScope != "word") {
-    throw std::invalid_argument("-textScope must be line or word");
   }
   if (!inputModel.empty() && hasAutotune()) {
     throw std::invalid_argument("-inputModel cannot be combined with autotune");
@@ -420,18 +378,12 @@ void Args::printDictionaryHelp() {
             << maxc << "]\n"
             << "  -maxBytes           bytes of text used for text ngrams, 0 = all ["
             << maxBytes << "]\n"
-            << "  -fold               case folding: none, ascii or unicode ["
-            << foldToString(fold) << "]\n"
             << "  -hashWords          hash words that are not in the vocabulary ["
             << boolToString(hashWords) << "]\n"
             << "  -wordlist           file with the allowed vocabulary, one word per line ["
             << wordlist << "]\n"
             << "  -maxVocab           keep at most this many words, 0 = no limit ["
             << maxVocab << "]\n"
-            << "  -posBins            also hash text n-grams with their position bin, 0 = off ["
-            << posBins << "]\n"
-            << "  -textScope          text n-grams over the line (with spaces) or inside words ["
-            << textScope << "]\n"
             << "  -cropProb           probability of training on a random span of a line ["
             << cropProb << "]\n"
             << "  -cropMin            min span length [" << cropMin << "]\n"
@@ -544,10 +496,12 @@ void Args::load(std::istream& in) {
 }
 
 // Text-feature settings, stored after the fastText fields in ByteFast
-// model files. The leading version allows the block to grow.
+// model files. The leading version allows the block to grow. The fold,
+// position-bin and text-scope fields belong to options that were removed;
+// they are written as 0 so that the layout stays readable by older builds.
 void Args::saveTextFeatures(std::ostream& out) const {
   const int32_t version = 3;
-  const int32_t foldValue = static_cast<int32_t>(fold);
+  const int32_t unused = 0;
   const int32_t hashWordsValue = hashWords ? 1 : 0;
   out.write((char*)&(version), sizeof(int32_t));
   out.write((char*)&(minb), sizeof(int));
@@ -555,16 +509,15 @@ void Args::saveTextFeatures(std::ostream& out) const {
   out.write((char*)&(minc), sizeof(int));
   out.write((char*)&(maxc), sizeof(int));
   out.write((char*)&(maxBytes), sizeof(int));
-  out.write((char*)&(foldValue), sizeof(int32_t));
+  out.write((char*)&(unused), sizeof(int32_t)); // fold
   out.write((char*)&(hashWordsValue), sizeof(int32_t));
   out.write((char*)&(maxVocab), sizeof(int));
-  out.write((char*)&(posBins), sizeof(int));
-  const int32_t scopeValue = textScope == "word" ? 1 : 0;
-  out.write((char*)&(scopeValue), sizeof(int32_t));
+  out.write((char*)&(unused), sizeof(int32_t)); // posBins
+  out.write((char*)&(unused), sizeof(int32_t)); // textScope
 }
 
 void Args::loadTextFeatures(std::istream& in) {
-  int32_t version, foldValue, hashWordsValue;
+  int32_t version, foldValue, hashWordsValue, posBinsValue = 0, scopeValue = 0;
   in.read((char*)&(version), sizeof(int32_t));
   if (!in || version < 1 || version > 3) {
     throw std::invalid_argument("Unsupported ByteFast text feature block");
@@ -577,20 +530,20 @@ void Args::loadTextFeatures(std::istream& in) {
   in.read((char*)&(foldValue), sizeof(int32_t));
   in.read((char*)&(hashWordsValue), sizeof(int32_t));
   in.read((char*)&(maxVocab), sizeof(int));
-  posBins = 0;
   if (version >= 2) {
-    in.read((char*)&(posBins), sizeof(int));
+    in.read((char*)&(posBinsValue), sizeof(int32_t));
   }
-  textScope = "line";
   if (version >= 3) {
-    int32_t scopeValue = 0;
     in.read((char*)&(scopeValue), sizeof(int32_t));
-    textScope = scopeValue == 1 ? "word" : "line";
   }
   if (!in || foldValue < 0 || foldValue > 2) {
     throw std::invalid_argument("Corrupt ByteFast text feature block");
   }
-  fold = static_cast<fold_name>(foldValue);
+  if (foldValue != 0 || posBinsValue != 0 || scopeValue != 0) {
+    throw std::invalid_argument(
+        "This model uses -fold, -posBins or -textScope word, which ByteFast no "
+        "longer supports");
+  }
   hashWords = hashWordsValue != 0;
   validate();
 }
@@ -628,11 +581,8 @@ void Args::dump(std::ostream& out) const {
     out << "minc " << minc << std::endl;
     out << "maxc " << maxc << std::endl;
     out << "maxBytes " << maxBytes << std::endl;
-    out << "fold " << foldToString(fold) << std::endl;
     out << "hashWords " << boolToString(hashWords) << std::endl;
     out << "maxVocab " << maxVocab << std::endl;
-    out << "posBins " << posBins << std::endl;
-    out << "textScope " << textScope << std::endl;
   }
 }
 

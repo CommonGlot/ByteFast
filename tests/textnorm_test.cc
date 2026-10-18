@@ -30,8 +30,8 @@ std::vector<uint32_t> chars(const std::string& s, int minN, int maxN) {
   return out;
 }
 
-std::string folded(std::string s, fold_name mode) {
-  text::fold(s, mode);
+std::string lowered(std::string s) {
+  text::lowercaseUtf8(s);
   return s;
 }
 
@@ -74,26 +74,21 @@ int main() {
   starts.clear();
   text::charNgrams(nihongo, 1, 1, [&](uint32_t, size_t i) { starts.push_back(i); });
   assert((starts == std::vector<size_t>{0, 3, 6}));
-  assert(text::positionHash(42, 0) != text::positionHash(42, 1));
-  assert(text::positionHash(42, 0) != 42u);
 
-  // Folding.
-  assert(folded("Hello WORLD", fold_name::ascii) == "hello world");
-  assert(folded("Hello WORLD", fold_name::none) == "Hello WORLD");
-  // ASCII folding leaves non-ASCII letters alone; Unicode folds them.
-  assert(folded("\xC3\x89T\xC3\x89", fold_name::ascii) == "\xC3\x89t\xC3\x89");
-  assert(folded("\xC3\x89T\xC3\x89", fold_name::unicode) == "\xC3\xA9t\xC3\xA9");
+  // Lowercasing (used by the CommonLID-style normalization).
+  assert(lowered("Hello WORLD") == "hello world");
+  assert(lowered("\xC3\x89T\xC3\x89") == "\xC3\xA9t\xC3\xA9");
   // Cyrillic "ПРИВЕТ" -> "привет", Greek "ΣΟΦΙΑ" -> "σοφια".
-  assert(folded("\xD0\x9F\xD0\xA0\xD0\x98\xD0\x92\xD0\x95\xD0\xA2", fold_name::unicode) ==
+  assert(lowered("\xD0\x9F\xD0\xA0\xD0\x98\xD0\x92\xD0\x95\xD0\xA2") ==
          "\xD0\xBF\xD1\x80\xD0\xB8\xD0\xB2\xD0\xB5\xD1\x82");
-  assert(folded("\xCE\xA3\xCE\x9F\xCE\xA6\xCE\x99\xCE\x91", fold_name::unicode) ==
+  assert(lowered("\xCE\xA3\xCE\x9F\xCE\xA6\xCE\x99\xCE\x91") ==
          "\xCF\x83\xCE\xBF\xCF\x86\xCE\xB9\xCE\xB1");
   // U+0130 uses its one-to-one mapping (i), so the length in code points
   // never changes; scripts without case are unchanged.
-  assert(folded("\xC4\xB0", fold_name::unicode) == "i");
-  assert(folded(nihongo, fold_name::unicode) == nihongo);
+  assert(lowered("\xC4\xB0") == "i");
+  assert(lowered(nihongo) == nihongo);
   // Malformed UTF-8 is copied byte by byte.
-  assert(folded("A\xFF\xC3", fold_name::unicode) == "a\xFF\xC3");
+  assert(lowered("A\xFF\xC3") == "a\xFF\xC3");
 
   // CommonLID-style normalization (expected values from the evaluator's
   // regex cleaner, applied per whitespace token).

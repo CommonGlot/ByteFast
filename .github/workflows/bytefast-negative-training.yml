@@ -35,7 +35,7 @@ jobs:
             fold=0
             if [[ $variant == explicitfold ]]; then fold=1; fi
             ./bytefast-proto train "$f" /tmp/wili/reject/$variant.bin \
-              -bucket 16384 -dim 32 -epoch 10 -lr 0.3 -hashCount 1 -asciiFold "$fold"
+              -bucket 16384 -dim 32 -epoch 10 -lr 0.3 -asciiFold "$fold"
           done
       - name: Estimate validation-only thresholds and test on 20 fully unseen languages
         run: |

@@ -21,7 +21,7 @@
 
 namespace {
 struct Options {
-  uint32_t bucket = 65536, dim = 64, minN = 2, maxN = 5, hashes = 1, positions = 0;
+  uint32_t bucket = 65536, dim = 64, minN = 2, maxN = 5;
   uint32_t maxBytes = 512, epochs = 5, asciiFold = 0;
   float lr = 0.15f;
 };
@@ -65,8 +65,7 @@ class Model {
     const std::string_view s(raw.data(), length);
     std::vector<uint32_t> ids;
     if (length < opt.minN) return ids;
-    ids.reserve(length * (opt.maxN - opt.minN + 1) * opt.hashes *
-                (opt.positions ? 2 : 1));
+    ids.reserve(length * (opt.maxN - opt.minN + 1));
     // Hash the actual bytes first; independently mix each hash before modulo.
     // Spaces and punctuation are never split or discarded.
     for (size_t pos=0; pos<length; ++pos) {
@@ -79,15 +78,7 @@ class Model {
         if (n<opt.minN) continue;
         // Match hashByteNgram: finalize by incorporating the n-gram length.
         const uint32_t base=(rolling ^ n)*16777619u;
-        for (uint32_t k=0; k<opt.hashes; ++k) {
-          const uint32_t seed=mix(base ^ (0x9e3779b9U*k));
-          ids.push_back(seed % opt.bucket);
-          if (opt.positions) {
-            const uint32_t bin=static_cast<uint32_t>((4*pos)/length);
-            ids.push_back(mix(seed ^ 0xa5a5a5a5U ^ (bin*0x9e3779b9U))
-                          % opt.bucket);
-          }
-        }
+        ids.push_back(mix(base) % opt.bucket);
       }
     }
     return ids;
@@ -209,7 +200,9 @@ class Model {
     const uint32_t magic=0x42594654U, version=2;
     write(f,magic);write(f,version);
     write(f,opt.bucket);write(f,opt.dim);write(f,opt.minN);write(f,opt.maxN);
-    write(f,opt.hashes);write(f,opt.positions);write(f,opt.maxBytes);
+    // Former hash-count and position fields, kept so the layout is unchanged.
+    const uint32_t hashes=1, positions=0;
+    write(f,hashes);write(f,positions);write(f,opt.maxBytes);
     write(f,opt.asciiFold);
     uint32_t count=static_cast<uint32_t>(labels.size());
     write(f,count);
@@ -225,16 +218,18 @@ class Model {
   void load(const std::string& path) {
     std::ifstream f(path,std::ios::binary);
     if (!f) throw std::runtime_error("Cannot read model");
-    uint32_t magic,version,count;
+    uint32_t magic,version,count,hashes,positions;
     read(f,magic);read(f,version);
     if (magic!=0x42594654U || (version!=1 && version!=2)) throw std::runtime_error("Invalid ByteFast model");
     read(f,opt.bucket);read(f,opt.dim);read(f,opt.minN);read(f,opt.maxN);
-    read(f,opt.hashes);read(f,opt.positions);read(f,opt.maxBytes);
+    read(f,hashes);read(f,positions);read(f,opt.maxBytes);
+    if (hashes!=1 || positions!=0)
+      throw std::runtime_error("This model uses -hashCount or -positionBins, "
+                               "which ByteFast no longer supports");
     if (version>=2) read(f,opt.asciiFold);
     read(f,count);
     if (!opt.bucket || !opt.dim || !opt.minN || opt.minN>opt.maxN ||
-        opt.maxN>16 || !opt.maxBytes || !opt.hashes || opt.hashes>4 ||
-        (opt.positions>1 || opt.asciiFold>1) || !count || count>10000 ||
+        opt.maxN>16 || !opt.maxBytes || opt.asciiFold>1 || !count || count>10000 ||
         64ULL+4ULL*(uint64_t(opt.bucket)*opt.dim+
           uint64_t(count)*opt.dim+count)>=1000000000ULL)
       throw std::runtime_error("Invalid model dimensions");
@@ -259,8 +254,8 @@ uint32_t numeric(const char* s) { return static_cast<uint32_t>(std::stoul(s)); }
 void usage() {
   std::cerr << "Usage:\n"
             << "  bytefast train INPUT MODEL [-bucket N] [-dim N] [-epoch N]"
-               " [-lr FLOAT] [-minn N] [-maxn N] [-hashCount 1..4]"
-               " [-positionBins 0|4] [-maxBytes N]\n"
+               " [-lr FLOAT] [-minn N] [-maxn N] [-maxBytes N]"
+               " [-asciiFold 0|1]\n"
             << "  bytefast test MODEL LABELED_FILE\n"
             << "  bytefast predict MODEL TEXT_FILE [-rejectThreshold 0..1] [-marginThreshold 0..1]\\n"
             << "  bytefast bench MODEL TEXT_FILE\n";

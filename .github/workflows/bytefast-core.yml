@@ -56,7 +56,7 @@ jobs:
           set -e
           for cfg in "-minn 2 -maxn 5" "-minb 2 -maxb 5 -minCount 1000000000 -bucket 100000" \
                      "-minc 1 -maxc 4 -minCount 1000000000 -bucket 100000" \
-                     "-minb 2 -maxb 5 -hashWords -fold unicode -maxBytes 64 -bucket 100000"; do
+                     "-minb 2 -maxb 5 -hashWords -maxBytes 64 -bucket 100000"; do
             ./bytefast supervised -input /tmp/core-train.txt -output /tmp/core -dim 16 -epoch 10 -lr 0.5 -thread 2 -verbose 0 $cfg
             ./bytefast test /tmp/core.bin /tmp/core-test.txt | tee /tmp/core-result.txt
             python3 -c "import sys; p=float(open('/tmp/core-result.txt').read().split()[3]); print('cfg=$cfg P@1=%s' % p); sys.exit(p < 0.95)"

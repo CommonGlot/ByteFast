@@ -47,18 +47,15 @@ class ByteModelBinding {
   }
   void train(const std::string& path, uint32_t dim,uint32_t bucket,
              uint32_t minn,uint32_t maxn,uint32_t epochs,float lr,
-             bool ascii_fold,uint32_t max_bytes,
-             uint32_t hash_count,uint32_t position_bins) {
+             bool ascii_fold,uint32_t max_bytes) {
     if(dim<1||dim>4096||bucket<1||bucket>10000000||minn<1||maxn>16||
        minn>maxn||epochs<1||epochs>1000||max_bytes<1||
-       !std::isfinite(lr)||lr<=0||lr>10||hash_count<1||hash_count>4||
-       (position_bins!=0&&position_bins!=4))
+       !std::isfinite(lr)||lr<=0||lr>10)
        throw std::runtime_error("Invalid byte training hyperparameters");
     model.opt.dim=dim;model.opt.bucket=bucket;
     model.opt.minN=minn;model.opt.maxN=maxn;
     model.opt.epochs=epochs;model.opt.lr=lr;
     model.opt.maxBytes=max_bytes;model.opt.asciiFold=ascii_fold?1:0;
-    model.opt.hashes=hash_count;model.opt.positions=position_bins?1:0;
     const auto examples=readRecords(path);
     model.train(examples);
   }
@@ -162,8 +159,7 @@ PYBIND11_MODULE(_proto_pybind,m) {
          py::arg("input"),py::arg("dim")=64,py::arg("bucket")=65536,
          py::arg("minn")=2,py::arg("maxn")=5,
          py::arg("epoch")=5,py::arg("lr")=.15f,
-         py::arg("ascii_fold")=false,py::arg("max_bytes")=512,
-         py::arg("hash_count")=1,py::arg("position_bins")=0);
+         py::arg("ascii_fold")=false,py::arg("max_bytes")=512);
   py::class_<CalibratedBinding>(m,"CalibratedByteFastModel")
     .def(py::init<>())
     .def("load_model",&CalibratedBinding::load)
