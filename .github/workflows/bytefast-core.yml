@@ -68,6 +68,11 @@ jobs:
         run: |
           make -j2 c_api_test
           ./c_api_test /tmp/core.safetensors "violin piano cello harp" __label__gamma
+      - name: Rust crate
+        run: |
+          BYTEFAST_TEST_MODEL=/tmp/core.safetensors BYTEFAST_TEST_TEXT="violin piano cello harp" \
+            BYTEFAST_TEST_LABEL=__label__gamma cargo test --release
+          cargo package --allow-dirty
       - name: Span cropping and continued training
         run: |
           set -e

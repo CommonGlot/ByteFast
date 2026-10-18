@@ -25,9 +25,9 @@ class Vector {
 
  public:
   explicit Vector(int64_t);
-  Vector(const Vector&) = default;
+  Vector(const Vector&) = delete;
   Vector(Vector&&) = default;
-  Vector& operator=(const Vector&) = default;
+  Vector& operator=(const Vector&) = delete;
   Vector& operator=(Vector&&) = default;
 
   inline real* data() {

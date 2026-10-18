@@ -1,0 +1,28 @@
+# Rust bindings (bindings/rust). The manifest is at the repository root so
+# that the published crate contains the C++ sources in src/.
+[package]
+name = "bytefast"
+version = "0.2.0"
+edition = "2021"
+description = "Fast text classification with byte, character and word features"
+license = "MIT"
+repository = "https://github.com/CommonGlot/ByteFast"
+readme = "bindings/rust/README.md"
+keywords = ["text-classification", "language-identification", "nlp", "fasttext"]
+categories = ["text-processing", "science"]
+build = "bindings/rust/build.rs"
+include = ["Cargo.toml", "LICENSE", "src/*.cc", "src/*.h", "bindings/rust/**"]
+
+[lib]
+path = "bindings/rust/src/lib.rs"
+
+[[test]]
+name = "predict"
+path = "bindings/rust/tests/predict.rs"
+
+[[example]]
+name = "predict"
+path = "bindings/rust/examples/predict.rs"
+
+[build-dependencies]
+cc = "1.0"
