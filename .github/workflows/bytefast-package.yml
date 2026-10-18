@@ -20,10 +20,8 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install .
           python -m pip check
-      - name: Build original fastText and separate native ByteFast executables
-        run: |
-          make -j2 opt
-          make bytefast-proto bytefast-lexical bytefast-calibrated
+      - name: Build the ByteFast executable
+        run: make -j2 opt
       - name: Prepare synthetic three-language classifier training
         run: |
           python - <<'PY'
@@ -47,7 +45,7 @@ jobs:
              'Bonjour le monde magnifique.\n'
              'Hola este es un documento.\n',encoding='utf8')
           PY
-      - name: Exercise original fastText Python APIs and both binary readers
+      - name: Exercise original fastText Python APIs and model loading
         run: |
           python - <<'PY'
           import bytefast
@@ -69,55 +67,12 @@ jobs:
           assert len(quantized.get_labels())==3
           assert quantized.predict('Bonjour le monde')[0]
 
-          model=bytefast.proto.train_supervised(
-             '/tmp/bytefast-train.txt',output='/tmp/native-bytefast.bin',
-             dim=32,bucket=4096,epoch=10,lr=0.3,ascii_fold=True)
-          assert model.model_type=='bytefast'
-          assert len(model.predict('Hello beautiful world.',k=2)[0])==2
-          assert len(model.predict(['hello world','bonjour ici']))==2
-          again=bytefast.load_model('/tmp/native-bytefast.bin')
-          assert again.model_type=='bytefast'
-          assert again.get_labels()==model.get_labels()
-          assert again.predict('hello world')[0][0].startswith('__label__')
           try:
               bytefast.load_model('/tmp/invalid.bin')
               raise AssertionError('invalid model unexpectedly loaded')
           except FileNotFoundError:
               pass
           print('BYTEFAST_AND_LEGACY_MODEL_LOADING_PASS')
-          PY
-      - name: Build portable learned lexical model and verify single-file bundle
-        run: |
-          ./bytefast-lexical build /tmp/native-bytefast.bin \
-            /tmp/bytefast-train.txt /tmp/native-words.lex 1000 1
-          ./bytefast-calibrated fit /tmp/native-bytefast.bin /tmp/native-words.lex \
-            /tmp/bytefast-train.txt /tmp/bytefast-train.txt /tmp/native-fusion.fuse
-          python - <<'PY'
-          import bytefast
-          import struct
-          import pathlib
-
-          base='/tmp/native-bytefast.bin'
-          words='/tmp/native-words.lex'
-          fusion='/tmp/native-fusion.fuse'
-          output='/tmp/bytefast-complete.bin'
-          bytefast.bundle_model(base,words,fusion,output)
-          assert pathlib.Path(output).read_bytes()[:4]==b'BFBN'
-          separate=bytefast.load_model(base,lexicon=words,fusion=fusion)
-          combined=bytefast.load_model(output)
-          assert combined.model_type=='bytefast-calibrated'
-          assert separate.get_labels()==combined.get_labels()
-          for query in ['hello world','bonjour le monde','hola amigos']:
-              expected=separate.predict(query,k=2)
-              actual=combined.predict(query,k=2)
-              assert expected[0]==actual[0],(expected,actual)
-          try:
-              bytefast.load_model('/tmp/original-fasttext.bin',
-                                  lexicon=words,fusion=fusion)
-              raise AssertionError('legacy should reject ByteFast sidecars')
-          except ValueError:
-              pass
-          print('BYTEFAST_SINGLE_FILE_BUNDLE_PASS')
           PY
       - name: Train a generic text classifier with arbitrary class names
         run: |
@@ -166,6 +121,6 @@ jobs:
           assert bytefast.__name__ == 'bytefast'
           assert fasttext.train_supervised is not bytefast.train_supervised
           assert len(bytefast.load_model('/tmp/original-fasttext.bin').get_labels())==3
-          assert len(bytefast.load_model('/tmp/bytefast-complete.bin').get_labels())==3
+          assert len(bytefast.load_model('/tmp/generic-classification.bin').get_labels())==3
           print('BYTEFAST_COEXISTS_WITH_FASTTEXT_PASS')
           PY

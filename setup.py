@@ -23,7 +23,6 @@ import io
 
 __version__ = "0.2.0"
 BYTEFAST_SRC = "src"
-BYTEFAST_PROTO_SRC = os.path.join(BYTEFAST_SRC, "proto")
 
 # Based on https://github.com/pybind/python_example
 
@@ -59,8 +58,7 @@ else:
     coverage = True
 
 # The core library is every .cc file directly in src/ except the CLI entry
-# point. The prototype byte classifier lives in src/proto and has its own
-# extension module.
+# point.
 core_src_cc = sorted(
     os.path.join(BYTEFAST_SRC, filename)
     for filename in os.listdir(BYTEFAST_SRC)
@@ -87,17 +85,6 @@ ext_modules = [
             if coverage
             else "-O3 -funroll-loops -pthread -march=native"
         ],
-    ),
-    Extension(
-        "bytefast._proto_pybind",
-        ["python/bytefast/pybind/proto_pybind.cc"],
-        include_dirs=[
-            get_pybind_include(),
-            get_pybind_include(user=True),
-            BYTEFAST_PROTO_SRC,
-        ],
-        language="c++",
-        extra_compile_args=["-O3", "-pthread"],
     ),
 ]
 

@@ -2,7 +2,6 @@
 # Built on the original fastText sources (MIT license).
 # Copyright (c) 2017-present, Facebook, Inc., and 2026 CommonGlot contributors.
 from . import core
-from . import proto
 from .core import (
     train_supervised,
     train_unsupervised,
@@ -15,7 +14,6 @@ from .core import (
     EOW,
 )
 from .api import load_model
-from .proto import bundle_model
 
 # Names kept for code written against earlier releases.
 legacy = core
@@ -28,8 +26,6 @@ __all__ = [
     "load_model",
     "tokenize",
     "core",
-    "proto",
-    "bundle_model",
     "cbow",
     "skipgram",
     "supervised",

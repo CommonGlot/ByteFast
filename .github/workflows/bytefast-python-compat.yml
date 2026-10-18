@@ -5,8 +5,6 @@ on:
     paths:
       - "setup.py"
       - "python/bytefast/core.py"
-      - "src/proto/bytefast_*.cc"
-      - "src/proto/bytefast_*.h"
       - "docs/python-compatibility.md"
       - ".github/workflows/fasttext-python-compat.yml"
   workflow_dispatch:
@@ -76,11 +74,8 @@ jobs:
 
           print("LEGACY_FASTTEXT_PYTHON_COMPATIBILITY_PASS")
           PY
-      - name: Build old fasttext executable and optional ByteFast executables
+      - name: Build the ByteFast executable
         run: |
           make -j2 opt
-          make bytefast-proto bytefast-lexical bytefast-wordemb bytefast-calibrated
           test -x ./bytefast
-          test -x ./bytefast-proto
-          test -x ./bytefast-calibrated
           echo LEGACY_FASTTEXT_CLI_COMPATIBILITY_PASS

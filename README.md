@@ -132,26 +132,9 @@ such as `hash_words`, `max_bytes` and `max_vocab`.
 | ByteFast model with text features (`BFCM` header) | `bytefast` only |
 | ByteFast model with only fastText features | `bytefast` and upstream `fasttext` |
 | Original fastText `.bin` / `.ftz` | `bytefast` and upstream `fasttext` |
-| Prototype byte models and bundles | `bytefast.proto` |
 
 `bytefast.load_model()` chooses the reader from the file header.
 `./bytefast quantize` works for every model type.
-
-## Prototype byte classifier
-
-`bytefast.proto` and the `bytefast-proto`, `bytefast-lexical`,
-`bytefast-calibrated` and `bytefast-wordemb` executables contain the earlier
-byte-only classifier. It has a statistical word-to-class sidecar and learned
-fusion weights, and is kept as a baseline for the ablations in
-[docs/architecture.md](docs/architecture.md). See
-[docs/bytefast-prototype.md](docs/bytefast-prototype.md).
-
-```python
-model = bytefast.proto.train_supervised(
-    "train.txt", output="proto.bin", dim=32, bucket=16384, epoch=10,
-    lexical=True, lexical_vocab=200000,
-)
-```
 
 ## Project status
 

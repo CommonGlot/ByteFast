@@ -2,7 +2,7 @@
 
 The magic header, not the file name or extension, selects the reader:
 ByteFast models and original fastText .bin/.ftz files load with the core
-reader, and prototype byte models and bundles with bytefast.proto.
+reader.
 Copyright (c) 2026 CommonGlot contributors. MIT License.
 """
 from __future__ import annotations
@@ -10,21 +10,20 @@ from __future__ import annotations
 from pathlib import Path
 
 from . import core
-from . import proto
 
 FASTTEXT_MAGIC = 793712314
 BYTEFAST_MAGIC = int.from_bytes(b"BFCM", "little")
 
 
-def load_model(path, *, lexicon=None, fusion=None):
-    """Load a ByteFast model, an original fastText model or a prototype model.
+def _magic(path):
+    with open(path, "rb") as f:
+        head = f.read(4)
+    return int.from_bytes(head, "little") if len(head) == 4 else None
 
-    lexicon= and fusion= only apply to prototype byte models; see
-    bytefast.proto.load_model.
-    """
+
+def load_model(path):
+    """Load a ByteFast model or an original fastText model."""
     path = Path(path)
-    if proto._magic(path) in (FASTTEXT_MAGIC, BYTEFAST_MAGIC):
-        if lexicon is not None or fusion is not None:
-            raise ValueError("lexicon= and fusion= only apply to prototype models")
-        return core.load_model(str(path))
-    return proto.load_model(path, lexicon=lexicon, fusion=fusion)
+    if _magic(path) not in (FASTTEXT_MAGIC, BYTEFAST_MAGIC):
+        raise ValueError("%s is not a ByteFast or fastText model" % path)
+    return core.load_model(str(path))

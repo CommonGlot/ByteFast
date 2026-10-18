@@ -10,10 +10,6 @@ result
 # Built executables (anchored: python/bytefast is the package)
 /fasttext
 /bytefast
-/bytefast-proto
-/bytefast-lexical
-/bytefast-calibrated
-/bytefast-wordemb
 website/node_modules/
 package-lock.json
 node_modules/

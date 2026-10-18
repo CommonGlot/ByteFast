@@ -47,35 +47,15 @@ aliases: `min_count`, `min_count_label`, `word_ngrams`, `lr_update_rate`,
 | ByteFast model with text features (`BFCM`) | `bytefast.core` |
 | ByteFast model with only fastText features | `bytefast.core`, also upstream `fasttext` |
 | Original fastText `.bin` / `.ftz` | `bytefast.core`, also upstream `fasttext` |
-| Prototype byte model (`TFYB`) and bundle (`BFBN`) | `bytefast.proto` |
 
 Upstream `fasttext` rejects `BFCM` files with "wrong file format".
-
-## Prototype API
-
-The earlier byte-only classifier and its lexical sidecar are in
-`bytefast.proto`:
-
-```python
-model = bytefast.proto.train_supervised(
-    "train.txt", output="proto.bin", dim=32, bucket=16384, epoch=10,
-    lexical=True, lexical_vocab=200000, lexical_min_df=1,
-    lexical_split=(0.8, 0.1, 0.1), lexical_fusion_epochs=90,
-)
-bytefast.bundle_model("base.bin", "words.lex", "weights.fuse", "complete.bin")
-```
-
-See [bytefast-prototype.md](bytefast-prototype.md) for the matching
-command-line tools.
 
 ## Renamed names
 
 | Before | Now |
 | --- | --- |
-| `bytefast.train_supervised` (byte prototype) | `bytefast.proto.train_supervised` |
 | `bytefast.train_fasttext_supervised` | `bytefast.train_supervised` (old name still works) |
 | `bytefast.legacy` | `bytefast.core` (old name still works) |
-| `bytefast.ByteFastModel` | `bytefast.proto.ProtoModel` |
 | `bytefast.util.download_model` | removed; download published vectors directly |
 
 The automated tests are in

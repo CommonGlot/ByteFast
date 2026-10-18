@@ -11,19 +11,6 @@ CXXFLAGS = -pthread -std=c++17 -march=native
 OBJS = args.o autotune.o matrix.o dictionary.o loss.o productquantizer.o densematrix.o quantmatrix.o vector.o model.o utils.o meter.o bytefast.o
 INCLUDES = -I.
 
-# Prototype byte-only classifier and its lexical tools (src/proto).
-bytefast-proto: src/proto/bytefast_cli.cc src/proto/bytefast_model.h src/proto/byte_ngrams.h
-	$(CXX) $(CXXFLAGS) -O3 -DNDEBUG -Isrc/proto src/proto/bytefast_cli.cc -o bytefast-proto
-
-bytefast-lexical: src/proto/bytefast_lexical.cc src/proto/bytefast_model.h src/proto/byte_ngrams.h
-	$(CXX) $(CXXFLAGS) -O3 -DNDEBUG -Isrc/proto src/proto/bytefast_lexical.cc -o bytefast-lexical
-
-bytefast-wordemb: src/proto/bytefast_wordemb.cc src/proto/bytefast_lexical.h src/proto/bytefast_model.h src/proto/byte_ngrams.h
-	$(CXX) $(CXXFLAGS) -O3 -DNDEBUG -Isrc/proto src/proto/bytefast_wordemb.cc -o bytefast-wordemb
-
-bytefast-calibrated: src/proto/bytefast_calibrated.cc src/proto/bytefast_lexical.h src/proto/bytefast_model.h src/proto/byte_ngrams.h
-	$(CXX) $(CXXFLAGS) -O3 -DNDEBUG -Isrc/proto src/proto/bytefast_calibrated.cc -o bytefast-calibrated
-
 opt: CXXFLAGS += -O3 -funroll-loops -DNDEBUG
 opt: bytefast
 
@@ -82,7 +69,7 @@ bytefast: $(OBJS) src/bytefast.cc src/main.cc
 	$(CXX) $(CXXFLAGS) $(OBJS) src/main.cc -o bytefast
 
 clean:
-	rm -rf *.o *.gcno *.gcda bytefast bytefast-proto bytefast-lexical bytefast-wordemb bytefast-calibrated *.bc webassembly/bytefast_wasm.js webassembly/bytefast_wasm.wasm
+	rm -rf *.o *.gcno *.gcda bytefast *.bc webassembly/bytefast_wasm.js webassembly/bytefast_wasm.wasm
 
 
 EMCXX = em++

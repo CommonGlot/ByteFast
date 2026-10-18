@@ -72,7 +72,6 @@ Each axis is a set of flags; nothing else changes between runs.
 | F. Loss | `softmax` / `one-vs-all` / `hs` |
 | G. Compression | `quantize` with `-cutoff`, `-qnorm`, `-qout`; accuracy against model size |
 | I. Short inputs | `-cropProb` 0 / 0.3 / 0.7 with `-cropUnit char` (`-cropMax` 20) or `word` (`-cropMax` 5); from scratch, or as a second stage with `-inputModel` |
-| H. Prototype | `bytefast.proto` byte model ± statistical lexicon and learned fusion, against the same budget in the core |
 
 Training settings (`-epoch`, `-lr`, `-thread`) are tuned per variant on the
 development split with the same search budget for every variant, including
