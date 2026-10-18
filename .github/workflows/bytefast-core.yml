@@ -1,7 +1,7 @@
 name: ByteFast core text features
 on:
   push:
-    branches: ["bytefast/**", "main"]
+    branches: ["main"]
   pull_request:
   workflow_dispatch:
 

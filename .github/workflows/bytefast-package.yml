@@ -1,7 +1,7 @@
 name: ByteFast package and legacy model interoperability
 on:
   push:
-    branches: ["bytefast/consolidated-package", "main"]
+    branches: ["main"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
