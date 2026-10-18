@@ -8,6 +8,8 @@
 
 #include "matrix.h"
 
+#include "vector.h"
+
 namespace bytefast {
 
 Matrix::Matrix() : m_(0), n_(0) {}
@@ -20,6 +22,12 @@ int64_t Matrix::size(int64_t dim) const {
     return m_;
   }
   return n_;
+}
+
+void Matrix::multiplyVector(Vector& out, const Vector& vec) const {
+  for (int64_t i = 0; i < m_; i++) {
+    out[i] = dotRow(vec, i);
+  }
 }
 
 } // namespace bytefast

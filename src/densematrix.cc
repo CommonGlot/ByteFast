@@ -109,18 +109,16 @@ void DenseMatrix::l2NormRow(Vector& norms) const {
   }
 }
 
-real DenseMatrix::dotRow(const Vector& vec, int64_t i) const {
-  assert(i >= 0);
-  assert(i < m_);
-  assert(vec.size() == n_);
-  // Independent partial sums let the compiler vectorize the loop (SSE/AVX
-  // on x86, NEON on ARM); a single accumulator forces a serial chain.
-  constexpr int64_t kLanes = 8;
-  const real* row = data_.data() + i * n_;
-  const real* v = vec.data();
+namespace {
+
+// Independent partial sums let the compiler vectorize the loop (SSE/AVX
+// on x86, NEON on ARM); a single accumulator forces a serial chain.
+constexpr int64_t kLanes = 8;
+
+real dot(const real* row, const real* v, int64_t n) {
   real partial[kLanes] = {};
   int64_t j = 0;
-  for (; j + kLanes <= n_; j += kLanes) {
+  for (; j + kLanes <= n; j += kLanes) {
     for (int64_t l = 0; l < kLanes; l++) {
       partial[l] += row[j + l] * v[j + l];
     }
@@ -129,13 +127,65 @@ real DenseMatrix::dotRow(const Vector& vec, int64_t i) const {
   for (int64_t l = 0; l < kLanes; l++) {
     d += partial[l];
   }
-  for (; j < n_; j++) {
+  for (; j < n; j++) {
     d += row[j] * v[j];
   }
+  return d;
+}
+
+} // namespace
+
+real DenseMatrix::dotRow(const Vector& vec, int64_t i) const {
+  assert(i >= 0);
+  assert(i < m_);
+  assert(vec.size() == n_);
+  real d = dot(data_.data() + i * n_, vec.data(), n_);
   if (std::isnan(d)) {
     throw EncounteredNaNError();
   }
   return d;
+}
+
+void DenseMatrix::multiplyVector(Vector& out, const Vector& vec) const {
+  assert(out.size() == m_);
+  assert(vec.size() == n_);
+  // Eight rows per pass share each load of vec, avoid a call per row and give
+  // the FMA units independent accumulators. Each row keeps dot()'s lanes and
+  // summation order, so the results are the same as dotRow's.
+  constexpr int64_t kRows = 8;
+  const real* v = vec.data();
+  real* o = out.data();
+  const int64_t nv = n_ - n_ % kLanes;
+  int64_t i = 0;
+  for (; i + kRows <= m_; i += kRows) {
+    const real* row = data_.data() + i * n_;
+    real partial[kRows][kLanes] = {};
+    for (int64_t j = 0; j < nv; j += kLanes) {
+      for (int64_t r = 0; r < kRows; r++) {
+        for (int64_t l = 0; l < kLanes; l++) {
+          partial[r][l] += row[r * n_ + j + l] * v[j + l];
+        }
+      }
+    }
+    for (int64_t r = 0; r < kRows; r++) {
+      real d = 0.0;
+      for (int64_t l = 0; l < kLanes; l++) {
+        d += partial[r][l];
+      }
+      for (int64_t j = nv; j < n_; j++) {
+        d += row[r * n_ + j] * v[j];
+      }
+      o[i + r] = d;
+    }
+  }
+  for (; i < m_; i++) {
+    o[i] = dot(data_.data() + i * n_, v, n_);
+  }
+  for (int64_t k = 0; k < m_; k++) {
+    if (std::isnan(o[k])) {
+      throw EncounteredNaNError();
+    }
+  }
 }
 
 void DenseMatrix::addVectorToRow(const Vector& vec, int64_t i, real a) {
