@@ -14,7 +14,7 @@ model = bytefast.train_supervised(
     minb=2, maxb=5,               # byte n-grams over the text
     bucket=1_000_000, dim=64, epoch=5, lr=0.5, thread=8,
 )
-model.save_model("model.bin")
+model.save_model("model.safetensors")
 ```
 
 `train_supervised` takes keyword arguments only. Every option of
@@ -30,7 +30,7 @@ multi-label data), `"hs"` and `"ns"`.
 ## Prediction and evaluation
 
 ```python
-model = bytefast.load_model("model.bin")
+model = bytefast.load_model("model.safetensors")
 
 labels, probs = model.predict("The striker scored twice", k=3)
 all_labels, all_probs = model.predict(["first line", "second line"], k=1)
@@ -51,5 +51,5 @@ model.get_labels(include_freq=True)
 model.get_dimension()
 
 model.quantize(input="train.txt", cutoff=100_000, retrain=True, qnorm=True)
-model.save_model("model.ftz")
+model.save_model("model.quant.safetensors")
 ```

@@ -49,12 +49,10 @@ def main():
         for name, cfg in configs.items():
             model = train(data, **cfg)
             assert model.predict(query)[0] == ("__label__sports",), name
-            path = root / ("%s.bin" % name)
+            path = root / ("%s.safetensors" % name)
             model.save_model(str(path))
-            magic = path.read_bytes()[:4]
-            # Only models with text features need the ByteFast format.
-            expected = b"\xba\x16\x4f\x2f" if name == "subwords" else b"BFCM"
-            assert magic == expected, (name, magic)
+            # A safetensors file: header length, then the JSON header.
+            assert path.read_bytes()[8:9] == b"{", name
             loaded = bytefast.load_model(str(path))
             assert loaded.predict(query)[0] == model.predict(query)[0], name
             args = loaded.f.getArgs()
@@ -84,7 +82,7 @@ def main():
         chars = train(data, minc=1, maxc=4, bucket=50000, minCount=10 ** 9,
                       crop_prob=0.5, crop_min=5, crop_max=30, crop_unit="char")
         assert chars.predict("telescope")[0][0].startswith("__label__")
-        base_path = root / "base.bin"
+        base_path = root / "base.safetensors"
         cropped.save_model(str(base_path))
         continued = bytefast.train_supervised(
             input=str(data), input_model=str(base_path), epoch=2, lr=0.05,
@@ -101,7 +99,7 @@ def main():
                     {"max_bytes": -1}, {"crop_prob": 1.5},
                     {"crop_prob": 0.5, "crop_max": 0},
                     {"crop_prob": 0.5, "crop_max": 3, "crop_unit": "token"},
-                    {"input_model": str(root / "missing.bin")}):
+                    {"input_model": str(root / "missing.safetensors")}):
             try:
                 train(data, **bad)
             except ValueError:

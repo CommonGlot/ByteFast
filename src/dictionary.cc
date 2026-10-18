@@ -7,10 +7,12 @@
  */
 
 #include "dictionary.h"
+#include "safetensors.h"
 
 #include <assert.h>
 
 #include <algorithm>
+#include <cstring>
 #include <cmath>
 #include <fstream>
 #include <iostream>
@@ -51,6 +53,16 @@ Dictionary::Dictionary(std::shared_ptr<Args> args)
       pruneidx_size_(-1) {}
 
 Dictionary::Dictionary(std::shared_ptr<Args> args, std::istream& in)
+    : args_(args),
+      size_(0),
+      nwords_(0),
+      nlabels_(0),
+      ntokens_(0),
+      pruneidx_size_(-1) {
+  load(in);
+}
+
+Dictionary::Dictionary(std::shared_ptr<Args> args, SafeTensorsReader& in)
     : args_(args),
       size_(0),
       nwords_(0),
@@ -632,23 +644,74 @@ std::string Dictionary::getLabel(int32_t lid) const {
   return words_[lid + nwords_].word;
 }
 
-void Dictionary::save(std::ostream& out) const {
-  out.write((char*)&size_, sizeof(int32_t));
-  out.write((char*)&nwords_, sizeof(int32_t));
-  out.write((char*)&nlabels_, sizeof(int32_t));
-  out.write((char*)&ntokens_, sizeof(int64_t));
-  out.write((char*)&pruneidx_size_, sizeof(int64_t));
+// The vocabulary is stored as three tensors: the entries' UTF-8 strings,
+// each ended by a NUL byte, their counts and their types (0 word, 1 label).
+// A pruned dictionary (after quantize -cutoff) adds the (n-gram, row) pairs.
+void Dictionary::save(SafeTensorsWriter& out) const {
+  std::string strings;
+  std::string counts(size_ * sizeof(int64_t), '\0');
+  std::string types(size_, '\0');
   for (int32_t i = 0; i < size_; i++) {
-    entry e = words_[i];
-    out.write(e.word.data(), e.word.size() * sizeof(char));
-    out.put(0);
-    out.write((char*)&(e.count), sizeof(int64_t));
-    out.write((char*)&(e.type), sizeof(entry_type));
+    strings += words_[i].word;
+    strings.push_back('\0');
+    std::memcpy(&counts[i * sizeof(int64_t)], &words_[i].count, sizeof(int64_t));
+    types[i] = static_cast<char>(words_[i].type);
   }
-  for (const auto pair : pruneidx_) {
-    out.write((char*)&(pair.first), sizeof(int32_t));
-    out.write((char*)&(pair.second), sizeof(int32_t));
+  out.metadata("vocab.nwords", std::to_string(nwords_));
+  out.metadata("vocab.nlabels", std::to_string(nlabels_));
+  out.metadata("vocab.ntokens", std::to_string(ntokens_));
+  const int64_t nbytes = strings.size();
+  out.tensor("vocab.strings", "U8", {nbytes}, std::move(strings));
+  out.tensor("vocab.counts", "I64", {size_}, std::move(counts));
+  out.tensor("vocab.types", "I8", {size_}, std::move(types));
+  if (pruneidx_size_ >= 0) {
+    std::vector<int32_t> pairs;
+    for (const auto& pair : pruneidx_) {
+      pairs.push_back(pair.first);
+      pairs.push_back(pair.second);
+    }
+    std::string bytes(pairs.size() * sizeof(int32_t), '\0');
+    std::memcpy(&bytes[0], pairs.data(), bytes.size());
+    out.tensor("vocab.prune", "I32", {pruneidx_size_, 2}, std::move(bytes));
   }
+}
+
+void Dictionary::load(SafeTensorsReader& in) {
+  nwords_ = in.metadataInt("vocab.nwords");
+  nlabels_ = in.metadataInt("vocab.nlabels");
+  ntokens_ = in.metadataInt("vocab.ntokens");
+  size_ = nwords_ + nlabels_;
+  std::string strings(in.bytes("vocab.strings"), '\0');
+  in.read("vocab.strings", "U8", &strings[0], strings.size());
+  std::vector<int64_t> counts(size_);
+  in.read("vocab.counts", "I64", counts.data(), size_ * sizeof(int64_t));
+  std::vector<int8_t> types(size_);
+  in.read("vocab.types", "I8", types.data(), size_);
+  words_.clear();
+  size_t start = 0;
+  for (int32_t i = 0; i < size_; i++) {
+    size_t end = strings.find('\0', start);
+    if (end == std::string::npos) {
+      throw std::invalid_argument("Corrupt vocabulary");
+    }
+    entry e;
+    e.word = strings.substr(start, end - start);
+    e.count = counts[i];
+    e.type = static_cast<entry_type>(types[i]);
+    words_.push_back(e);
+    start = end + 1;
+  }
+  pruneidx_.clear();
+  pruneidx_size_ = -1;
+  if (in.has("vocab.prune")) {
+    pruneidx_size_ = in.shape("vocab.prune")[0];
+    std::vector<int32_t> pairs(pruneidx_size_ * 2);
+    in.read("vocab.prune", "I32", pairs.data(), pairs.size() * sizeof(int32_t));
+    for (int64_t i = 0; i < pruneidx_size_; i++) {
+      pruneidx_[pairs[2 * i]] = pairs[2 * i + 1];
+    }
+  }
+  initLookup();
 }
 
 void Dictionary::load(std::istream& in) {
@@ -676,8 +739,11 @@ void Dictionary::load(std::istream& in) {
     in.read((char*)&second, sizeof(int32_t));
     pruneidx_[first] = second;
   }
-  initNgrams();
+  initLookup();
+}
 
+void Dictionary::initLookup() {
+  initNgrams();
   int32_t word2intsize = std::ceil(size_ / 0.7);
   word2int_.assign(word2intsize, -1);
   for (int32_t i = 0; i < size_; i++) {
@@ -726,17 +792,6 @@ void Dictionary::prune(std::vector<int32_t>& idx) {
   size_ = nwords_ + nlabels_;
   words_.erase(words_.begin() + size_, words_.end());
   initNgrams();
-}
-
-void Dictionary::dump(std::ostream& out) const {
-  out << words_.size() << std::endl;
-  for (auto it : words_) {
-    std::string entryType = "word";
-    if (it.type == entry_type::label) {
-      entryType = "label";
-    }
-    out << it.word << " " << it.count << " " << entryType << std::endl;
-  }
 }
 
 } // namespace bytefast

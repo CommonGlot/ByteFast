@@ -74,9 +74,9 @@ class DenseMatrix : public Matrix {
   void addRowToVector(Vector& x, int32_t i) const override;
   void addRowToVector(Vector& x, int32_t i, real a) const override;
   void averageRowsToVector(Vector& x, const std::vector<int32_t>& rows) const override;
-  void save(std::ostream&) const override;
+  void save(SafeTensorsWriter&, const std::string& name) const override;
+  void load(SafeTensorsReader&, const std::string& name) override;
   void load(std::istream&) override;
-  void dump(std::ostream&) const override;
 
   class EncounteredNaNError : public std::runtime_error {
    public:

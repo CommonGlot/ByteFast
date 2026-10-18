@@ -54,9 +54,12 @@ word and subword hashes are unchanged, so fastText models keep working.
   dictionary, features and weights of a supervised model and only takes the
   training schedule from the command line; the learning-rate schedule is
   computed from the new input's token count.
-- **File format.** A model that uses a ByteFast text feature starts with
-  `BFCM` and a versioned block with the text-feature settings; other models
-  keep fastText's layout.
+- **File format.** Models are safetensors files (`format` = `bytefast`,
+  `format_version` = `1` in the metadata). The settings are `args.*`
+  metadata strings, the vocabulary is three tensors (`vocab.strings`,
+  `vocab.counts`, `vocab.types`, plus `vocab.prune` after `quantize
+  -cutoff`), and the matrices are `input` and `output`, or their product-
+  quantized codes and centroids (`input.codes`, `input.pq.centroids`, ...).
 
 ## Ablations
 

@@ -7,6 +7,7 @@
  */
 
 #include "productquantizer.h"
+#include "safetensors.h"
 
 #include <algorithm>
 #include <iostream>
@@ -229,12 +230,31 @@ void ProductQuantizer::compute_codes(const real* x, uint8_t* codes, int32_t n)
   }
 }
 
-void ProductQuantizer::save(std::ostream& out) const {
-  out.write((char*)&dim_, sizeof(dim_));
-  out.write((char*)&nsubq_, sizeof(nsubq_));
-  out.write((char*)&dsub_, sizeof(dsub_));
-  out.write((char*)&lastdsub_, sizeof(lastdsub_));
-  out.write((char*)centroids_.data(), centroids_.size() * sizeof(real));
+void ProductQuantizer::save(SafeTensorsWriter& out, const std::string& prefix)
+    const {
+  out.metadata(prefix + ".dim", std::to_string(dim_));
+  out.metadata(prefix + ".nsubq", std::to_string(nsubq_));
+  out.metadata(prefix + ".dsub", std::to_string(dsub_));
+  out.metadata(prefix + ".lastdsub", std::to_string(lastdsub_));
+  out.tensor(
+      prefix + ".centroids",
+      "F32",
+      {int64_t(centroids_.size())},
+      centroids_.data(),
+      centroids_.size() * sizeof(real));
+}
+
+void ProductQuantizer::load(SafeTensorsReader& in, const std::string& prefix) {
+  dim_ = in.metadataInt(prefix + ".dim");
+  nsubq_ = in.metadataInt(prefix + ".nsubq");
+  dsub_ = in.metadataInt(prefix + ".dsub");
+  lastdsub_ = in.metadataInt(prefix + ".lastdsub");
+  centroids_.resize(dim_ * ksub_);
+  in.read(
+      prefix + ".centroids",
+      "F32",
+      centroids_.data(),
+      centroids_.size() * sizeof(real));
 }
 
 void ProductQuantizer::load(std::istream& in) {

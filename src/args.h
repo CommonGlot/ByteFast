@@ -16,6 +16,9 @@
 
 namespace bytefast {
 
+class SafeTensorsReader;
+class SafeTensorsWriter;
+
 enum class loss_name : int { hs = 1, ns, softmax, ova };
 
 class Args {
@@ -74,9 +77,10 @@ class Args {
   void printDictionaryHelp();
   void printTrainingHelp();
   void printQuantizationHelp();
-  void save(std::ostream&);
+  void save(SafeTensorsWriter&) const;
+  void load(SafeTensorsReader&);
+  // Read the settings of a model file from before safetensors.
   void load(std::istream&);
-  void saveTextFeatures(std::ostream&) const;
   void loadTextFeatures(std::istream&);
   bool usesTextFeatures() const;
   bool usesHashedFeatures() const;
@@ -84,5 +88,6 @@ class Args {
   bool isManual(const std::string& argName) const;
   void setManual(const std::string& argName);
   std::string lossToString(loss_name) const;
+  static loss_name lossFromString(const std::string&);
 };
 } // namespace bytefast

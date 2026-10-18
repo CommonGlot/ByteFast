@@ -23,7 +23,7 @@ fastTextModule.addOnPostRun(() => {
 const thisModule = this;
 const trainFileInWasmFs = 'train.txt';
 const testFileInWasmFs = 'test.txt';
-const modelFileInWasmFs = 'model.bin';
+const modelFileInWasmFs = 'model.safetensors';
 
 const getFloat32ArrayFromHeap = (len) => {
   const dataBytes = len * Float32Array.BYTES_PER_ELEMENT;

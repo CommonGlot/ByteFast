@@ -22,6 +22,9 @@
 
 namespace bytefast {
 
+class SafeTensorsReader;
+class SafeTensorsWriter;
+
 typedef int32_t id_type;
 enum class entry_type : int8_t { word = 0, label = 1 };
 
@@ -40,6 +43,7 @@ class Dictionary {
   int32_t find(const std::string_view) const;
   int32_t find(const std::string_view, uint32_t h) const;
   void initNgrams();
+  void initLookup();
   void reset(std::istream&) const;
   void pushHash(std::vector<int32_t>&, int32_t) const;
   void addSubwords(std::vector<int32_t>&, const std::string_view, int32_t) const;
@@ -79,6 +83,7 @@ class Dictionary {
 
   explicit Dictionary(std::shared_ptr<Args>);
   explicit Dictionary(std::shared_ptr<Args>, std::istream&);
+  explicit Dictionary(std::shared_ptr<Args>, SafeTensorsReader&);
   int32_t nwords() const;
   int32_t nlabels() const;
   int64_t ntokens() const;
@@ -94,7 +99,9 @@ class Dictionary {
   bool readWord(std::istream&, std::string&) const;
   void readFromFile(std::istream&);
   std::string getLabel(int32_t) const;
-  void save(std::ostream&) const;
+  void save(SafeTensorsWriter&) const;
+  void load(SafeTensorsReader&);
+  // Reads the dictionary of a model file from before safetensors.
   void load(std::istream&);
   std::vector<int64_t> getCounts(entry_type) const;
   int32_t getLine(std::istream&, std::vector<int32_t>&, std::vector<int32_t>&)
@@ -109,7 +116,6 @@ class Dictionary {
   bool isPruned() {
     return pruneidx_size_ >= 0;
   }
-  void dump(std::ostream&) const;
   void init();
 };
 

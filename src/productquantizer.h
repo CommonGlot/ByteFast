@@ -9,6 +9,7 @@
 #pragma once
 
 #include <cstring>
+#include <string>
 #include <istream>
 #include <ostream>
 #include <random>
@@ -18,6 +19,9 @@
 #include "vector.h"
 
 namespace bytefast {
+
+class SafeTensorsReader;
+class SafeTensorsWriter;
 
 class ProductQuantizer {
  protected:
@@ -56,7 +60,8 @@ class ProductQuantizer {
   void compute_code(const real*, uint8_t*) const;
   void compute_codes(const real*, uint8_t*, int32_t) const;
 
-  void save(std::ostream&) const;
+  void save(SafeTensorsWriter&, const std::string& prefix) const;
+  void load(SafeTensorsReader&, const std::string& prefix);
   void load(std::istream&);
 };
 

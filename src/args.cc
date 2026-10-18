@@ -7,6 +7,7 @@
  */
 
 #include "args.h"
+#include "safetensors.h"
 
 #include <cstdlib>
 #include <cstdint>
@@ -72,6 +73,19 @@ std::string Args::lossToString(loss_name ln) const {
   return "Unknown loss!"; // should never happen
 }
 
+loss_name Args::lossFromString(const std::string& name) {
+  if (name == "hs") {
+    return loss_name::hs;
+  } else if (name == "ns") {
+    return loss_name::ns;
+  } else if (name == "softmax") {
+    return loss_name::softmax;
+  } else if (name == "one-vs-all" || name == "ova") {
+    return loss_name::ova;
+  }
+  throw std::invalid_argument("Unknown loss: " + name);
+}
+
 std::string Args::boolToString(bool b) const {
   if (b) {
     return "true";
@@ -115,20 +129,7 @@ void Args::parseArgs(const std::vector<std::string>& args) {
       } else if (args[ai] == "-wordNgrams") {
         wordNgrams = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-loss") {
-        if (args.at(ai + 1) == "hs") {
-          loss = loss_name::hs;
-        } else if (args.at(ai + 1) == "ns") {
-          loss = loss_name::ns;
-        } else if (args.at(ai + 1) == "softmax") {
-          loss = loss_name::softmax;
-        } else if (
-            args.at(ai + 1) == "one-vs-all" || args.at(ai + 1) == "ova") {
-          loss = loss_name::ova;
-        } else {
-          std::cerr << "Unknown loss: " << args.at(ai + 1) << std::endl;
-          printHelp();
-          exit(EXIT_FAILURE);
-        }
+        loss = lossFromString(args.at(ai + 1));
       } else if (args[ai] == "-bucket") {
         bucket = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-minn") {
@@ -362,29 +363,60 @@ void Args::printQuantizationHelp() {
       << "  -dsub               size of each sub-vector [" << dsub << "]\n";
 }
 
-// Fields of the model file that only applied to word-vector training (window
-// size, model type, subsampling threshold) are written as the supervised
-// values and checked on load.
-constexpr int kFileWs = 5;
-constexpr int kFileSupervised = 3;
-constexpr double kFileT = 1e-4;
-
-void Args::save(std::ostream& out) {
-  out.write((char*)&(dim), sizeof(int));
-  out.write((char*)&(kFileWs), sizeof(int));
-  out.write((char*)&(epoch), sizeof(int));
-  out.write((char*)&(minCount), sizeof(int));
-  out.write((char*)&(neg), sizeof(int));
-  out.write((char*)&(wordNgrams), sizeof(int));
-  out.write((char*)&(loss), sizeof(loss_name));
-  out.write((char*)&(kFileSupervised), sizeof(int));
-  out.write((char*)&(bucket), sizeof(int));
-  out.write((char*)&(minn), sizeof(int));
-  out.write((char*)&(maxn), sizeof(int));
-  out.write((char*)&(lrUpdateRate), sizeof(int));
-  out.write((char*)&(kFileT), sizeof(double));
+// Model settings are stored as safetensors metadata strings.
+void Args::save(SafeTensorsWriter& out) const {
+  const std::vector<std::pair<std::string, std::string>> fields = {
+      {"dim", std::to_string(dim)},
+      {"epoch", std::to_string(epoch)},
+      {"minCount", std::to_string(minCount)},
+      {"neg", std::to_string(neg)},
+      {"wordNgrams", std::to_string(wordNgrams)},
+      {"loss", lossToString(loss)},
+      {"bucket", std::to_string(bucket)},
+      {"minn", std::to_string(minn)},
+      {"maxn", std::to_string(maxn)},
+      {"minb", std::to_string(minb)},
+      {"maxb", std::to_string(maxb)},
+      {"minc", std::to_string(minc)},
+      {"maxc", std::to_string(maxc)},
+      {"maxBytes", std::to_string(maxBytes)},
+      {"hashWords", hashWords ? "1" : "0"},
+      {"maxVocab", std::to_string(maxVocab)},
+      {"label", label},
+      {"lrUpdateRate", std::to_string(lrUpdateRate)}};
+  for (const auto& field : fields) {
+    out.metadata("args." + field.first, field.second);
+  }
 }
 
+void Args::load(SafeTensorsReader& in) {
+  auto get = [&](const std::string& name) {
+    return std::stoi(in.metadata("args." + name));
+  };
+  dim = get("dim");
+  epoch = get("epoch");
+  minCount = get("minCount");
+  neg = get("neg");
+  wordNgrams = get("wordNgrams");
+  loss = lossFromString(in.metadata("args.loss"));
+  bucket = get("bucket");
+  minn = get("minn");
+  maxn = get("maxn");
+  minb = get("minb");
+  maxb = get("maxb");
+  minc = get("minc");
+  maxc = get("maxc");
+  maxBytes = get("maxBytes");
+  hashWords = get("hashWords") != 0;
+  maxVocab = get("maxVocab");
+  label = in.metadata("args.label");
+  lrUpdateRate = get("lrUpdateRate");
+  validate();
+}
+
+// Model files from before safetensors: the fastText fields (the window size,
+// model type and subsampling threshold only applied to word vectors), then
+// the text-feature block in BFCM files.
 void Args::load(std::istream& in) {
   int ws, model;
   double t;
@@ -401,30 +433,9 @@ void Args::load(std::istream& in) {
   in.read((char*)&(maxn), sizeof(int));
   in.read((char*)&(lrUpdateRate), sizeof(int));
   in.read((char*)&(t), sizeof(double));
-  if (!in || model != kFileSupervised) {
+  if (!in || model != 3) {
     throw std::invalid_argument("Not a supervised classifier model");
   }
-}
-
-// Text-feature settings, stored after the fastText fields in ByteFast
-// model files. The leading version allows the block to grow. The fold,
-// position-bin and text-scope fields belong to options that were removed;
-// they are written as 0 so that the layout stays readable by older builds.
-void Args::saveTextFeatures(std::ostream& out) const {
-  const int32_t version = 3;
-  const int32_t unused = 0;
-  const int32_t hashWordsValue = hashWords ? 1 : 0;
-  out.write((char*)&(version), sizeof(int32_t));
-  out.write((char*)&(minb), sizeof(int));
-  out.write((char*)&(maxb), sizeof(int));
-  out.write((char*)&(minc), sizeof(int));
-  out.write((char*)&(maxc), sizeof(int));
-  out.write((char*)&(maxBytes), sizeof(int));
-  out.write((char*)&(unused), sizeof(int32_t)); // fold
-  out.write((char*)&(hashWordsValue), sizeof(int32_t));
-  out.write((char*)&(maxVocab), sizeof(int));
-  out.write((char*)&(unused), sizeof(int32_t)); // posBins
-  out.write((char*)&(unused), sizeof(int32_t)); // textScope
 }
 
 void Args::loadTextFeatures(std::istream& in) {

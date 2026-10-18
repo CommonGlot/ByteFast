@@ -14,7 +14,7 @@ import {ByteFast, addOnPostRun} from "./bytefast.js";
 
 addOnPostRun(async () => {
   const bf = new ByteFast();
-  const model = await bf.loadModel("model.bin");
+  const model = await bf.loadModel("model.safetensors");
   console.log(model.predict("The striker scored twice", 3, 0.0));
   console.log(model.getLabels());
 });

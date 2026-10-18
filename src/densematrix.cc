@@ -7,6 +7,7 @@
  */
 
 #include "densematrix.h"
+#include "safetensors.h"
 
 #include <algorithm>
 #include <random>
@@ -343,10 +344,19 @@ void DenseMatrix::averageRowsToVector(Vector& x, const std::vector<int32_t>& row
   x.mul(1.0 / rows.size());
 }
 
-void DenseMatrix::save(std::ostream& out) const {
-  out.write((char*)&m_, sizeof(int64_t));
-  out.write((char*)&n_, sizeof(int64_t));
-  out.write((char*)data_.data(), m_ * n_ * sizeof(real));
+void DenseMatrix::save(SafeTensorsWriter& out, const std::string& name) const {
+  out.tensor(name, "F32", {m_, n_}, data_.data(), m_ * n_ * sizeof(real));
+}
+
+void DenseMatrix::load(SafeTensorsReader& in, const std::string& name) {
+  const std::vector<int64_t>& shape = in.shape(name);
+  if (shape.size() != 2) {
+    throw std::invalid_argument(name + " is not a matrix");
+  }
+  m_ = shape[0];
+  n_ = shape[1];
+  data_ = intgemm::AlignedVector<real>(m_ * n_);
+  in.read(name, "F32", data_.data(), m_ * n_ * sizeof(real));
 }
 
 void DenseMatrix::load(std::istream& in) {
@@ -355,18 +365,5 @@ void DenseMatrix::load(std::istream& in) {
   data_ = intgemm::AlignedVector<real>(m_ * n_);
   in.read((char*)data_.data(), m_ * n_ * sizeof(real));
 }
-
-void DenseMatrix::dump(std::ostream& out) const {
-  out << m_ << " " << n_ << std::endl;
-  for (int64_t i = 0; i < m_; i++) {
-    for (int64_t j = 0; j < n_; j++) {
-      if (j > 0) {
-        out << " ";
-      }
-      out << at(i, j);
-    }
-    out << std::endl;
-  }
-};
 
 } // namespace bytefast

@@ -48,8 +48,8 @@ Command line:
 ```bash
 ./bytefast supervised -input train.txt -output model \
     -minb 2 -maxb 5 -bucket 1000000 -dim 64 -epoch 5 -lr 0.5 -thread 8
-./bytefast test model.bin valid.txt
-echo "The striker scored twice" | ./bytefast predict-prob model.bin - 3
+./bytefast test model.safetensors valid.txt
+echo "The striker scored twice" | ./bytefast predict-prob model.safetensors - 3
 ```
 
 Python:
@@ -64,8 +64,8 @@ model = bytefast.train_supervised(
     bucket=1_000_000, dim=64, epoch=5, lr=0.5, thread=8,
 )
 labels, probabilities = model.predict("The striker scored twice", k=3)
-model.save_model("model.bin")
-model = bytefast.load_model("model.bin")
+model.save_model("model.safetensors")
+model = bytefast.load_model("model.safetensors")
 ```
 
 ## Features and options
@@ -109,11 +109,11 @@ data and with staged training:
   is generated from the `regex` module by `tools/gen_norm_table.py`; on 50,000
   CommonLID lines the output equals the Python cleaner's.
 - `-saveEpochs` and `-validation dev.txt`: after every epoch, save the model so
-  far as `OUTPUT.epN.bin` and print precision@1 on a labeled file, to see when
+  far as `OUTPUT.epN.safetensors` and print precision@1 on a labeled file, to see when
   more epochs stop helping. The learning-rate schedule is unchanged (it still
   decays over all `-epoch` epochs); the snapshots are written while training
   continues and need `-thread` above 1.
-- `-inputModel model.bin`: continue training a saved supervised model on new
+- `-inputModel model.safetensors`: continue training a saved supervised model on new
   data, for example a mix of short and long lines. The model's features and
   architecture are kept; `-lr`, `-epoch`, `-thread`, `-seed` and the crop
   and `-normProb` options apply to the new run.
@@ -124,8 +124,14 @@ such as `hash_words`, `max_bytes` and `max_vocab`.
 
 ## Model files
 
-Training writes `OUTPUT.bin`; `./bytefast quantize` writes a compressed
-`OUTPUT.ftz`. Both load with `./bytefast` and `bytefast.load_model()`.
+Models are [safetensors](https://github.com/huggingface/safetensors) files:
+the input table and output layer are F32 tensors (`input`, `output`), the
+vocabulary is in `vocab.strings`, `vocab.counts` and `vocab.types`, and the
+settings are metadata strings (`args.dim`, `args.minb`, ...). Any safetensors
+reader can open them. Training writes `OUTPUT.safetensors`, and
+`./bytefast quantize` writes a compressed `OUTPUT.quant.safetensors`.
+`./bytefast convert old.bin new.safetensors` rewrites a model in the earlier
+`.bin`/`.ftz` format.
 
 ## Project status
 

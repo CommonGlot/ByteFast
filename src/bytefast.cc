@@ -9,6 +9,7 @@
 #include "bytefast.h"
 #include "loss.h"
 #include "quantmatrix.h"
+#include "safetensors.h"
 
 #include <algorithm>
 #include <iomanip>
@@ -22,10 +23,13 @@
 
 namespace bytefast {
 
-constexpr int32_t FASTTEXT_VERSION = 12; /* Version 1b */
+// Models are safetensors files with this format name and version in their
+// metadata. Older model files (fastText's layout, and "BFCM" for models with
+// text features) can still be read.
+const char* const kFormat = "bytefast";
+const char* const kFormatVersion = "1";
+constexpr int32_t FASTTEXT_VERSION = 12;
 constexpr int32_t FASTTEXT_FILEFORMAT_MAGIC_INT32 = 793712314;
-// Models that use ByteFast text features ("BFCM" on disk). Others are
-// written in the fastText format above, so upstream fastText reads them.
 constexpr int32_t BYTEFAST_FILEFORMAT_MAGIC_INT32 = 0x4D434642;
 constexpr int32_t BYTEFAST_VERSION = 1;
 
@@ -89,40 +93,42 @@ bool ByteFast::checkModel(std::istream& in) {
   return true;
 }
 
-void ByteFast::signModel(std::ostream& out) {
-  const bool textFeatures = args_->usesTextFeatures();
-  const int32_t magic = textFeatures ? BYTEFAST_FILEFORMAT_MAGIC_INT32
-                                     : FASTTEXT_FILEFORMAT_MAGIC_INT32;
-  const int32_t version = textFeatures ? BYTEFAST_VERSION : FASTTEXT_VERSION;
-  out.write((char*)&(magic), sizeof(int32_t));
-  out.write((char*)&(version), sizeof(int32_t));
-}
-
 void ByteFast::saveModel(const std::string& filename) {
-  std::ofstream ofs(filename, std::ofstream::binary);
-  if (!ofs.is_open()) {
-    throw std::invalid_argument(filename + " cannot be opened for saving!");
-  }
   if (!input_ || !output_) {
     throw std::runtime_error("Model never trained");
   }
-  signModel(ofs);
-  args_->save(ofs);
-  if (args_->usesTextFeatures()) {
-    args_->saveTextFeatures(ofs);
-  }
-  dict_->save(ofs);
-
-  ofs.write((char*)&(quant_), sizeof(bool));
-  input_->save(ofs);
-
-  ofs.write((char*)&(args_->qout), sizeof(bool));
-  output_->save(ofs);
-
-  ofs.close();
+  SafeTensorsWriter out;
+  out.metadata("format", kFormat);
+  out.metadata("format_version", kFormatVersion);
+  args_->save(out);
+  dict_->save(out);
+  input_->save(out, "input");
+  output_->save(out, "output");
+  out.write(filename);
 }
 
 void ByteFast::loadModel(const std::string& filename) {
+  if (SafeTensorsReader::isSafeTensors(filename)) {
+    SafeTensorsReader in(filename);
+    if (in.metadata("format") != kFormat ||
+        in.metadata("format_version") != kFormatVersion) {
+      throw std::invalid_argument(filename + " is not a ByteFast model");
+    }
+    args_ = std::make_shared<Args>();
+    args_->load(in);
+    dict_ = std::make_shared<Dictionary>(args_, in);
+    quant_ = in.has("input.codes");
+    args_->qout = in.has("output.codes");
+    input_ = quant_ ? std::shared_ptr<Matrix>(std::make_shared<QuantMatrix>())
+                    : std::make_shared<DenseMatrix>();
+    output_ = args_->qout
+        ? std::shared_ptr<Matrix>(std::make_shared<QuantMatrix>())
+        : std::make_shared<DenseMatrix>();
+    input_->load(in, "input");
+    output_->load(in, "output");
+    buildModel();
+    return;
+  }
   std::ifstream ifs(filename, std::ifstream::binary);
   if (!ifs.is_open()) {
     throw std::invalid_argument(filename + " cannot be opened for loading!");
@@ -551,7 +557,8 @@ void ByteFast::startThreads(const TrainCallback& callback) {
 // print precision@1 on -validation.
 void ByteFast::epochCheckpoint(int32_t epoch) {
   if (args_->saveEpochs && epoch < args_->epoch) {
-    saveModel(args_->output + ".ep" + std::to_string(epoch) + ".bin");
+    saveModel(
+        args_->output + ".ep" + std::to_string(epoch) + ".safetensors");
   }
   if (!args_->validation.empty()) {
     std::ifstream ifs(args_->validation);

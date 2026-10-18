@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <istream>
+#include <string>
 #include <ostream>
 #include <vector>
 
@@ -19,6 +20,8 @@
 namespace bytefast {
 
 class Vector;
+class SafeTensorsReader;
+class SafeTensorsWriter;
 
 class Matrix {
  protected:
@@ -40,9 +43,10 @@ class Matrix {
   virtual void addRowToVector(Vector& x, int32_t i) const = 0;
   virtual void addRowToVector(Vector& x, int32_t i, real a) const = 0;
   virtual void averageRowsToVector(Vector& x, const std::vector<int32_t>& rows) const = 0;
-  virtual void save(std::ostream&) const = 0;
+  virtual void save(SafeTensorsWriter&, const std::string& name) const = 0;
+  virtual void load(SafeTensorsReader&, const std::string& name) = 0;
+  // Reads the matrix of a model file from before safetensors.
   virtual void load(std::istream&) = 0;
-  virtual void dump(std::ostream&) const = 0;
 };
 
 } // namespace bytefast

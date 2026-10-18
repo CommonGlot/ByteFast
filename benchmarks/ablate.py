@@ -166,7 +166,7 @@ def main():
                     log.write(json.dumps(record) + "\n"); log.flush()
                     print("%-24s dev %s FAILED: %s" % (v["name"], record["grid"], error), flush=True)
                     continue
-                dev = evaluate(a.bin, model + ".bin", a.data / "dev.txt", a.threads)
+                dev = evaluate(a.bin, model + ".safetensors", a.data / "dev.txt", a.threads)
                 record = {"stage": "dev", "variant": v["name"], "grid": dict(zip(names, combo)),
                           "dev_macro_f1": dev["macro_f1"], "dev_accuracy": dev["accuracy"],
                           "train_seconds": seconds}
@@ -185,21 +185,21 @@ def main():
                     log.write(json.dumps({"stage": "test", "variant": v["name"], "grid": best[2],
                                           "seed": seed, "error": error}) + "\n"); log.flush()
                     continue
-                test = evaluate(a.bin, model + ".bin", a.data / "test.txt", a.threads)
+                test = evaluate(a.bin, model + ".safetensors", a.data / "test.txt", a.threads)
                 record = {"stage": "test", "variant": v["name"], "flags": " ".join(flags),
                           "grid": best[2], "seed": seed, "dev_macro_f1": best[0],
                           "test_macro_f1": test["macro_f1"], "test_accuracy": test["accuracy"],
                           "train_seconds": seconds, "threads": a.threads,
                           "per_label_f1": test["per_label_f1"]}
                 if not tests:  # first successful seed: size and speed
-                    record["model_bytes"] = os.path.getsize(model + ".bin")
-                    load, lps = throughput(a.bin, model + ".bin", a.data / "test.txt",
+                    record["model_bytes"] = os.path.getsize(model + ".safetensors")
+                    load, lps = throughput(a.bin, model + ".safetensors", a.data / "test.txt",
                                            a.throughput_lines, work)
                     record["load_seconds"] = load
                     record["predict_lines_per_second"] = lps
                     if a.keep_models:
                         a.keep_models.mkdir(parents=True, exist_ok=True)
-                        os.replace(model + ".bin", a.keep_models / ("%s.bin" % v["name"]))
+                        os.replace(model + ".safetensors", a.keep_models / ("%s.safetensors" % v["name"]))
                 log.write(json.dumps(record) + "\n"); log.flush()
                 tests.append(record)
             if not tests:

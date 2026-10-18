@@ -51,7 +51,6 @@ class ByteFast {
   int64_t trainTokens_ = 0;
   std::exception_ptr trainException_;
 
-  void signModel(std::ostream&);
   bool checkModel(std::istream&);
   void startThreads(const TrainCallback& callback = {});
   void epochCheckpoint(int32_t epoch);

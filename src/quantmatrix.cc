@@ -7,6 +7,7 @@
  */
 
 #include "quantmatrix.h"
+#include "safetensors.h"
 
 #include <assert.h>
 #include <iostream>
@@ -88,16 +89,31 @@ void QuantMatrix::averageRowsToVector(Vector& x, const std::vector<int32_t>& row
   x.mul(1.0 / rows.size());
 }
 
-void QuantMatrix::save(std::ostream& out) const {
-  out.write((char*)&qnorm_, sizeof(qnorm_));
-  out.write((char*)&m_, sizeof(m_));
-  out.write((char*)&n_, sizeof(n_));
-  out.write((char*)&codesize_, sizeof(codesize_));
-  out.write((char*)codes_.data(), codesize_ * sizeof(uint8_t));
-  pq_->save(out);
+void QuantMatrix::save(SafeTensorsWriter& out, const std::string& name) const {
+  out.metadata(name + ".rows", std::to_string(m_));
+  out.metadata(name + ".cols", std::to_string(n_));
+  out.tensor(name + ".codes", "U8", {codesize_}, codes_.data(), codesize_);
+  pq_->save(out, name + ".pq");
   if (qnorm_) {
-    out.write((char*)norm_codes_.data(), m_ * sizeof(uint8_t));
-    npq_->save(out);
+    out.tensor(name + ".norm_codes", "U8", {m_}, norm_codes_.data(), m_);
+    npq_->save(out, name + ".npq");
+  }
+}
+
+void QuantMatrix::load(SafeTensorsReader& in, const std::string& name) {
+  m_ = in.metadataInt(name + ".rows");
+  n_ = in.metadataInt(name + ".cols");
+  codesize_ = in.bytes(name + ".codes");
+  codes_.resize(codesize_);
+  in.read(name + ".codes", "U8", codes_.data(), codesize_);
+  pq_ = std::unique_ptr<ProductQuantizer>(new ProductQuantizer());
+  pq_->load(in, name + ".pq");
+  qnorm_ = in.has(name + ".norm_codes");
+  if (qnorm_) {
+    norm_codes_.resize(m_);
+    in.read(name + ".norm_codes", "U8", norm_codes_.data(), m_);
+    npq_ = std::unique_ptr<ProductQuantizer>(new ProductQuantizer());
+    npq_->load(in, name + ".npq");
   }
 }
 
@@ -116,10 +132,6 @@ void QuantMatrix::load(std::istream& in) {
     npq_ = std::unique_ptr<ProductQuantizer>(new ProductQuantizer());
     npq_->load(in);
   }
-}
-
-void QuantMatrix::dump(std::ostream&) const {
-  throw std::runtime_error("Operation not permitted on quantized matrices.");
 }
 
 } // namespace bytefast

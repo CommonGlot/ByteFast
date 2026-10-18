@@ -30,11 +30,27 @@ void printUsage() {
       << "  predict                 predict most likely labels\n"
       << "  predict-prob            predict most likely labels with "
          "probabilities\n"
+      << "  convert                 rewrite an older .bin/.ftz model as "
+         "safetensors\n"
       << std::endl;
 }
 
 void printQuantizeUsage() {
-  std::cerr << "usage: bytefast quantize <args>" << std::endl;
+  std::cerr << "usage: bytefast quantize <args>\n\n"
+            << "  reads OUTPUT.safetensors and writes OUTPUT.quant.safetensors"
+            << std::endl;
+}
+
+void convert(const std::vector<std::string>& args) {
+  if (args.size() != 4) {
+    std::cerr << "usage: bytefast convert <old model> <new.safetensors>"
+              << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  ByteFast model;
+  model.loadModel(args[2]);
+  model.saveModel(args[3]);
+  exit(0);
 }
 
 void printTestUsage() {
@@ -78,9 +94,9 @@ void quantize(const std::vector<std::string>& args) {
   a.parseArgs(args);
   ByteFast fasttext;
   // parseArgs checks if a->output is given.
-  fasttext.loadModel(a.output + ".bin");
+  fasttext.loadModel(a.output + ".safetensors");
   fasttext.quantize(a);
-  fasttext.saveModel(a.output + ".ftz");
+  fasttext.saveModel(a.output + ".quant.safetensors");
   exit(0);
 }
 
@@ -271,7 +287,7 @@ void train(const std::vector<std::string> args) {
   Args a = Args();
   a.parseArgs(args);
   std::shared_ptr<ByteFast> fasttext = std::make_shared<ByteFast>();
-  std::string outputFileName = a.output + ".bin";
+  std::string outputFileName = a.output + ".safetensors";
   std::ofstream ofs(outputFileName);
   if (!ofs.is_open()) {
     throw std::invalid_argument(
@@ -297,6 +313,8 @@ int main(int argc, char** argv) {
     quantize(args);
   } else if (command == "predict" || command == "predict-prob") {
     predict(args);
+  } else if (command == "convert") {
+    convert(args);
   } else {
     printUsage();
     exit(EXIT_FAILURE);
