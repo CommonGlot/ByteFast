@@ -8,6 +8,7 @@
 
 #include "densematrix.h"
 
+#include <algorithm>
 #include <random>
 #include <stdexcept>
 #include <thread>
@@ -39,25 +40,38 @@ void DenseMatrix::uniformThread(real a, int block, int32_t seed) {
   std::minstd_rand rng(block + seed);
   std::uniform_real_distribution<> uniform(-a, a);
   int64_t blockSize = (m_ * n_) / 10;
-  for (int64_t i = blockSize * block;
-       i < (m_ * n_) && i < blockSize * (block + 1);
-       i++) {
+  // Block 10 takes everything after the tenth block.
+  const int64_t end = block >= 10 ? m_ * n_ : blockSize * (block + 1);
+  for (int64_t i = blockSize * block; i < (m_ * n_) && i < end; i++) {
     data_[i] = uniform(rng);
   }
 }
 
 void DenseMatrix::uniform(real a, unsigned int thread, int32_t seed) {
-  if (thread > 1) {
-    std::vector<std::thread> threads;
-    for (int i = 0; i < thread; i++) {
-      threads.push_back(std::thread([=]() { uniformThread(a, i, seed); }));
+  // The matrix is filled in blocks of a tenth of its size, each with its own
+  // seed, so the values do not depend on the number of threads; block 10
+  // holds the elements after the tenth block. Upstream fastText filled one
+  // block per thread, which left most of the matrix uninitialized with fewer
+  // than ten threads; with eleven or more threads the result is unchanged.
+  constexpr int kBlocks = 11;
+  const int workers = static_cast<int>(
+      std::min<unsigned int>(std::max(thread, 1u), kBlocks));
+  auto fill = [=](int worker) {
+    for (int block = worker; block < kBlocks; block += workers) {
+      uniformThread(a, block, seed);
     }
-    for (int32_t i = 0; i < threads.size(); i++) {
-      threads[i].join();
+  };
+  if (workers > 1) {
+    std::vector<std::thread> threads;
+    for (int i = 0; i < workers; i++) {
+      threads.push_back(std::thread(fill, i));
+    }
+    for (auto& t : threads) {
+      t.join();
     }
   } else {
     // webassembly can't instantiate `std::thread`
-    uniformThread(a, 0, seed);
+    fill(0);
   }
 }
 
