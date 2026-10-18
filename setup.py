@@ -118,14 +118,16 @@ class BuildExt(build_ext):
     """A custom build extension for adding compiler-specific options."""
 
     c_opts = {
-        "msvc": ["/EHsc"],
+        # ByteFast uses C++17 (std::string_view); MSVC defaults to C++14.
+        "msvc": ["/EHsc", "/std:c++17"],
         "unix": [],
     }
 
     def build_extensions(self):
         if sys.platform == "darwin":
             mac_osx_version = float(".".join(platform.mac_ver()[0].split(".")[:2]))
-            os.environ["MACOSX_DEPLOYMENT_TARGET"] = str(mac_osx_version)
+            # Keep a target set by the wheel builder (e.g. cibuildwheel).
+            os.environ.setdefault("MACOSX_DEPLOYMENT_TARGET", str(mac_osx_version))
             all_flags = ["-stdlib=libc++", "-mmacosx-version-min=10.7"]
             if has_flag(self.compiler, [all_flags[0]]):
                 self.c_opts["unix"] += [all_flags[0]]
@@ -174,16 +176,21 @@ setup(
     long_description_content_type="text/markdown",
     ext_modules=ext_modules,
     url="https://github.com/CommonGlot/ByteFast",
+    maintainer="CommonGlot",
+    maintainer_email="commonglot@gmail.com",
     license="MIT",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: MIT License",
-        "Programming Language :: Python :: 2.7",
-        "Programming Language :: Python :: 3.4",
-        "Programming Language :: Python :: 3.5",
-        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
         "Topic :: Software Development",
         "Topic :: Scientific/Engineering",
         "Operating System :: Microsoft :: Windows",
@@ -191,7 +198,8 @@ setup(
         "Operating System :: Unix",
         "Operating System :: MacOS",
     ],
-    install_requires=["pybind11>=2.2", "setuptools >= 0.7.0", "numpy"],
+    python_requires=">=3.9",
+    install_requires=["numpy"],
     cmdclass={"build_ext": BuildExt},
     packages=["bytefast"],
     package_dir={"bytefast": "python/bytefast"},
