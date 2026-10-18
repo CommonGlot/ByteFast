@@ -14,6 +14,20 @@ INCLUDES = -I.
 opt: CXXFLAGS += -O3 -funroll-loops -DNDEBUG
 opt: bytefast
 
+# Static library with the C API (src/bytefast_c.h), and its test.
+lib: CXXFLAGS += -O3 -funroll-loops -DNDEBUG
+lib: libbytefast.a
+
+libbytefast.a: $(OBJS) bytefast_c.o
+	ar rcs libbytefast.a $(OBJS) bytefast_c.o
+
+bytefast_c.o: src/bytefast_c.cc src/*.h
+	$(CXX) $(CXXFLAGS) -c src/bytefast_c.cc
+
+c_api_test: lib tests/c_api_test.c
+	cc -O2 -Wall -Wextra -Werror -Isrc -c tests/c_api_test.c -o c_api_test.o
+	$(CXX) -pthread c_api_test.o libbytefast.a -o c_api_test
+
 coverage: CXXFLAGS += -O0 -fno-inline -fprofile-arcs --coverage
 coverage: bytefast
 
@@ -70,7 +84,7 @@ bytefast: $(OBJS) src/bytefast.cc src/main.cc
 	$(CXX) $(CXXFLAGS) $(OBJS) src/main.cc -o bytefast
 
 clean:
-	rm -rf *.o *.gcno *.gcda bytefast *.bc webassembly/bytefast_wasm.js webassembly/bytefast_wasm.wasm
+	rm -rf *.o *.gcno *.gcda bytefast libbytefast.a c_api_test *.bc webassembly/bytefast_wasm.js webassembly/bytefast_wasm.wasm
 
 
 EMCXX = em++

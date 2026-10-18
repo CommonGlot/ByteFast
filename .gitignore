@@ -16,3 +16,5 @@ node_modules/
 # Python build outputs
 build/
 *.egg-info/
+libbytefast.a
+c_api_test

@@ -21,6 +21,7 @@ set(CMAKE_CXX_FLAGS " -pthread -std=c++17 -funroll-loops -O3 -march=native")
 
 set(HEADER_FILES
     src/args.h
+    src/bytefast_c.h
     src/safetensors.h
     src/densematrix.h
     src/dictionary.h
@@ -44,8 +45,8 @@ set(SOURCE_FILES
     src/densematrix.cc
     src/dictionary.cc
     src/bytefast.cc
+    src/bytefast_c.cc
     src/loss.cc
-    src/main.cc
     src/matrix.cc
     src/meter.cc
     src/model.cc

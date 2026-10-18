@@ -64,6 +64,10 @@ jobs:
             ./bytefast test /tmp/core.quant.safetensors /tmp/core-test.txt
           done
           python3 -c "d=open('/tmp/core.safetensors','rb').read(9); assert d[8:9]==b'{', d"
+      - name: C API
+        run: |
+          make -j2 c_api_test
+          ./c_api_test /tmp/core.safetensors "violin piano cello harp" __label__gamma
       - name: Span cropping and continued training
         run: |
           set -e

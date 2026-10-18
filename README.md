@@ -32,6 +32,9 @@ python -m pip install .       # Python package "bytefast"
 
 The Python API is described in [docs/python-module.md](docs/python-module.md)
 and the browser build in [webassembly/README.md](webassembly/README.md).
+`make lib` builds `libbytefast.a` with a C API for prediction
+([src/bytefast_c.h](src/bytefast_c.h)), the base for bindings in other
+languages.
 
 ## Training a classifier
 
