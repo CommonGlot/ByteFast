@@ -39,7 +39,6 @@ class Dictionary {
 
   int32_t find(const std::string_view) const;
   int32_t find(const std::string_view, uint32_t h) const;
-  void initTableDiscard();
   void initNgrams();
   void reset(std::istream&) const;
   void pushHash(std::vector<int32_t>&, int32_t) const;
@@ -61,7 +60,6 @@ class Dictionary {
   std::vector<int32_t> word2int_;
   std::vector<entry> words_;
 
-  std::vector<real> pdiscard_;
   int32_t size_;
   int32_t nwords_;
   int32_t nlabels_;
@@ -88,18 +86,9 @@ class Dictionary {
   int32_t getId(const std::string_view, uint32_t h) const;
   entry_type getType(int32_t) const;
   entry_type getType(const std::string_view) const;
-  bool discard(int32_t, real) const;
   std::string getWord(int32_t) const;
   const std::vector<int32_t>& getSubwords(int32_t) const;
-  const std::vector<int32_t> getSubwords(const std::string&) const;
-  void getSubwords(
-      const std::string&,
-      std::vector<int32_t>&,
-      std::vector<std::string>&) const;
-  void computeSubwords(
-      const std::string&,
-      std::vector<int32_t>&,
-      std::vector<std::string>* substrings = nullptr) const;
+  void computeSubwords(const std::string&, std::vector<int32_t>&) const;
   uint32_t hash(const std::string_view str) const;
   void add(const std::string&);
   bool readWord(std::istream&, std::string&) const;
@@ -109,8 +98,6 @@ class Dictionary {
   void load(std::istream&);
   std::vector<int64_t> getCounts(entry_type) const;
   int32_t getLine(std::istream&, std::vector<int32_t>&, std::vector<int32_t>&)
-      const;
-  int32_t getLine(std::istream&, std::vector<int32_t>&, std::minstd_rand&)
       const;
   int32_t getLine(std::istream&, std::vector<int32_t>&, std::vector<int32_t>&,
       std::minstd_rand&) const;

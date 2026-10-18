@@ -54,9 +54,9 @@ word and subword hashes are unchanged, so fastText models keep working.
   dictionary, features and weights of a supervised model and only takes the
   training schedule from the command line; the learning-rate schedule is
   computed from the new input's token count.
-- **File format.** A model is written in the fastText format unless it uses
-  a ByteFast-only feature. Otherwise the header is `BFCM` and a versioned
-  block with the text-feature settings follows the fastText arguments.
+- **File format.** A model that uses a ByteFast text feature starts with
+  `BFCM` and a versioned block with the text-feature settings; other models
+  keep fastText's layout.
 
 ## Ablations
 

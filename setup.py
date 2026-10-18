@@ -169,7 +169,7 @@ setup(
     version=__version__,
     author="CommonGlot contributors and original fastText authors",
     author_email="commonglot@gmail.com",
-    description="ByteFast byte-level text classification with support for original fastText models",
+    description="ByteFast: fast text classification with byte, character and word features",
     long_description=_get_readme(),
     long_description_content_type="text/markdown",
     ext_modules=ext_modules,
@@ -193,7 +193,7 @@ setup(
     ],
     install_requires=["pybind11>=2.2", "setuptools >= 0.7.0", "numpy"],
     cmdclass={"build_ext": BuildExt},
-    packages=["bytefast", "bytefast.util"],
+    packages=["bytefast"],
     package_dir={"bytefast": "python/bytefast"},
     zip_safe=False,
 )

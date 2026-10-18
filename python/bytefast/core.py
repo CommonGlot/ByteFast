@@ -1,481 +1,39 @@
-# Copyright (c) 2017-present, Facebook, Inc.
-# All rights reserved.
-#
-# This source code is licensed under the MIT license found in the
-# LICENSE file in the root directory of this source tree.
+# Copyright (c) 2017-present, Facebook, Inc., and 2026 CommonGlot contributors.
+# MIT License.
+"""Python API: train_supervised, load_model and the model object."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
+import multiprocessing
+
+import numpy as np
 
 from . import _core_pybind as _core
-import numpy as np
-import multiprocessing
-from itertools import chain
 
-loss_name = _core.loss_name
-model_name = _core.model_name
-EOS = "</s>"
-BOW = "<"
-EOW = ">"
-
-displayed_errors = {}
-
-
-class _Meter:
-    def __init__(self, fasttext_model, meter):
-        self.f = fasttext_model
-        self.m = meter
-
-    def score_vs_true(self, label):
-        """Return scores and the gold of each sample for a specific label"""
-        label_id = self.f.get_label_id(label)
-        pair_list = self.m.scoreVsTrue(label_id)
-
-        if pair_list:
-            y_scores, y_true = zip(*pair_list)
-        else:
-            y_scores, y_true = ([], ())
-
-        return np.asarray(y_scores), np.asarray(y_true)
-
-    def precision_recall_curve(self, label=None):
-        """Return precision/recall curve"""
-        if label:
-            label_id = self.f.get_label_id(label)
-            pair_list = self.m.precisionRecallCurveLabel(label_id)
-        else:
-            pair_list = self.m.precisionRecallCurve()
-
-        if pair_list:
-            precision, recall = zip(*pair_list)
-        else:
-            precision, recall = ([], ())
-
-        return np.asarray(precision), np.asarray(recall)
-
-    def precision_at_recall(self, recall, label=None):
-        """Return precision for a given recall"""
-        if label:
-            label_id = self.f.get_label_id(label)
-            precision = self.m.precisionAtRecallLabel(label_id, recall)
-        else:
-            precision = self.m.precisionAtRecall(recall)
-
-        return precision
-
-    def recall_at_precision(self, precision, label=None):
-        """Return recall for a given precision"""
-        if label:
-            label_id = self.f.get_label_id(label)
-            recall = self.m.recallAtPrecisionLabel(label_id, precision)
-        else:
-            recall = self.m.recallAtPrecision(precision)
-
-        return recall
-
-
-class _ByteFast:
-    """
-    This class defines the API to inspect models and should not be used to
-    create objects. It will be returned by functions such as load_model or
-    train.
-
-    In general this API assumes to be given only unicode for Python2 and the
-    Python3 equvalent called str for any string-like arguments. All unicode
-    strings are then encoded as UTF-8 and fed to the fastText C++ API.
-    """
-
-    def __init__(self, model_path=None, args=None):
-        self.f = _core.bytefast()
-        if model_path is not None:
-            self.f.loadModel(model_path)
-        self._words = None
-        self._labels = None
-        self.set_args(args)
-
-    def set_args(self, args=None):
-        if args:
-            arg_names = [
-                "lr",
-                "dim",
-                "ws",
-                "epoch",
-                "minCount",
-                "minCountLabel",
-                "minn",
-                "maxn",
-                "minb",
-                "maxb",
-                "minc",
-                "maxc",
-                "maxBytes",
-                "hashWords",
-                "maxVocab",
-                "neg",
-                "wordNgrams",
-                "loss",
-                "bucket",
-                "thread",
-                "lrUpdateRate",
-                "t",
-                "label",
-                "verbose",
-                "pretrainedVectors",
-            ]
-            for arg_name in arg_names:
-                setattr(self, arg_name, getattr(args, arg_name))
-
-    def is_quantized(self):
-        return self.f.isQuant()
-
-    def get_dimension(self):
-        """Get the dimension (size) of a lookup vector (hidden layer)."""
-        a = self.f.getArgs()
-        return a.dim
-
-    def get_word_vector(self, word):
-        """Get the vector representation of word."""
-        dim = self.get_dimension()
-        b = _core.Vector(dim)
-        self.f.getWordVector(b, word)
-        return np.array(b)
-
-    def get_sentence_vector(self, text):
-        """
-        Given a string, get a single vector represenation. This function
-        assumes to be given a single line of text. We split words on
-        whitespace (space, newline, tab, vertical tab) and the control
-        characters carriage return, formfeed and the null character.
-        """
-        if text.find("\n") != -1:
-            raise ValueError("predict processes one line at a time (remove '\\n')")
-        text += "\n"
-        dim = self.get_dimension()
-        b = _core.Vector(dim)
-        self.f.getSentenceVector(b, text)
-        return np.array(b)
-
-    def get_nearest_neighbors(self, word, k=10, on_unicode_error="strict"):
-        return self.f.getNN(word, k, on_unicode_error)
-
-    def get_analogies(self, wordA, wordB, wordC, k=10, on_unicode_error="strict"):
-        return self.f.getAnalogies(wordA, wordB, wordC, k, on_unicode_error)
-
-    def get_word_id(self, word):
-        """
-        Given a word, get the word id within the dictionary.
-        Returns -1 if word is not in the dictionary.
-        """
-        return self.f.getWordId(word)
-
-    def get_label_id(self, label):
-        """
-        Given a label, get the label id within the dictionary.
-        Returns -1 if label is not in the dictionary.
-        """
-        return self.f.getLabelId(label)
-
-    def get_subword_id(self, subword):
-        """
-        Given a subword, return the index (within input matrix) it hashes to.
-        """
-        return self.f.getSubwordId(subword)
-
-    def get_subwords(self, word, on_unicode_error="strict"):
-        """
-        Given a word, get the subwords and their indicies.
-        """
-        pair = self.f.getSubwords(word, on_unicode_error)
-        return pair[0], np.array(pair[1])
-
-    def get_input_vector(self, ind):
-        """
-        Given an index, get the corresponding vector of the Input Matrix.
-        """
-        dim = self.get_dimension()
-        b = _core.Vector(dim)
-        self.f.getInputVector(b, ind)
-        return np.array(b)
-
-    def predict(self, text, k=1, threshold=0.0, on_unicode_error="strict"):
-        """
-        Given a string, get a list of labels and a list of
-        corresponding probabilities. k controls the number
-        of returned labels. A choice of 5, will return the 5
-        most probable labels. By default this returns only
-        the most likely label and probability. threshold filters
-        the returned labels by a threshold on probability. A
-        choice of 0.5 will return labels with at least 0.5
-        probability. k and threshold will be applied together to
-        determine the returned labels.
-
-        This function assumes to be given
-        a single line of text. We split words on whitespace (space,
-        newline, tab, vertical tab) and the control characters carriage
-        return, formfeed and the null character.
-
-        If the model is not supervised, this function will throw a ValueError.
-
-        If given a list of strings, it will return a list of results as usually
-        received for a single line of text.
-        """
-
-        def check(entry):
-            if entry.find("\n") != -1:
-                raise ValueError("predict processes one line at a time (remove '\\n')")
-            entry += "\n"
-            return entry
-
-        if type(text) == list:
-            text = [check(entry) for entry in text]
-            all_labels, all_probs = self.f.multilinePredict(
-                text, k, threshold, on_unicode_error
-            )
-
-            return all_labels, all_probs
-        else:
-            text = check(text)
-            predictions = self.f.predict(text, k, threshold, on_unicode_error)
-            if predictions:
-                probs, labels = zip(*predictions)
-            else:
-                probs, labels = ([], ())
-
-            return labels, np.asarray(probs)
-
-    def get_input_matrix(self):
-        """
-        Get a reference to the full input matrix of a Model. This only
-        works if the model is not quantized.
-        """
-        if self.f.isQuant():
-            raise ValueError("Can't get quantized Matrix")
-        return np.array(self.f.getInputMatrix())
-
-    def get_output_matrix(self):
-        """
-        Get a reference to the full output matrix of a Model. This only
-        works if the model is not quantized.
-        """
-        if self.f.isQuant():
-            raise ValueError("Can't get quantized Matrix")
-        return np.array(self.f.getOutputMatrix())
-
-    def get_words(self, include_freq=False, on_unicode_error="strict"):
-        """
-        Get the entire list of words of the dictionary optionally
-        including the frequency of the individual words. This
-        does not include any subwords. For that please consult
-        the function get_subwords.
-        """
-        pair = self.f.getVocab(on_unicode_error)
-        if include_freq:
-            return (pair[0], np.array(pair[1]))
-        else:
-            return pair[0]
-
-    def get_labels(self, include_freq=False, on_unicode_error="strict"):
-        """
-        Get the entire list of labels of the dictionary optionally
-        including the frequency of the individual labels. Unsupervised
-        models use words as labels, which is why get_labels
-        will call and return get_words for this type of
-        model.
-        """
-        a = self.f.getArgs()
-        if a.model == model_name.supervised:
-            pair = self.f.getLabels(on_unicode_error)
-            if include_freq:
-                return (pair[0], np.array(pair[1]))
-            else:
-                return pair[0]
-        else:
-            return self.get_words(include_freq)
-
-    def get_line(self, text, on_unicode_error="strict"):
-        """
-        Split a line of text into words and labels. Labels must start with
-        the prefix used to create the model (__label__ by default).
-        """
-
-        def check(entry):
-            if entry.find("\n") != -1:
-                raise ValueError("get_line processes one line at a time (remove '\\n')")
-            entry += "\n"
-            return entry
-
-        if type(text) == list:
-            text = [check(entry) for entry in text]
-            return self.f.multilineGetLine(text, on_unicode_error)
-        else:
-            text = check(text)
-            return self.f.getLine(text, on_unicode_error)
-
-    def save_model(self, path):
-        """Save the model to the given path"""
-        self.f.saveModel(path)
-
-    def test(self, path, k=1, threshold=0.0):
-        """Evaluate supervised model using file given by path"""
-        return self.f.test(path, k, threshold)
-
-    def test_label(self, path, k=1, threshold=0.0):
-        """
-        Return the precision and recall score for each label.
-
-        The returned value is a dictionary, where the key is the label.
-        For example:
-        f.test_label(...)
-        {'__label__italian-cuisine' : {'precision' : 0.7, 'recall' : 0.74}}
-        """
-        return self.f.testLabel(path, k, threshold)
-
-    def get_meter(self, path, k=-1):
-        meter = _Meter(self, self.f.getMeter(path, k))
-
-        return meter
-
-    def quantize(
-        self,
-        input=None,
-        qout=False,
-        cutoff=0,
-        retrain=False,
-        epoch=None,
-        lr=None,
-        thread=None,
-        verbose=None,
-        dsub=2,
-        qnorm=False,
-    ):
-        """
-        Quantize the model reducing the size of the model and
-        it's memory footprint.
-        """
-        a = self.f.getArgs()
-        if not epoch:
-            epoch = a.epoch
-        if not lr:
-            lr = a.lr
-        if not thread:
-            thread = a.thread
-        if not verbose:
-            verbose = a.verbose
-        if retrain and not input:
-            raise ValueError("Need input file path if retraining")
-        if input is None:
-            input = ""
-        self.f.quantize(
-            input, qout, cutoff, retrain, epoch, lr, thread, verbose, dsub, qnorm
-        )
-
-    def set_matrices(self, input_matrix, output_matrix):
-        """
-        Set input and output matrices. This function assumes you know what you
-        are doing.
-        """
-        self.f.setMatrices(
-            input_matrix.astype(np.float32), output_matrix.astype(np.float32)
-        )
-
-    @property
-    def words(self):
-        if self._words is None:
-            self._words = self.get_words()
-        return self._words
-
-    @property
-    def labels(self):
-        if self._labels is None:
-            self._labels = self.get_labels()
-        return self._labels
-
-    def __getitem__(self, word):
-        return self.get_word_vector(word)
-
-    def __contains__(self, word):
-        return word in self.words
-
-
-def _parse_model_string(string):
-    if string == "cbow":
-        return model_name.cbow
-    if string == "skipgram":
-        return model_name.skipgram
-    if string == "supervised":
-        return model_name.supervised
-    else:
-        raise ValueError("Unrecognized model name")
-
-
-def _parse_loss_string(string):
-    if string == "ns":
-        return loss_name.ns
-    if string == "hs":
-        return loss_name.hs
-    if string == "softmax":
-        return loss_name.softmax
-    if string == "ova":
-        return loss_name.ova
-    else:
-        raise ValueError("Unrecognized loss name")
-
-
-def _build_args(args, manually_set_args):
-    args["model"] = _parse_model_string(args["model"])
-    args["loss"] = _parse_loss_string(args["loss"])
-    if "hashWords" in args:
-        args["hashWords"] = bool(args["hashWords"])
-    if type(args["autotuneModelSize"]) == int:
-        args["autotuneModelSize"] = str(args["autotuneModelSize"])
-
-    a = _core.args()
-    for (k, v) in args.items():
-        setattr(a, k, v)
-        if k in manually_set_args:
-            a.setManual(k)
-    a.output = ""  # User should use save_model
-    a.saveOutput = 0  # Never use this
-    # Without hashed features the bucket table is unused; keep it empty.
-    if (a.wordNgrams <= 1 and a.maxn == 0 and a.maxb == 0 and a.maxc == 0
-            and not a.hashWords):
-        a.bucket = 0
-    return a
-
-
-def tokenize(text):
-    """Given a string of text, tokenize it and return a list of tokens"""
-    f = _core.bytefast()
-    return f.tokenize(text)
-
-
-def load_model(path):
-    """Load a model given a filepath and return a model object."""
-    return _ByteFast(model_path=path)
-
-
-unsupervised_default = {
-    "model": "skipgram",
-    "lr": 0.05,
+LOSSES = {
+    "softmax": _core.loss_name.softmax,
+    "ova": _core.loss_name.ova,
+    "hs": _core.loss_name.hs,
+    "ns": _core.loss_name.ns,
+}
+
+# Training arguments and their defaults. The snake_case aliases below are
+# accepted as keyword arguments too.
+DEFAULTS = {
+    "input": "",
+    "lr": 0.1,
     "dim": 100,
-    "ws": 5,
     "epoch": 5,
-    "minCount": 5,
+    "minCount": 1,
     "minCountLabel": 0,
-    "minn": 3,
-    "maxn": 6,
+    "minn": 0,
+    "maxn": 0,
     "neg": 5,
     "wordNgrams": 1,
-    "loss": "ns",
+    "loss": "softmax",
     "bucket": 2000000,
-    "thread": multiprocessing.cpu_count() - 1,
+    "thread": max(1, multiprocessing.cpu_count() - 1),
     "lrUpdateRate": 100,
-    "t": 1e-4,
     "label": "__label__",
     "verbose": 2,
-    "pretrainedVectors": "",
     "seed": 0,
     "minb": 0,
     "maxb": 0,
@@ -493,207 +51,146 @@ unsupervised_default = {
     "normProb": 0.0,
     "saveEpochs": False,
     "validation": "",
-    "autotuneValidationFile": "",
-    "autotuneMetric": "f1",
-    "autotunePredictions": 1,
-    "autotuneDuration": 60 * 5,  # 5 minutes
-    "autotuneModelSize": "",
+}
+
+ALIASES = {
+    "min_count": "minCount",
+    "min_count_label": "minCountLabel",
+    "word_ngrams": "wordNgrams",
+    "lr_update_rate": "lrUpdateRate",
+    "label_prefix": "label",
+    "max_bytes": "maxBytes",
+    "hash_words": "hashWords",
+    "max_vocab": "maxVocab",
+    "input_model": "inputModel",
+    "crop_prob": "cropProb",
+    "crop_min": "cropMin",
+    "crop_max": "cropMax",
+    "crop_unit": "cropUnit",
+    "norm_prob": "normProb",
+    "save_epochs": "saveEpochs",
 }
 
 
-def read_args(arg_list, arg_dict, arg_names, default_values):
-    param_map = {
-        "min_count": "minCount",
-        "word_ngrams": "wordNgrams",
-        "lr_update_rate": "lrUpdateRate",
-        "label_prefix": "label",
-        "pretrained_vectors": "pretrainedVectors",
-        "min_count_label": "minCountLabel",
-        "max_bytes": "maxBytes",
-        "hash_words": "hashWords",
-        "max_vocab": "maxVocab",
-        "input_model": "inputModel",
-        "crop_prob": "cropProb",
-        "crop_min": "cropMin",
-        "crop_max": "cropMax",
-        "crop_unit": "cropUnit",
-        "norm_prob": "normProb",
-        "save_epochs": "saveEpochs",
-    }
-
-    ret = {}
-    manually_set_args = set()
-    for (arg_name, arg_value) in chain(zip(arg_names, arg_list), arg_dict.items()):
-        if arg_name in param_map:
-            arg_name = param_map[arg_name]
-        if arg_name not in arg_names:
-            raise TypeError("unexpected keyword argument '%s'" % arg_name)
-        if arg_name in ret:
-            raise TypeError("multiple values for argument '%s'" % arg_name)
-        ret[arg_name] = arg_value
-        manually_set_args.add(arg_name)
-
-    for (arg_name, arg_value) in default_values.items():
-        if arg_name not in ret:
-            ret[arg_name] = arg_value
-
-    return (ret, manually_set_args)
+def _line(text):
+    if "\n" in text:
+        raise ValueError("predict processes one line at a time (remove '\\n')")
+    return text + "\n"
 
 
-def train_supervised(*kargs, **kwargs):
-    """
-    Train a supervised classifier and return a model object.
+class _Model:
+    """A trained classifier, returned by train_supervised and load_model."""
 
-    input must be a filepath with one example per line, UTF-8 encoded, with
-    at least one label (``__label__NAME`` by default) per line.
+    def __init__(self, f):
+        self.f = f
+        self._labels = None
+        self._words = None
 
-    Every example is represented by the average of its feature vectors.
-    Features can be combined freely:
+    def predict(self, text, k=1, threshold=0.0, on_unicode_error="strict"):
+        """Top-k labels and probabilities of one line, or of a list of lines.
 
-    - words: the vocabulary, built with minCount, optionally restricted to a
-      wordlist file and capped at maxVocab words; hashWords=True also gives
-      words outside the vocabulary a hashed vector
-    - minn/maxn: character n-grams inside each word (fastText subwords)
+        A string gives (labels, probabilities); a list gives a list of labels
+        per line and a list of probability arrays.
+        """
+        if isinstance(text, list):
+            return self.f.multilinePredict(
+                [_line(t) for t in text], k, threshold, on_unicode_error)
+        predictions = self.f.predict(_line(text), k, threshold, on_unicode_error)
+        probs, labels = zip(*predictions) if predictions else ((), ())
+        return labels, np.asarray(probs)
+
+    def test(self, path, k=1, threshold=0.0):
+        """(number of examples, precision@k, recall@k) on a labeled file."""
+        return self.f.test(path, k, threshold)
+
+    def test_label(self, path, k=1, threshold=0.0):
+        """Precision, recall and F1 of every label on a labeled file."""
+        return self.f.testLabel(path, k, threshold)
+
+    def save_model(self, path):
+        self.f.saveModel(path)
+
+    def quantize(self, input=None, qout=False, cutoff=0, retrain=False,
+                 epoch=None, lr=None, thread=None, verbose=None, dsub=2,
+                 qnorm=False):
+        """Compress the model with product quantization."""
+        a = self.f.getArgs()
+        if retrain and not input:
+            raise ValueError("Need input file path if retraining")
+        self.f.quantize(input or "", qout, cutoff, retrain, epoch or a.epoch,
+                        lr or a.lr, thread or a.thread, verbose or a.verbose,
+                        dsub, qnorm)
+
+    def is_quantized(self):
+        return self.f.isQuant()
+
+    def get_dimension(self):
+        return self.f.getArgs().dim
+
+    def get_labels(self, include_freq=False, on_unicode_error="strict"):
+        labels, freq = self.f.getLabels(on_unicode_error)
+        return (labels, np.array(freq)) if include_freq else labels
+
+    def get_words(self, include_freq=False, on_unicode_error="strict"):
+        words, freq = self.f.getVocab(on_unicode_error)
+        return (words, np.array(freq)) if include_freq else words
+
+    @property
+    def labels(self):
+        if self._labels is None:
+            self._labels = self.get_labels()
+        return self._labels
+
+    @property
+    def words(self):
+        if self._words is None:
+            self._words = self.get_words()
+        return self._words
+
+
+def load_model(path):
+    """Load a model file and return the model object."""
+    f = _core.bytefast()
+    f.loadModel(str(path))
+    return _Model(f)
+
+
+def train_supervised(**kwargs):
+    """Train a classifier and return the model object.
+
+    input is a UTF-8 file with one example per line and at least one label
+    (``__label__NAME`` by default) per line. Each example is represented by
+    the average of its feature vectors, and the features combine freely:
+
+    - words (minCount, wordlist, maxVocab; hashWords gives words outside the
+      vocabulary a hashed vector)
+    - minn/maxn: character n-grams inside each word
     - wordNgrams: hashed word n-grams
-    - minb/maxb: byte n-grams over the whole text, across word boundaries
-    - minc/maxc: character n-grams over the whole text, across word
-      boundaries; maxBytes limits how much of the text they read
+    - minb/maxb: byte n-grams over the whole text
+    - minc/maxc: character n-grams over the whole text; maxBytes limits how
+      much of the text the text n-grams read
 
-    Set maxb/maxc to 0 to disable text n-grams, and minCount above the corpus
-    size to disable word vectors. Models that use only fastText features are
-    saved in the original fastText format.
-
-    Training options:
-
-    - crop_prob/crop_min/crop_max/crop_unit: with probability crop_prob, train
-      on a random contiguous span of crop_min..crop_max characters ('char')
-      or words ('word') of a line instead of the whole line
-    - input_model: continue training a saved supervised model on input; the
-      model's features and architecture are kept, and lr, epoch, thread,
-      seed and the crop options apply to the new run
+    crop_prob/crop_min/crop_max/crop_unit train on random spans of lines,
+    norm_prob on normalized lines, and input_model continues training a saved
+    model.
     """
-    supervised_default = unsupervised_default.copy()
-    supervised_default.update(
-        {
-            "lr": 0.1,
-            "minCount": 1,
-            "minn": 0,
-            "maxn": 0,
-            "loss": "softmax",
-            "model": "supervised",
-        }
-    )
-
-    arg_names = [
-        "input",
-        "lr",
-        "dim",
-        "ws",
-        "epoch",
-        "minCount",
-        "minCountLabel",
-        "minn",
-        "maxn",
-        "neg",
-        "wordNgrams",
-        "loss",
-        "bucket",
-        "thread",
-        "lrUpdateRate",
-        "t",
-        "label",
-        "verbose",
-        "pretrainedVectors",
-        "seed",
-        "minb",
-        "maxb",
-        "minc",
-        "maxc",
-        "maxBytes",
-        "hashWords",
-        "wordlist",
-        "maxVocab",
-        "inputModel",
-        "cropProb",
-        "cropMin",
-        "cropMax",
-        "cropUnit",
-        "normProb",
-        "saveEpochs",
-        "validation",
-        "autotuneValidationFile",
-        "autotuneMetric",
-        "autotunePredictions",
-        "autotuneDuration",
-        "autotuneModelSize",
-    ]
-    args, manually_set_args = read_args(kargs, kwargs, arg_names, supervised_default)
-    a = _build_args(args, manually_set_args)
-    ft = _ByteFast(args=a)
-    _core.train(ft.f, a)
-    ft.set_args(ft.f.getArgs())
-    return ft
-
-
-def train_unsupervised(*kargs, **kwargs):
-    """
-    Train an unsupervised model and return a model object.
-
-    input must be a filepath. The input text does not need to be tokenized
-    as per the tokenize function, but it must be preprocessed and encoded
-    as UTF-8. You might want to consult standard preprocessing scripts such
-    as tokenizer.perl mentioned here: http://www.statmt.org/wmt07/baseline.html
-
-    The input field must not contain any labels or use the specified label prefix
-    unless it is ok for those words to be ignored. For an example consult the
-    dataset pulled by the example script word-vector-example.sh, which is
-    part of the fastText repository.
-    """
-    arg_names = [
-        "input",
-        "model",
-        "lr",
-        "dim",
-        "ws",
-        "epoch",
-        "minCount",
-        "minCountLabel",
-        "minn",
-        "maxn",
-        "neg",
-        "wordNgrams",
-        "loss",
-        "bucket",
-        "thread",
-        "lrUpdateRate",
-        "t",
-        "label",
-        "verbose",
-        "pretrainedVectors",
-        "wordlist",
-        "maxVocab",
-    ]
-    args, manually_set_args = read_args(kargs, kwargs, arg_names, unsupervised_default)
-    a = _build_args(args, manually_set_args)
-    ft = _ByteFast(args=a)
-    _core.train(ft.f, a)
-    ft.set_args(ft.f.getArgs())
-    return ft
-
-
-def cbow(*kargs, **kwargs):
-    raise Exception(
-        "`cbow` is not supported any more. Please use `train_unsupervised` with model=`cbow`. For more information please refer to https://fasttext.cc/blog/2019/06/25/blog-post.html#2-you-were-using-the-unofficial-fasttext-module"
-    )
-
-
-def skipgram(*kargs, **kwargs):
-    raise Exception(
-        "`skipgram` is not supported any more. Please use `train_unsupervised` with model=`skipgram`. For more information please refer to https://fasttext.cc/blog/2019/06/25/blog-post.html#2-you-were-using-the-unofficial-fasttext-module"
-    )
-
-
-def supervised(*kargs, **kwargs):
-    raise Exception(
-        "`supervised` is not supported any more. Please use `train_supervised`. For more information please refer to https://fasttext.cc/blog/2019/06/25/blog-post.html#2-you-were-using-the-unofficial-fasttext-module"
-    )
+    args = dict(DEFAULTS)
+    for name, value in kwargs.items():
+        name = ALIASES.get(name, name)
+        if name not in DEFAULTS:
+            raise TypeError("unexpected keyword argument '%s'" % name)
+        args[name] = value
+    if args["loss"] not in LOSSES:
+        raise ValueError("Unrecognized loss name: %s" % args["loss"])
+    args["loss"] = LOSSES[args["loss"]]
+    args["hashWords"] = bool(args["hashWords"])
+    a = _core.args()
+    for name, value in args.items():
+        setattr(a, name, value)
+    # Without hashed features the bucket table is unused; keep it empty.
+    if (a.wordNgrams <= 1 and a.maxn == 0 and a.maxb == 0 and a.maxc == 0
+            and not a.hashWords):
+        a.bucket = 0
+    f = _core.bytefast()
+    _core.train(f, a)
+    return _Model(f)

@@ -17,21 +17,6 @@
 using namespace emscripten;
 using namespace bytefast;
 
-struct Float32ArrayBridge {
-  uintptr_t ptr;
-  int size;
-};
-
-void fillFloat32ArrayFromVector(
-    const Float32ArrayBridge& vecFloat,
-    const Vector& v) {
-  float* buffer = reinterpret_cast<float*>(vecFloat.ptr);
-  assert(vecFloat.size == v.size());
-  for (int i = 0; i < v.size(); i++) {
-    buffer[i] = v[i];
-  }
-}
-
 std::vector<std::pair<float, std::string>>
 predict(ByteFast* fasttext, std::string text, int k, double threshold) {
   std::stringstream ioss(text + std::string("\n"));
@@ -42,53 +27,6 @@ predict(ByteFast* fasttext, std::string text, int k, double threshold) {
   return predictions;
 }
 
-void getWordVector(
-    ByteFast* fasttext,
-    const Float32ArrayBridge& vecFloat,
-    std::string word) {
-  assert(fasttext);
-  Vector v(fasttext->getDimension());
-  fasttext->getWordVector(v, word);
-
-  fillFloat32ArrayFromVector(vecFloat, v);
-}
-
-void getSentenceVector(
-    ByteFast* fasttext,
-    const Float32ArrayBridge& vecFloat,
-    std::string text) {
-  assert(fasttext);
-  Vector v(fasttext->getDimension());
-  std::stringstream ioss(text);
-  fasttext->getSentenceVector(ioss, v);
-
-  fillFloat32ArrayFromVector(vecFloat, v);
-}
-
-std::pair<std::vector<std::string>, std::vector<int32_t>> getSubwords(
-    ByteFast* fasttext,
-    std::string word) {
-  assert(fasttext);
-  std::vector<std::string> subwords;
-  std::vector<int32_t> ngrams;
-  std::shared_ptr<const Dictionary> d = fasttext->getDictionary();
-  d->getSubwords(word, ngrams, subwords);
-
-  return std::pair<std::vector<std::string>, std::vector<int32_t>>(
-      subwords, ngrams);
-}
-
-void getInputVector(
-    ByteFast* fasttext,
-    const Float32ArrayBridge& vecFloat,
-    int32_t ind) {
-  assert(fasttext);
-  Vector v(fasttext->getDimension());
-  fasttext->getInputVector(v, ind);
-
-  fillFloat32ArrayFromVector(vecFloat, v);
-}
-
 void train(ByteFast* fasttext, Args* args, emscripten::val jsCallback) {
   assert(args);
   assert(fasttext);
@@ -97,18 +35,6 @@ void train(ByteFast* fasttext, Args* args, emscripten::val jsCallback) {
       [=](float progress, float loss, double wst, double lr, int64_t eta) {
         jsCallback(progress, loss, wst, lr, static_cast<int32_t>(eta));
       });
-}
-
-const DenseMatrix* getInputMatrix(ByteFast* fasttext) {
-  assert(fasttext);
-  std::shared_ptr<const DenseMatrix> mm = fasttext->getInputMatrix();
-  return mm.get();
-}
-
-const DenseMatrix* getOutputMatrix(ByteFast* fasttext) {
-  assert(fasttext);
-  std::shared_ptr<const DenseMatrix> mm = fasttext->getOutputMatrix();
-  return mm.get();
 }
 
 std::pair<std::vector<std::string>, std::vector<int32_t>> getTokens(
@@ -190,84 +116,52 @@ EMSCRIPTEN_BINDINGS(fasttext) {
       .property("lr", &Args::lr)
       .property("lrUpdateRate", &Args::lrUpdateRate)
       .property("dim", &Args::dim)
-      .property("ws", &Args::ws)
       .property("epoch", &Args::epoch)
       .property("minCount", &Args::minCount)
       .property("minCountLabel", &Args::minCountLabel)
       .property("neg", &Args::neg)
       .property("wordNgrams", &Args::wordNgrams)
       .property("loss", &Args::loss)
-      .property("model", &Args::model)
       .property("bucket", &Args::bucket)
       .property("minn", &Args::minn)
       .property("maxn", &Args::maxn)
       .property("thread", &Args::thread)
-      .property("t", &Args::t)
       .property("label", &Args::label)
       .property("verbose", &Args::verbose)
-      .property("pretrainedVectors", &Args::pretrainedVectors)
-      .property("saveOutput", &Args::saveOutput)
       .property("seed", &Args::seed)
       .property("qout", &Args::qout)
       .property("retrain", &Args::retrain)
       .property("qnorm", &Args::qnorm)
       .property("cutoff", &Args::cutoff)
       .property("dsub", &Args::dsub)
-      .property("qnorm", &Args::qnorm)
-      .property("autotuneValidationFile", &Args::autotuneValidationFile)
-      .property("autotuneMetric", &Args::autotuneMetric)
-      .property("autotunePredictions", &Args::autotunePredictions)
-      .property("autotuneDuration", &Args::autotuneDuration)
-      .property("autotuneModelSize", &Args::autotuneModelSize);
+      .property("minb", &Args::minb)
+      .property("maxb", &Args::maxb)
+      .property("minc", &Args::minc)
+      .property("maxc", &Args::maxc)
+      .property("maxBytes", &Args::maxBytes)
+      .property("hashWords", &Args::hashWords)
+      .property("wordlist", &Args::wordlist)
+      .property("maxVocab", &Args::maxVocab)
+      .property("cropProb", &Args::cropProb)
+      .property("cropMin", &Args::cropMin)
+      .property("cropMax", &Args::cropMax)
+      .property("cropUnit", &Args::cropUnit)
+      .property("normProb", &Args::normProb);
 
   class_<ByteFast>("ByteFast")
       .constructor<>()
       .function(
           "loadModel",
           select_overload<void(const std::string&)>(&ByteFast::loadModel))
-      .function(
-          "getNN",
-          select_overload<std::vector<std::pair<real, std::string>>(
-              const std::string& word, int32_t k)>(&ByteFast::getNN))
-      .function("getAnalogies", &ByteFast::getAnalogies)
-      .function("getWordId", &ByteFast::getWordId)
-      .function("getSubwordId", &ByteFast::getSubwordId)
-      .function("getInputMatrix", &getInputMatrix, allow_raw_pointers())
-      .function("getOutputMatrix", &getOutputMatrix, allow_raw_pointers())
       .function("getWords", &getWords, allow_raw_pointers())
       .function("getLabels", &getLabels, allow_raw_pointers())
       .function("getLine", &getLine, allow_raw_pointers())
       .function("test", &test, allow_raw_pointers())
       .function("predict", &predict, allow_raw_pointers())
-      .function("getWordVector", &getWordVector, allow_raw_pointers())
-      .function("getSentenceVector", &getSentenceVector, allow_raw_pointers())
-      .function("getSubwords", &getSubwords, allow_raw_pointers())
-      .function("getInputVector", &getInputVector, allow_raw_pointers())
       .function("train", &train, allow_raw_pointers())
       .function("saveModel", &ByteFast::saveModel)
       .property("isQuant", &ByteFast::isQuant)
       .property("args", &ByteFast::getArgs);
-
-  class_<DenseMatrix>("DenseMatrix")
-      .constructor<>()
-      // we return int32_t because "JS can't represent int64s"
-      .function(
-          "rows",
-          optional_override(
-              [](const DenseMatrix* self) -> int32_t { return self->rows(); }),
-          allow_raw_pointers())
-      .function(
-          "cols",
-          optional_override(
-              [](const DenseMatrix* self) -> int32_t { return self->cols(); }),
-          allow_raw_pointers())
-      .function(
-          "at",
-          optional_override(
-              [](const DenseMatrix* self, int32_t i, int32_t j) -> const float {
-                return self->at(i, j);
-              }),
-          allow_raw_pointers());
 
   class_<Meter>("Meter")
       .constructor<bool>()
@@ -281,20 +175,11 @@ EMSCRIPTEN_BINDINGS(fasttext) {
               [](const Meter* self) -> int32_t { return self->nexamples(); }),
           allow_raw_pointers());
 
-  enum_<model_name>("ModelName")
-      .value("cbow", model_name::cbow)
-      .value("skipgram", model_name::sg)
-      .value("supervised", model_name::sup);
-
   enum_<loss_name>("LossName")
       .value("hs", loss_name::hs)
       .value("ns", loss_name::ns)
       .value("softmax", loss_name::softmax)
       .value("ova", loss_name::ova);
-
-  emscripten::value_object<Float32ArrayBridge>("Float32ArrayBridge")
-      .field("ptr", &Float32ArrayBridge::ptr)
-      .field("size", &Float32ArrayBridge::size);
 
   emscripten::value_array<std::pair<float, std::string>>(
       "std::pair<float, std::string>")

@@ -15,14 +15,11 @@ switched on or off independently:
   has the same length in characters in every script.
 - **Words**: a vocabulary built from the training data, a vocabulary you
   supply as a word list, and hashed vectors for words outside it.
-- **Normalization**: ASCII or Unicode lowercasing, and a limit on how much
-  of each text the n-grams read.
+- **Limits**: how much of each text the n-grams read.
 
-The original fastText features (character n-grams within words, word n-grams,
-pretrained vectors) and losses (softmax, one-vs-all, hierarchical softmax,
-negative sampling) are unchanged. ByteFast reads fastText `.bin` and `.ftz`
-models, and writes models that use only fastText features in the fastText
-format, so upstream `fasttext` can load them.
+fastText's character n-grams within words and word n-grams are available
+too. ByteFast is a classifier only: it does not train word vectors, and it
+does not aim to read or write fastText model files.
 
 ## Installation
 
@@ -33,8 +30,8 @@ make opt                      # builds ./bytefast
 python -m pip install .       # Python package "bytefast"
 ```
 
-The Python package is named `bytefast` and can be installed next to the
-upstream `fasttext` package.
+The Python API is described in [docs/python-module.md](docs/python-module.md)
+and the browser build in [webassembly/README.md](webassembly/README.md).
 
 ## Training a classifier
 
@@ -127,14 +124,8 @@ such as `hash_words`, `max_bytes` and `max_vocab`.
 
 ## Model files
 
-| File | Reader |
-| --- | --- |
-| ByteFast model with text features (`BFCM` header) | `bytefast` only |
-| ByteFast model with only fastText features | `bytefast` and upstream `fasttext` |
-| Original fastText `.bin` / `.ftz` | `bytefast` and upstream `fasttext` |
-
-`bytefast.load_model()` chooses the reader from the file header.
-`./bytefast quantize` works for every model type.
+Training writes `OUTPUT.bin`; `./bytefast quantize` writes a compressed
+`OUTPUT.ftz`. Both load with `./bytefast` and `bytefast.load_model()`.
 
 ## Project status
 
@@ -147,5 +138,4 @@ are in [benchmarks](benchmarks/) and [.github/workflows](.github/workflows/).
 
 ByteFast is a fork of fastText by Facebook, Inc., renamed and extended by the
 CommonGlot contributors. The original copyright notices are preserved under
-the [MIT license](LICENSE). The original fastText README is kept in
-[docs/original-fasttext.md](docs/original-fasttext.md).
+the [MIT license](LICENSE).

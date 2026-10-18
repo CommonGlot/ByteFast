@@ -89,22 +89,18 @@ class ByteFast {
         const FS = fastTextModule.FS;
         FS.writeFile(trainFileInWasmFs, byteArray);
       }).then(() =>  {
-        const argsList = ['lr', 'lrUpdateRate', 'dim', 'ws', 'epoch',
-          'minCount', 'minCountLabel', 'neg', 'wordNgrams', 'loss',
-          'model', 'bucket', 'minn', 'maxn', 't', 'label', 'verbose',
-          'pretrainedVectors', 'saveOutput', 'seed', 'qout', 'retrain',
-          'qnorm', 'cutoff', 'dsub', 'qnorm', 'autotuneValidationFile',
-          'autotuneMetric', 'autotunePredictions', 'autotuneDuration',
-          'autotuneModelSize'];
+        const argsList = ['lr', 'lrUpdateRate', 'dim', 'epoch',
+          'minCount', 'minCountLabel', 'neg', 'wordNgrams', 'bucket',
+          'minn', 'maxn', 'minb', 'maxb', 'minc', 'maxc', 'maxBytes',
+          'hashWords', 'wordlist', 'maxVocab', 'cropProb', 'cropMin',
+          'cropMax', 'cropUnit', 'normProb', 'label', 'verbose', 'seed'];
         const args = new fastTextModule.Args();
         argsList.forEach(k => {
           if (k in kwargs) {
             args[k] = kwargs[k];
           }
         });
-        args.model = fastTextModule.ModelName[modelName];
-        args.loss = ('loss' in kwargs) ?
-          fastTextModule.LossName[kwargs['loss']] : 'hs';
+        args.loss = fastTextModule.LossName[kwargs['loss'] || 'softmax'];
         args.thread = 1;
         args.input = trainFileInWasmFs;
 
@@ -152,45 +148,6 @@ class ByteFast {
     });
   }
 
-  /**
-   * trainUnsupervised
-   *
-   * Downloads the input file from the specified url, trains an unsupervised
-   * model and returns a `FastTextModel` object.
-   *
-   * @param {string}     url
-   *     the url of the input file.
-   *     The input file must not contain any labels or use the specified label
-   *     prefixunless it is ok for those words to be ignored. For an example
-   *     consult the dataset pulled by the example script word-vector-example.sh
-   *     which is part of the fastText repository.
-   *
-   * @param {string}     modelName
-   *     Model to be used for unsupervised learning. `cbow` or `skipgram`.
-   *
-   * @param {dict}       kwargs
-   *     train parameters.
-   *     For example {'lr': 0.5, 'epoch': 5}
-   *
-   * @param {function}   callback
-   *     train callback function
-   *     `callback` function is called regularly from the train loop:
-   *     `callback(progress, loss, wordsPerSec, learningRate, eta)`
-   *
-   * @return {Promise}   promise object that resolves to a `FastTextModel`
-   *
-   */
-  trainUnsupervised(url, modelName, kwargs = {}, callback) {
-    const self = this;
-    return new Promise(function(resolve, reject) {
-      self._train(url, modelName, kwargs, callback).then(model => {
-        resolve(model);
-      }).catch(error => {
-        reject(error);
-      });
-    });
-  }
-
 }
 
 
@@ -228,132 +185,6 @@ class FastTextModel {
   }
 
   /**
-     * getWordVector
-     *
-     * @param {string}          word
-     *
-     * @return {Float32Array}   the vector representation of `word`.
-     *
-     */
-  getWordVector(word) {
-    const b = getFloat32ArrayFromHeap(this.getDimension());
-    this.f.getWordVector(b, word);
-
-    return heapToFloat32(b);
-  }
-
-  /**
-     * getSentenceVector
-     *
-     * @param {string}          text
-     *
-     * @return {Float32Array}   the vector representation of `text`.
-     *
-     */
-  getSentenceVector(text) {
-    if (text.indexOf('\n') != -1) {
-      "sentence vector processes one line at a time (remove '\\n')";
-    }
-    text += '\n';
-    const b = getFloat32ArrayFromHeap(this.getDimension());
-    this.f.getSentenceVector(b, text);
-
-    return heapToFloat32(b);
-  }
-
-  /**
-     * getNearestNeighbors
-     *
-     * returns the nearest `k` neighbors of `word`.
-     *
-     * @param {string}          word
-     * @param {int}             k
-     *
-     * @return {Array.<Pair.<number, string>>}
-     *     words and their corresponding cosine similarities.
-     *
-     */
-  getNearestNeighbors(word, k = 10) {
-    return this.f.getNN(word, k);
-  }
-
-  /**
-     * getAnalogies
-     *
-     * returns the nearest `k` neighbors of the operation
-     * `wordA - wordB + wordC`.
-     *
-     * @param {string}          wordA
-     * @param {string}          wordB
-     * @param {string}          wordC
-     * @param {int}             k
-     *
-     * @return {Array.<Pair.<number, string>>}
-     *     words and their corresponding cosine similarities
-     *
-     */
-  getAnalogies(wordA, wordB, wordC, k) {
-    return this.f.getAnalogies(k, wordA, wordB, wordC);
-  }
-
-  /**
-     * getWordId
-     *
-     * Given a word, get the word id within the dictionary.
-     * Returns -1 if word is not in the dictionary.
-     *
-     * @return {int}    word id
-     *
-     */
-  getWordId(word) {
-    return this.f.getWordId(word);
-  }
-
-  /**
-     * getSubwordId
-     *
-     * Given a subword, return the index (within input matrix) it hashes to.
-     *
-     * @return {int}    subword id
-     *
-     */
-  getSubwordId(subword) {
-    return this.f.getSubwordId(subword);
-  }
-
-  /**
-     * getSubwords
-     *
-     * returns the subwords and their indicies.
-     *
-     * @param {string}          word
-     *
-     * @return {Pair.<Array.<string>, Array.<int>>}
-     *     words and their corresponding indicies
-     *
-     */
-  getSubwords(word) {
-    return this.f.getSubwords(word);
-  }
-
-  /**
-     * getInputVector
-     *
-     * Given an index, get the corresponding vector of the Input Matrix.
-     *
-     * @param {int}             ind
-     *
-     * @return {Float32Array}   the vector of the `ind`'th index
-     *
-     */
-  getInputVector(ind) {
-    const b = getFloat32ArrayFromHeap(this.getDimension());
-    this.f.getInputVector(b, ind);
-
-    return heapToFloat32(b);
-  }
-
-  /**
      * predict
      *
      * Given a string, get a list of labels and a list of corresponding
@@ -369,46 +200,6 @@ class FastTextModel {
      */
   predict(text, k = 1, threshold = 0.0) {
     return this.f.predict(text, k, threshold);
-  }
-
-  /**
-     * getInputMatrix
-     *
-     * Get a reference to the full input matrix of a Model. This only
-     * works if the model is not quantized.
-     *
-     * @return {DenseMatrix}
-     *     densematrix with functions: `rows`, `cols`, `at(i,j)`
-     *
-     * example:
-     *     let inputMatrix = model.getInputMatrix();
-     *     let value = inputMatrix.at(1, 2);
-     */
-  getInputMatrix() {
-    if (this.isQuant()) {
-      throw new Error("Can't get quantized Matrix");
-    }
-    return this.f.getInputMatrix();
-  }
-
-  /**
-     * getOutputMatrix
-     *
-     * Get a reference to the full input matrix of a Model. This only
-     * works if the model is not quantized.
-     *
-     * @return {DenseMatrix}
-     *     densematrix with functions: `rows`, `cols`, `at(i,j)`
-     *
-     * example:
-     *     let outputMatrix = model.getOutputMatrix();
-     *     let value = outputMatrix.at(1, 2);
-     */
-  getOutputMatrix() {
-    if (this.isQuant()) {
-      throw new Error("Can't get quantized Matrix");
-    }
-    return this.f.getOutputMatrix();
   }
 
   /**

@@ -8,7 +8,7 @@
 
 CXX = c++
 CXXFLAGS = -pthread -std=c++17 -march=native
-OBJS = args.o autotune.o matrix.o dictionary.o loss.o productquantizer.o densematrix.o quantmatrix.o vector.o model.o utils.o meter.o bytefast.o
+OBJS = args.o matrix.o dictionary.o loss.o productquantizer.o densematrix.o quantmatrix.o vector.o model.o utils.o meter.o bytefast.o
 INCLUDES = -I.
 
 opt: CXXFLAGS += -O3 -funroll-loops -DNDEBUG
@@ -29,8 +29,6 @@ wasmdebug: webassembly/bytefast_wasm.js
 args.o: src/args.cc src/args.h src/*.h
 	$(CXX) $(CXXFLAGS) -c src/args.cc
 
-autotune.o: src/autotune.cc src/autotune.h src/*.h
-	$(CXX) $(CXXFLAGS) -c src/autotune.cc
 
 matrix.o: src/matrix.cc src/matrix.h src/*.h
 	$(CXX) $(CXXFLAGS) -c src/matrix.cc
@@ -74,7 +72,7 @@ clean:
 
 EMCXX = em++
 EMCXXFLAGS = --bind --std=c++11 -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -s "EXTRA_EXPORTED_RUNTIME_METHODS=['addOnPostRun', 'FS']" -s "DISABLE_EXCEPTION_CATCHING=0" -s "EXCEPTION_DEBUG=1" -s "FORCE_FILESYSTEM=1" -s "MODULARIZE=1" -s "EXPORT_ES6=1" -s 'EXPORT_NAME="ByteFastModule"' -Isrc/
-EMOBJS = args.bc autotune.bc matrix.bc dictionary.bc loss.bc productquantizer.bc densematrix.bc quantmatrix.bc vector.bc model.bc utils.bc meter.bc bytefast.bc main.bc
+EMOBJS = args.bc matrix.bc dictionary.bc loss.bc productquantizer.bc densematrix.bc quantmatrix.bc vector.bc model.bc utils.bc meter.bc bytefast.bc main.bc
 
 
 main.bc: webassembly/bytefast_wasm.cc
@@ -83,8 +81,6 @@ main.bc: webassembly/bytefast_wasm.cc
 args.bc: src/args.cc src/args.h
 	$(EMCXX) $(EMCXXFLAGS)  src/args.cc -o args.bc
 
-autotune.bc: src/autotune.cc src/autotune.h
-	$(EMCXX) $(EMCXXFLAGS)  src/autotune.cc -o autotune.bc
 
 matrix.bc: src/matrix.cc src/matrix.h
 	$(EMCXX) $(EMCXXFLAGS) src/matrix.cc -o matrix.bc

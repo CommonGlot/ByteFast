@@ -36,18 +36,6 @@
 
                 printVector(model.predict("Which baking dish is best to bake a banana bread ?", 5, 0.0));
 
-                /* getInputMatrix */
-                let inputMatrix = model.getInputMatrix();
-                console.log(inputMatrix.cols());
-                console.log(inputMatrix.rows());
-                console.log(inputMatrix.at(1, 2));
-
-                /* getOutputMatrix */
-                let outputMatrix = model.getOutputMatrix();
-                console.log(outputMatrix.cols());
-                console.log(outputMatrix.rows());
-                console.log(outputMatrix.at(1, 2));
-
                 /* getWords */
                 let wordsInformation = model.getWords();
                 printVector(wordsInformation[0], 30);   // words
