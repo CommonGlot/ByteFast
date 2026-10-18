@@ -1,5 +1,3 @@
 include LICENSE
-include PATENTS
 
-recursive-include python *.md *.rst
 recursive-include src *.h

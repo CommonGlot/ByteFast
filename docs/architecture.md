@@ -85,7 +85,7 @@ the fastText baseline.
   - language identification: WiLI-2018 for quick runs; the GlotLID corpus
     with FLORES-200 and UDHR at full scale
   - topic and sentiment: DBpedia, AG News, Yelp
-    (`classification-example.sh` fetches DBpedia)
+    (`benchmarks/prepare_classification.py` builds WiLI, DBpedia and AG News)
 - **Splits.** Choose on a development split. Report the test split once per
   final configuration.
 - **Quality.** Macro F1 and accuracy, per-class F1, and false positive rate

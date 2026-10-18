@@ -1,4 +1,10 @@
 # fastText
+
+> The original fastText README, kept for reference. The scripts, examples and
+> documentation pages it mentions are in the
+> [fastText repository](https://github.com/facebookresearch/fastText); ByteFast
+> does not include them.
+
 [fastText](https://fasttext.cc/) is a library for efficient learning of word representations and sentence classification.
 
 [![CircleCI](https://circleci.com/gh/facebookresearch/fastText/tree/master.svg?style=svg)](https://circleci.com/gh/facebookresearch/fastText/tree/master)

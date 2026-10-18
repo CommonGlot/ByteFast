@@ -160,10 +160,6 @@ class BuildExt(build_ext):
 
 
 def _get_readme():
-    """
-    Use pandoc to generate rst from md.
-    pandoc --from=markdown --to=rst --output=python/README.rst python/README.md
-    """
     with io.open("README.md", encoding="utf-8") as fid:
         return fid.read()
 
