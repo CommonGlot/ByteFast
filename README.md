@@ -30,11 +30,16 @@ make opt                      # builds ./bytefast
 python -m pip install .       # Python package "bytefast"
 ```
 
-The Python API is described in [docs/python-module.md](docs/python-module.md)
-and the browser build in [webassembly/README.md](webassembly/README.md).
-`make lib` builds `libbytefast.a` with a C API for prediction
-([src/bytefast_c.h](src/bytefast_c.h)), the base for bindings in other
-languages. The Rust crate is in [bindings/rust](bindings/rust/README.md).
+The Python API is described in [docs/python-module.md](docs/python-module.md).
+Prediction is also available from other languages, all through one C API
+([src/bytefast_c.h](src/bytefast_c.h); `make lib` builds `libbytefast.a`):
+
+| Language | Package | Source |
+| --- | --- | --- |
+| Python | `pip install bytefast` (training too) | [python/](python/) |
+| Rust | `bytefast` crate | [bindings/rust](bindings/rust/README.md) |
+| JavaScript (Node, browsers) | `npm install bytefast` | [bindings/js](bindings/js/README.md) |
+| C / C++ | `libbytefast.a` + `bytefast_c.h` | [src/bytefast_c.h](src/bytefast_c.h) |
 
 ## Training a classifier
 

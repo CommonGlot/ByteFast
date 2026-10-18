@@ -34,10 +34,7 @@ coverage: bytefast
 debug: CXXFLAGS += -g -O0 -fno-inline
 debug: bytefast
 
-wasm: webassembly/bytefast_wasm.js
-
-wasmdebug: export EMCC_DEBUG=1
-wasmdebug: webassembly/bytefast_wasm.js
+wasm: bindings/js/bytefast_wasm.js
 
 
 args.o: src/args.cc src/args.h src/*.h
@@ -84,58 +81,16 @@ bytefast: $(OBJS) src/bytefast.cc src/main.cc
 	$(CXX) $(CXXFLAGS) $(OBJS) src/main.cc -o bytefast
 
 clean:
-	rm -rf *.o *.gcno *.gcda bytefast libbytefast.a c_api_test *.bc webassembly/bytefast_wasm.js webassembly/bytefast_wasm.wasm
+	rm -rf *.o *.gcno *.gcda bytefast libbytefast.a c_api_test bindings/js/bytefast_wasm.js bindings/js/bytefast_wasm.wasm
 
 
-EMCXX = em++
-EMCXXFLAGS = --bind --std=c++11 -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -s "EXTRA_EXPORTED_RUNTIME_METHODS=['addOnPostRun', 'FS']" -s "DISABLE_EXCEPTION_CATCHING=0" -s "EXCEPTION_DEBUG=1" -s "FORCE_FILESYSTEM=1" -s "MODULARIZE=1" -s "EXPORT_ES6=1" -s 'EXPORT_NAME="ByteFastModule"' -Isrc/
-EMOBJS = args.bc safetensors.bc matrix.bc dictionary.bc loss.bc productquantizer.bc densematrix.bc quantmatrix.bc vector.bc model.bc utils.bc meter.bc bytefast.bc main.bc
+# WebAssembly build of the C API for the npm package (bindings/js).
+LIB_SOURCES = $(filter-out src/main.cc,$(wildcard src/*.cc))
+WASM_EXPORTS = _bytefast_load,_bytefast_free,_bytefast_free_error,_bytefast_predict,_bytefast_num_labels,_bytefast_label,_bytefast_dimension,_malloc,_free
+WASM_RUNTIME = FS,HEAPU8,getValue,setValue,UTF8ToString,stringToUTF8,lengthBytesUTF8
 
-
-main.bc: webassembly/bytefast_wasm.cc
-	$(EMCXX) $(EMCXXFLAGS)  webassembly/bytefast_wasm.cc -o main.bc
-
-args.bc: src/args.cc src/args.h
-	$(EMCXX) $(EMCXXFLAGS)  src/args.cc -o args.bc
-
-safetensors.bc: src/safetensors.cc src/safetensors.h
-	$(EMCXX) $(EMCXXFLAGS)  src/safetensors.cc -o safetensors.bc
-
-
-matrix.bc: src/matrix.cc src/matrix.h
-	$(EMCXX) $(EMCXXFLAGS) src/matrix.cc -o matrix.bc
-
-dictionary.bc: src/dictionary.cc src/dictionary.h src/args.h
-	$(EMCXX) $(EMCXXFLAGS)  src/dictionary.cc -o dictionary.bc
-
-loss.bc: src/loss.cc src/loss.h src/matrix.h src/real.h
-	$(EMCXX) $(EMCXXFLAGS) src/loss.cc -o loss.bc
-
-productquantizer.bc: src/productquantizer.cc src/productquantizer.h src/utils.h
-	$(EMCXX) $(EMCXXFLAGS)  src/productquantizer.cc -o productquantizer.bc
-
-densematrix.bc: src/densematrix.cc src/densematrix.h src/utils.h src/matrix.h
-	$(EMCXX) $(EMCXXFLAGS) src/densematrix.cc -o densematrix.bc
-
-quantmatrix.bc: src/quantmatrix.cc src/quantmatrix.h src/utils.h src/matrix.h
-	$(EMCXX) $(EMCXXFLAGS) src/quantmatrix.cc -o quantmatrix.bc
-
-vector.bc: src/vector.cc src/vector.h src/utils.h
-	$(EMCXX) $(EMCXXFLAGS)  src/vector.cc -o vector.bc
-
-model.bc: src/model.cc src/model.h src/args.h
-	$(EMCXX) $(EMCXXFLAGS)  src/model.cc -o model.bc
-
-utils.bc: src/utils.cc src/utils.h
-	$(EMCXX) $(EMCXXFLAGS)  src/utils.cc -o utils.bc
-
-meter.bc: src/meter.cc src/meter.h
-	$(EMCXX) $(EMCXXFLAGS)  src/meter.cc -o meter.bc
-
-bytefast.bc: src/bytefast.cc src/*.h
-	$(EMCXX) $(EMCXXFLAGS)  src/bytefast.cc -o bytefast.bc
-
-webassembly/bytefast_wasm.js: $(EMOBJS) webassembly/bytefast_wasm.cc Makefile
-	$(EMCXX) $(EMCXXFLAGS) $(EMOBJS) -o webassembly/bytefast_wasm.js
-
-
+bindings/js/bytefast_wasm.js: $(LIB_SOURCES) src/*.h Makefile
+	em++ -std=c++17 -O3 -flto -DNDEBUG -fexceptions -Isrc $(LIB_SOURCES) -o $@ \
+	  -sWASM=1 -sALLOW_MEMORY_GROWTH=1 -sMODULARIZE=1 -sEXPORT_ES6=1 \
+	  -sEXPORT_NAME=createByteFast -sFORCE_FILESYSTEM=1 \
+	  -sEXPORTED_FUNCTIONS=$(WASM_EXPORTS) -sEXPORTED_RUNTIME_METHODS=$(WASM_RUNTIME)

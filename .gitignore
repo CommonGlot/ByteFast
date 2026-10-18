@@ -20,3 +20,5 @@ libbytefast.a
 c_api_test
 /target
 Cargo.lock
+bindings/js/bytefast_wasm.js
+bindings/js/bytefast_wasm.wasm

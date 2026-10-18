@@ -73,6 +73,12 @@ jobs:
           BYTEFAST_TEST_MODEL=/tmp/core.safetensors BYTEFAST_TEST_TEXT="violin piano cello harp" \
             BYTEFAST_TEST_LABEL=__label__gamma cargo test --release
           cargo package --allow-dirty
+      - uses: mymindstorm/setup-emsdk@v14
+      - name: JavaScript package (WebAssembly)
+        run: |
+          make wasm
+          node bindings/js/test.mjs /tmp/core.safetensors "violin piano cello harp" __label__gamma
+          cd bindings/js && npm pack --dry-run
       - name: Span cropping and continued training
         run: |
           set -e

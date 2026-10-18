@@ -1,0 +1,14 @@
+{
+  "name": "bytefast",
+  "version": "0.2.0",
+  "description": "Fast text classification with byte, character and word features (WebAssembly)",
+  "type": "module",
+  "main": "index.js",
+  "exports": "./index.js",
+  "files": ["index.js", "bytefast_wasm.js", "bytefast_wasm.wasm", "README.md"],
+  "keywords": ["text-classification", "language-identification", "nlp", "fasttext", "wasm"],
+  "license": "MIT",
+  "repository": {"type": "git", "url": "git+https://github.com/CommonGlot/ByteFast.git", "directory": "bindings/js"},
+  "homepage": "https://github.com/CommonGlot/ByteFast",
+  "engines": {"node": ">=18"}
+}

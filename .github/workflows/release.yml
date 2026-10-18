@@ -1,0 +1,48 @@
+name: Release packages
+
+# Publishing a GitHub release uploads the Rust crate and the npm package
+# (the Python wheels are uploaded by wheels.yml). The first upload of each
+# needs a token (secrets CARGO_REGISTRY_TOKEN and NPM_TOKEN); later ones can
+# use trusted publishing once it is set up on crates.io and npmjs.com.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  crate:
+    name: Rust crate
+    runs-on: ubuntu-latest
+    environment: crates-io
+    permissions:
+      id-token: write
+    env:
+      TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+        if: ${{ env.TOKEN == '' }}
+      - run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ env.TOKEN || steps.auth.outputs.token }}
+
+  npm:
+    name: npm package
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mymindstorm/setup-emsdk@v14
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+      - run: make wasm
+      - run: npm install -g npm@latest
+      - run: npm publish --provenance --access public
+        working-directory: bindings/js
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
