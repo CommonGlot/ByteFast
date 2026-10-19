@@ -19,8 +19,8 @@ namespace bytefast {
 class SafeTensorsReader;
 class SafeTensorsWriter;
 
-// The values match the loss field of model files from before safetensors.
-enum class loss_name : int { softmax = 3, ova = 4 };
+// The value matches the loss field of model files from before safetensors.
+enum class loss_name : int { softmax = 3 };
 
 class Args {
  protected:
@@ -57,6 +57,7 @@ class Args {
   int cropMax;
   std::string cropUnit;
   double normProb;
+  double stripProb;
   bool saveEpochs;
   std::string validation;
   int thread;

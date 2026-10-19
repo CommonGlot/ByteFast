@@ -12,6 +12,7 @@
 #include <string_view>
 
 #include "norm_table.h"
+#include "strip_table.h"
 #include "unicode_fold.h"
 
 namespace bytefast {
@@ -141,6 +142,64 @@ inline bool normRemoved(uint32_t cp) {
     }
   }
   return false;
+}
+
+// Remove optional diacritics from a token (for -stripProb): combining tone
+// and accent marks and the Arabic and Hebrew vowel marks are dropped, and
+// precomposed Latin, Greek and Cyrillic letters lose their marks (see
+// tools/gen_strip_table.py). Other characters, and malformed bytes, are kept.
+inline bool stripMark(uint32_t cp) {
+  int lo = 0, hi = unicode::kStripMarksSize - 1;
+  while (lo <= hi) {
+    const int mid = (lo + hi) / 2;
+    if (cp < unicode::kStripMarks[mid].first) {
+      hi = mid - 1;
+    } else if (cp > unicode::kStripMarks[mid].last) {
+      lo = mid + 1;
+    } else {
+      return true;
+    }
+  }
+  return false;
+}
+
+inline uint32_t stripBase(uint32_t cp) {
+  int lo = 0, hi = unicode::kStripBaseSize - 1;
+  while (lo <= hi) {
+    const int mid = (lo + hi) / 2;
+    if (cp < unicode::kStripBase[mid].from) {
+      hi = mid - 1;
+    } else if (cp > unicode::kStripBase[mid].from) {
+      lo = mid + 1;
+    } else {
+      return unicode::kStripBase[mid].to;
+    }
+  }
+  return cp;
+}
+
+inline void stripDiacritics(std::string& s) {
+  std::string out;
+  out.reserve(s.size());
+  for (size_t i = 0; i < s.size();) {
+    uint32_t cp = 0;
+    const size_t len =
+        static_cast<uint8_t>(s[i]) < 0x80 ? 0 : utf8Length(s, i, cp);
+    if (len == 0) {
+      out.push_back(s[i++]);
+      continue;
+    }
+    if (!stripMark(cp)) {
+      const uint32_t base = stripBase(cp);
+      if (base == cp) {
+        out.append(s, i, len);
+      } else {
+        appendUtf8(base, out);
+      }
+    }
+    i += len;
+  }
+  s.swap(out);
 }
 
 // Normalize one token like the CommonLID input cleaner: lowercase, then drop

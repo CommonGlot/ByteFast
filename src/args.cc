@@ -42,6 +42,7 @@ Args::Args() {
   cropMax = 0;
   cropUnit = "char";
   normProb = 0.0;
+  stripProb = 0.0;
   saveEpochs = false;
   validation = "";
   thread = 12;
@@ -58,17 +59,17 @@ Args::Args() {
 }
 
 std::string Args::lossToString(loss_name ln) const {
-  return ln == loss_name::ova ? "one-vs-all" : "softmax";
+  (void)ln;
+  return "softmax";
 }
 
 loss_name Args::lossFromString(const std::string& name) {
   if (name == "softmax") {
     return loss_name::softmax;
-  } else if (name == "one-vs-all" || name == "ova") {
-    return loss_name::ova;
-  } else if (name == "hs" || name == "ns") {
+  } else if (name == "one-vs-all" || name == "ova" || name == "hs" ||
+             name == "ns") {
     throw std::invalid_argument(
-        "-loss " + name + " is no longer supported (softmax or ova)");
+        "-loss " + name + " is no longer supported (softmax only)");
   }
   throw std::invalid_argument("Unknown loss: " + name);
 }
@@ -145,6 +146,8 @@ void Args::parseArgs(const std::vector<std::string>& args) {
         cropMax = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-normProb") {
         normProb = std::stod(args.at(ai + 1));
+      } else if (args[ai] == "-stripProb") {
+        stripProb = std::stod(args.at(ai + 1));
       } else if (args[ai] == "-saveEpochs") {
         saveEpochs = true;
         ai--;
@@ -233,6 +236,9 @@ void Args::validate() const {
   if (!(normProb >= 0.0 && normProb <= 1.0)) {
     throw std::invalid_argument("-normProb must be in [0, 1]");
   }
+  if (!(stripProb >= 0.0 && stripProb <= 1.0)) {
+    throw std::invalid_argument("-stripProb must be in [0, 1]");
+  }
   if (!(cropProb >= 0.0 && cropProb <= 1.0)) {
     throw std::invalid_argument("-cropProb must be in [0, 1]");
   }
@@ -294,6 +300,11 @@ void Args::printDictionaryHelp() {
             << "  -normProb           probability of training on the CommonLID-style\n"
             << "                      normalized line (lowercase, no digits/punctuation) ["
             << normProb << "]\n"
+            << "  -stripProb          probability of training on the line without "
+               "optional\n"
+            << "                      diacritics (tones, accents, Arabic/Hebrew "
+               "vowel marks) ["
+            << stripProb << "]\n"
             << "  -label              labels prefix [" << label << "]\n";
 }
 
@@ -306,7 +317,7 @@ void Args::printTrainingHelp() {
       << lrUpdateRate << "]\n"
       << "  -dim                size of word vectors [" << dim << "]\n"
       << "  -epoch              number of epochs [" << epoch << "]\n"
-      << "  -loss               loss function {softmax, one-vs-all} ["
+      << "  -loss               loss function {softmax} ["
       << lossToString(loss) << "]\n"
       << "  -thread             number of threads (set to 1 to ensure "
          "reproducible results) ["

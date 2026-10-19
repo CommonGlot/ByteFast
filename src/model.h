@@ -73,7 +73,6 @@ class Model {
   real std_log(real) const;
 
   static const int32_t kUnlimitedPredictions = -1;
-  static const int32_t kAllLabelsAsTarget = -1;
 };
 
 } // namespace bytefast

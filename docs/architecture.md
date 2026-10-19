@@ -69,7 +69,7 @@ Each axis is a set of flags; nothing else changes between runs.
 | C. Word context | `-wordNgrams` 1 / 2 |
 | D. Normalization | `-normProb` 0 / 0.3; `-maxBytes` 0 / 256 / 512 |
 | E. Capacity | `-bucket` 2^18 / 2^20 / 2^22 × `-dim` 32 / 64 / 128 / 256 |
-| F. Loss | `softmax` / `one-vs-all` |
+| F. Loss | `softmax` (one-vs-all, `hs` and `ns` were removed after this ablation) |
 | G. Compression | `quantize` with `-cutoff`, `-qnorm`, `-qout`; accuracy against model size |
 | I. Short inputs | `-cropProb` 0 / 0.3 / 0.7 with `-cropUnit char` (`-cropMax` 20) or `word` (`-cropMax` 5); from scratch, or as a second stage with `-inputModel` |
 

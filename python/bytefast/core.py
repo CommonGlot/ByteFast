@@ -10,7 +10,6 @@ from . import _core_pybind as _core
 
 LOSSES = {
     "softmax": _core.loss_name.softmax,
-    "ova": _core.loss_name.ova,
 }
 
 # Training arguments and their defaults. The snake_case aliases below are
@@ -45,6 +44,7 @@ DEFAULTS = {
     "cropMax": 0,
     "cropUnit": "char",
     "normProb": 0.0,
+    "stripProb": 0.0,
     "saveEpochs": False,
     "validation": "",
 }
@@ -63,6 +63,7 @@ ALIASES = {
     "crop_max": "cropMax",
     "crop_unit": "cropUnit",
     "norm_prob": "normProb",
+    "strip_prob": "stripProb",
     "save_epochs": "saveEpochs",
 }
 

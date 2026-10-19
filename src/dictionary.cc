@@ -503,6 +503,16 @@ int32_t Dictionary::getLine(
     }
     tokens.swap(kept);
   }
+  // Optional diacritics (tones, accents, Arabic and Hebrew vowel marks) are
+  // removed last, so a line can be both normalized and stripped.
+  if (args_->stripProb > 0 &&
+      std::uniform_real_distribution<>(0, 1)(rng) < args_->stripProb) {
+    for (auto& token : tokens) {
+      if (token != EOS) {
+        text::stripDiacritics(token);
+      }
+    }
+  }
   addFeatures(tokens, words);
   return ntokens;
 }

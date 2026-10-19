@@ -13,8 +13,6 @@
 
 namespace bytefast {
 
-constexpr int64_t SIGMOID_TABLE_SIZE = 512;
-constexpr int64_t MAX_SIGMOID = 8;
 constexpr int64_t LOG_TABLE_SIZE = 512;
 
 bool comparePairs(
@@ -28,12 +26,6 @@ real std_log(real x) {
 }
 
 Loss::Loss(std::shared_ptr<Matrix>& wo) : wo_(wo) {
-  t_sigmoid_.reserve(SIGMOID_TABLE_SIZE + 1);
-  for (int i = 0; i < SIGMOID_TABLE_SIZE + 1; i++) {
-    real x = real(i * 2 * MAX_SIGMOID) / SIGMOID_TABLE_SIZE - MAX_SIGMOID;
-    t_sigmoid_.push_back(1.0 / (1.0 + std::exp(-x)));
-  }
-
   t_log_.reserve(LOG_TABLE_SIZE + 1);
   for (int i = 0; i < LOG_TABLE_SIZE + 1; i++) {
     real x = (real(i) + 1e-5) / LOG_TABLE_SIZE;
@@ -47,18 +39,6 @@ real Loss::log(real x) const {
   }
   int64_t i = int64_t(x * LOG_TABLE_SIZE);
   return t_log_[i];
-}
-
-real Loss::sigmoid(real x) const {
-  if (x < -MAX_SIGMOID) {
-    return 0.0;
-  } else if (x > MAX_SIGMOID) {
-    return 1.0;
-  } else {
-    int64_t i =
-        int64_t((x + MAX_SIGMOID) * SIGMOID_TABLE_SIZE / MAX_SIGMOID / 2);
-    return t_sigmoid_[i];
-  }
 }
 
 void Loss::predict(
@@ -92,56 +72,6 @@ void Loss::findKBest(
       heap.pop_back();
     }
   }
-}
-
-BinaryLogisticLoss::BinaryLogisticLoss(std::shared_ptr<Matrix>& wo)
-    : Loss(wo) {}
-
-real BinaryLogisticLoss::binaryLogistic(
-    int32_t target,
-    Model::State& state,
-    bool labelIsPositive,
-    real lr,
-    bool backprop) const {
-  real score = sigmoid(wo_->dotRow(state.hidden, target));
-  if (backprop) {
-    real alpha = lr * (real(labelIsPositive) - score);
-    state.grad.addRow(*wo_, target, alpha);
-    wo_->addVectorToRow(state.hidden, target, alpha);
-  }
-  if (labelIsPositive) {
-    return -log(score);
-  } else {
-    return -log(1.0 - score);
-  }
-}
-
-void BinaryLogisticLoss::computeOutput(Model::State& state) const {
-  Vector& output = state.output;
-  output.mul(*wo_, state.hidden);
-  int32_t osz = output.size();
-  for (int32_t i = 0; i < osz; i++) {
-    output[i] = sigmoid(output[i]);
-  }
-}
-
-OneVsAllLoss::OneVsAllLoss(std::shared_ptr<Matrix>& wo)
-    : BinaryLogisticLoss(wo) {}
-
-real OneVsAllLoss::forward(
-    const std::vector<int32_t>& targets,
-    int32_t /* we take all targets here */,
-    Model::State& state,
-    real lr,
-    bool backprop) {
-  real loss = 0.0;
-  int32_t osz = state.output.size();
-  for (int32_t i = 0; i < osz; i++) {
-    bool isMatch = utils::contains(targets, i);
-    loss += binaryLogistic(i, state, isMatch, lr, backprop);
-  }
-
-  return loss;
 }
 
 SoftmaxLoss::SoftmaxLoss(std::shared_ptr<Matrix>& wo) : Loss(wo) {}

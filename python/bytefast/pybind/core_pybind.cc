@@ -74,6 +74,7 @@ PYBIND11_MODULE(_core_pybind, m) {
       .def_readwrite("cropMax", &bytefast::Args::cropMax)
       .def_readwrite("cropUnit", &bytefast::Args::cropUnit)
       .def_readwrite("normProb", &bytefast::Args::normProb)
+      .def_readwrite("stripProb", &bytefast::Args::stripProb)
       .def_readwrite("saveEpochs", &bytefast::Args::saveEpochs)
       .def_readwrite("validation", &bytefast::Args::validation)
       .def_readwrite("thread", &bytefast::Args::thread)
@@ -92,7 +93,6 @@ PYBIND11_MODULE(_core_pybind, m) {
 
   py::enum_<bytefast::loss_name>(m, "loss_name", py::module_local())
       .value("softmax", bytefast::loss_name::softmax)
-      .value("ova", bytefast::loss_name::ova)
       .export_values();
 
   m.def(

@@ -23,8 +23,8 @@ snake_case aliases also work: `min_count`, `min_count_label`,
 `word_ngrams`, `lr_update_rate`, `label_prefix`, `max_bytes`, `max_vocab`, `input_model`, `crop_prob`, `crop_min`, `crop_max`,
 `crop_unit`, `norm_prob` and `save_epochs`.
 
-`loss` is `"softmax"` (default) or `"ova"` (one-vs-all, which also handles
-multi-label data).
+The loss is softmax. A line with several labels trains on one of them, chosen
+at random each time it is read.
 
 ## Prediction and evaluation
 

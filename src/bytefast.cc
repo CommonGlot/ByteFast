@@ -38,8 +38,6 @@ std::shared_ptr<Loss> ByteFast::createLoss(std::shared_ptr<Matrix>& output) {
   switch (lossName) {
     case loss_name::softmax:
       return std::make_shared<SoftmaxLoss>(output);
-    case loss_name::ova:
-      return std::make_shared<OneVsAllLoss>(output);
     default:
       throw std::runtime_error("Unknown loss");
   }
@@ -276,13 +274,10 @@ void ByteFast::supervised(
   if (labels.size() == 0 || line.size() == 0) {
     return;
   }
-  if (args_->loss == loss_name::ova) {
-    model_->update(line, labels, Model::kAllLabelsAsTarget, lr, state);
-  } else {
-    std::uniform_int_distribution<> uniform(0, labels.size() - 1);
-    int32_t i = uniform(state.rng);
-    model_->update(line, labels, i, lr, state);
-  }
+  // A line with several labels trains on one of them, chosen at random.
+  std::uniform_int_distribution<> uniform(0, labels.size() - 1);
+  int32_t i = uniform(state.rng);
+  model_->update(line, labels, i, lr, state);
 }
 
 std::tuple<int64_t, double, double>
@@ -462,6 +457,7 @@ void ByteFast::continueTraining(const Args& args, const TrainCallback& callback)
   args_->cropMax = args.cropMax;
   args_->cropUnit = args.cropUnit;
   args_->normProb = args.normProb;
+  args_->stripProb = args.stripProb;
   args_->saveEpochs = args.saveEpochs;
   args_->validation = args.validation;
   if (args_->input == "-") {

@@ -29,12 +29,10 @@ class Loss {
       const Vector& output) const;
 
  protected:
-  std::vector<real> t_sigmoid_;
   std::vector<real> t_log_;
   std::shared_ptr<Matrix>& wo_;
 
   real log(real x) const;
-  real sigmoid(real x) const;
 
  public:
   explicit Loss(std::shared_ptr<Matrix>& wo);
@@ -53,33 +51,6 @@ class Loss {
       real /*threshold*/,
       Predictions& /*heap*/,
       Model::State& /*state*/) const;
-};
-
-class BinaryLogisticLoss : public Loss {
- protected:
-  real binaryLogistic(
-      int32_t target,
-      Model::State& state,
-      bool labelIsPositive,
-      real lr,
-      bool backprop) const;
-
- public:
-  explicit BinaryLogisticLoss(std::shared_ptr<Matrix>& wo);
-  virtual ~BinaryLogisticLoss() noexcept override = default;
-  void computeOutput(Model::State& state) const override;
-};
-
-class OneVsAllLoss : public BinaryLogisticLoss {
- public:
-  explicit OneVsAllLoss(std::shared_ptr<Matrix>& wo);
-  ~OneVsAllLoss() noexcept override = default;
-  real forward(
-      const std::vector<int32_t>& targets,
-      int32_t targetIndex,
-      Model::State& state,
-      real lr,
-      bool backprop) override;
 };
 
 class SoftmaxLoss : public Loss {

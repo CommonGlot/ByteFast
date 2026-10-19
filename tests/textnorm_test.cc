@@ -113,5 +113,24 @@ int main() {
   assert(text::truncateUtf8("abcdef", 4) == "abcd");
   assert(text::truncateUtf8(nihongo, 4) == "\xE6\x97\xA5");
   assert(text::truncateUtf8(nihongo, 6) == nihongo.substr(0, 6));
+  // -stripProb: tones, accents and Arabic/Hebrew vowel marks are removed;
+  // marks that are letters of other scripts (Devanagari vowel signs) stay.
+  auto strip = [](std::string t) {
+    text::stripDiacritics(t);
+    return t;
+  };
+  assert(strip("K\xC3\xA0 \xC9\xB2\xC9\x94g\xC9\x94n l\xC3\xA1j\xC9\x9Bn") ==
+         "Ka \xC9\xB2\xC9\x94g\xC9\x94n laj\xC9\x9Bn");  // Dyula: Kà ɲɔgɔn lájɛn
+  assert(strip("Ti\xE1\xBA\xBFng Vi\xE1\xBB\x87t") == "Tieng Viet");  // Tiếng Việt
+  assert(strip("\xC9\x9B\xCC\x81") == "\xC9\x9B");  // ɛ + U+0301
+  assert(strip("\xD9\x85\xD9\x8E\xD8\xB1\xD9\x92\xD8\xAD\xD9\x8E\xD8\xA8\xD9\x8B\xD8\xA7") ==
+         "\xD9\x85\xD8\xB1\xD8\xAD\xD8\xA8\xD8\xA7");  // Arabic with harakat
+  assert(strip("\xD7\xA9\xD7\x81\xD6\xB8\xD7\x9C\xD7\x95\xD6\xB9\xD7\x9D") ==
+         "\xD7\xA9\xD7\x9C\xD7\x95\xD7\x9D");  // Hebrew with niqqud
+  const std::string hindi = "\xE0\xA4\xB9\xE0\xA4\xBF\xE0\xA4\xA8\xE0\xA5\x8D\xE0\xA4\xA6\xE0\xA5\x80";
+  assert(strip(hindi) == hindi);
+  assert(strip("plain ascii 123") == "plain ascii 123");
+  assert(strip("\xFF bad") == "\xFF bad");
+
   return 0;
 }
