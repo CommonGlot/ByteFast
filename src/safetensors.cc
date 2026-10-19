@@ -180,7 +180,7 @@ size_t dtypeSize(const std::string& dtype) {
   if (dtype == "F32" || dtype == "I32") {
     return 4;
   }
-  if (dtype == "I64") {
+  if (dtype == "I64" || dtype == "U64") {
     return 8;
   }
   if (dtype == "U8" || dtype == "I8") {

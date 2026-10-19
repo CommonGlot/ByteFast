@@ -7,10 +7,6 @@
       "flags": "-minCount 1"
     },
     {
-      "name": "words+bigrams",
-      "flags": "-minCount 1 -wordNgrams 2"
-    },
-    {
       "name": "words+subwords",
       "flags": "-minCount 1 -minn 2 -maxn 5"
     },
@@ -23,20 +19,12 @@
       "flags": "-minCount 1 -minb 2 -maxb 5"
     },
     {
-      "name": "bytes2-5+words+bigrams",
-      "flags": "-minCount 1 -minb 2 -maxb 5 -wordNgrams 2"
-    },
-    {
       "name": "bytes2-5+words5",
       "flags": "-minCount 5 -minb 2 -maxb 5"
     },
     {
       "name": "bytes2-5+words+maxBytes512",
       "flags": "-minCount 1 -minb 2 -maxb 5 -maxBytes 512"
-    },
-    {
-      "name": "words+subwords+maxVocab50k",
-      "flags": "-minCount 1 -minn 2 -maxn 5 -maxVocab 50000"
     }
   ]
 }

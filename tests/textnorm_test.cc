@@ -110,5 +110,25 @@ int main() {
   assert(strip("plain ascii 123") == "plain ascii 123");
   assert(strip("\xFF bad") == "\xFF bad");
 
+  // normalizedHash(s) is the hash of normalizeToken(s), without the string.
+  auto fnv64 = [](const std::string& t) {
+    uint64_t h = 14695981039346656037ull;
+    for (char c : t) {
+      h = (h ^ static_cast<uint8_t>(c)) * 1099511628211ull;
+    }
+    h ^= h >> 33;
+    h *= 0xFF51AFD7ED558CCDull;
+    h ^= h >> 33;
+    return h;
+  };
+  for (const std::string& t : std::vector<std::string>{"Hello", "Caf\xC3\xA9!", "\xC4\xB0stanbul", "123", "A\xFF\xC3",
+                              "\xD0\x9F\xD0\xA0\xD0\x98\xD0\x92", hindi, nihongo, "x\xF0\x9F\x98\x80y",
+                              "\xCE\xA3\xCE\x9F\xCE\xA6"}) {
+    uint64_t h = 0;
+    const bool any = text::normalizedHash(t, h);
+    assert(any == !norm(t).empty());
+    assert(!any || h == fnv64(norm(t)));
+  }
+
   return 0;
 }

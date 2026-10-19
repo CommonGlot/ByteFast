@@ -21,6 +21,7 @@
 #include "args.h"
 #include "densematrix.h"
 #include "dictionary.h"
+#include "lexicon.h"
 #include "matrix.h"
 #include "meter.h"
 #include "model.h"
@@ -38,6 +39,7 @@ class ByteFast {
  protected:
   std::shared_ptr<Args> args_;
   std::shared_ptr<Dictionary> dict_;
+  Lexicon lexicon_;
   std::shared_ptr<Matrix> input_;
   std::shared_ptr<Matrix> output_;
   std::shared_ptr<Model> model_;
@@ -49,7 +51,6 @@ class ByteFast {
   std::exception_ptr trainException_;
 
   void startThreads(const TrainCallback& callback = {});
-  void epochCheckpoint(int32_t epoch);
   void trainThread(int32_t, const TrainCallback& callback);
   void printInfo(real, real, std::ostream&);
   std::shared_ptr<Matrix> createRandomMatrix() const;
@@ -83,9 +84,11 @@ class ByteFast {
 
   void test(std::istream& in, int32_t k, real threshold, Meter& meter) const;
 
+  // Top-k labels of a line's tokens, after the lexicon check when the
+  // model has a lexicon.
   void predict(
       int32_t k,
-      const std::vector<int32_t>& words,
+      const std::vector<std::string>& tokens,
       Predictions& predictions,
       real threshold = 0.0) const;
 
@@ -100,6 +103,9 @@ class ByteFast {
   void abort();
 
   int getDimension() const;
+
+  // Share of words for the lexicon check; 0 turns it off.
+  void setLexiconThreshold(real threshold);
 
   class AbortError : public std::runtime_error {
    public:

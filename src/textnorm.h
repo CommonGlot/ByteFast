@@ -204,6 +204,18 @@ inline void stripDiacritics(std::string& s) {
 
 // Normalize one token like the CommonLID input cleaner: lowercase, then drop
 // non-word characters and digits. Malformed UTF-8 bytes are dropped too.
+inline bool normRemovedAscii(uint8_t b) {
+  static const struct Table {
+    bool removed[128];
+    Table() {
+      for (uint32_t c = 0; c < 128; c++) {
+        removed[c] = normRemoved(c);
+      }
+    }
+  } table;
+  return table.removed[b];
+}
+
 inline void normalizeToken(std::string& s) {
   // Python lowercases U+0130 (capital I with dot) to "i" + U+0307; match it.
   for (size_t pos = s.find("\xC4\xB0"); pos != std::string::npos;
@@ -216,7 +228,7 @@ inline void normalizeToken(std::string& s) {
   for (size_t i = 0; i < s.size();) {
     const uint8_t b = static_cast<uint8_t>(s[i]);
     if (b < 0x80) {
-      if (!normRemoved(b)) {
+      if (!normRemovedAscii(b)) {
         out.push_back(s[i]);
       }
       i++;
@@ -234,6 +246,67 @@ inline void normalizeToken(std::string& s) {
     i += len;
   }
   s.swap(out);
+}
+
+// 64-bit hash of normalizeToken(s), computed in one pass without building
+// the string (FNV-1a over the normalized bytes, then a finalizer). Returns
+// false if the normalized token is empty.
+inline bool normalizedHash(std::string_view s, uint64_t& hash) {
+  uint64_t h = 14695981039346656037ull;
+  bool any = false;
+  auto byte = [&](uint32_t c) { h = (h ^ c) * 1099511628211ull; };
+  auto feed = [&](uint32_t cp) {
+    if (normRemoved(cp)) {
+      return;
+    }
+    if (cp < 0x80) {
+      byte(cp);
+    } else if (cp < 0x800) {
+      byte(0xC0 | (cp >> 6));
+      byte(0x80 | (cp & 0x3F));
+    } else if (cp < 0x10000) {
+      byte(0xE0 | (cp >> 12));
+      byte(0x80 | ((cp >> 6) & 0x3F));
+      byte(0x80 | (cp & 0x3F));
+    } else {
+      byte(0xF0 | (cp >> 18));
+      byte(0x80 | ((cp >> 12) & 0x3F));
+      byte(0x80 | ((cp >> 6) & 0x3F));
+      byte(0x80 | (cp & 0x3F));
+    }
+    any = true;
+  };
+  for (size_t i = 0; i < s.size();) {
+    const uint8_t b = static_cast<uint8_t>(s[i]);
+    if (b < 0x80) {
+      const uint8_t c = static_cast<uint8_t>(asciiLower(static_cast<char>(b)));
+      if (!normRemovedAscii(c)) {
+        byte(c);
+        any = true;
+      }
+      i++;
+      continue;
+    }
+    uint32_t cp = 0;
+    const size_t len = utf8Length(s, i, cp);
+    if (len == 0) {
+      i++; // malformed bytes are dropped
+      continue;
+    }
+    if (cp == 0x130) {
+      // Python lowercases U+0130 to "i" + U+0307.
+      feed('i');
+      feed(0x307);
+    } else {
+      feed(lowercase(cp));
+    }
+    i += len;
+  }
+  h ^= h >> 33;
+  h *= 0xFF51AFD7ED558CCDull;
+  h ^= h >> 33;
+  hash = h;
+  return any;
 }
 
 // Feature hashing for text n-grams: 32-bit FNV-1a over

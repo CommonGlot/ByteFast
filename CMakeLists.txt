@@ -26,11 +26,13 @@ set(HEADER_FILES
     src/densematrix.h
     src/dictionary.h
     src/bytefast.h
+    src/lexicon.h
     src/loss.h
     src/matrix.h
     src/meter.h
     src/model.h
     src/norm_table.h
+    src/strip_table.h
     src/real.h
     src/textnorm.h
     src/unicode_fold.h
@@ -44,6 +46,7 @@ set(SOURCE_FILES
     src/dictionary.cc
     src/bytefast.cc
     src/bytefast_c.cc
+    src/lexicon.cc
     src/loss.cc
     src/matrix.cc
     src/meter.cc

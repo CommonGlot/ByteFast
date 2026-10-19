@@ -217,12 +217,11 @@ void Dictionary::readFromFile(std::istream& in) {
     }
     if (size_ > 0.75 * MAX_VOCAB_SIZE) {
       minThreshold++;
-      threshold(minThreshold, minThreshold);
+      threshold(minThreshold);
     }
   }
   applyWordlist();
-  threshold(args_->minCount, args_->minCountLabel);
-  applyMaxVocab();
+  threshold(args_->minCount);
   initNgrams();
   if (args_->verbose > 0) {
     std::cerr << "\rRead " << ntokens_ / 1000000 << "M words" << std::endl;
@@ -267,21 +266,8 @@ void Dictionary::applyWordlist() {
   }
 }
 
-// Keep the -maxVocab most frequent words; ties are broken by the word itself
-// so that the selected vocabulary does not depend on sort order.
-void Dictionary::applyMaxVocab() {
-  if (args_->maxVocab <= 0 || nwords_ <= args_->maxVocab) {
-    return;
-  }
-  auto wordsEnd = words_.begin() + nwords_;
-  std::sort(words_.begin(), wordsEnd, [](const entry& a, const entry& b) {
-    return a.count != b.count ? a.count > b.count : a.word < b.word;
-  });
-  words_.erase(words_.begin() + args_->maxVocab, wordsEnd);
-  threshold(1, 1);
-}
-
-void Dictionary::threshold(int64_t t, int64_t tl) {
+// Drops words seen fewer than t times; labels are always kept.
+void Dictionary::threshold(int64_t t) {
   sort(words_.begin(), words_.end(), [](const entry& e1, const entry& e2) {
     if (e1.type != e2.type) {
       return e1.type < e2.type;
@@ -293,8 +279,7 @@ void Dictionary::threshold(int64_t t, int64_t tl) {
           words_.begin(),
           words_.end(),
           [&](const entry& e) {
-            return (e.type == entry_type::word && e.count < t) ||
-                (e.type == entry_type::label && e.count < tl);
+            return e.type == entry_type::word && e.count < t;
           }),
       words_.end());
   words_.shrink_to_fit();
@@ -324,19 +309,6 @@ std::vector<int64_t> Dictionary::getCounts(entry_type type) const {
   return counts;
 }
 
-void Dictionary::addWordNgrams(
-    std::vector<int32_t>& line,
-    const std::vector<int32_t>& hashes,
-    int32_t n) const {
-  for (int32_t i = 0; i < hashes.size(); i++) {
-    uint64_t h = hashes[i];
-    for (int32_t j = i + 1; j < hashes.size() && j < i + n; j++) {
-      h = h * 116049371 + hashes[j];
-      pushHash(line, h % args_->bucket);
-    }
-  }
-}
-
 void Dictionary::addSubwords(
     std::vector<int32_t>& line,
     const std::string_view token,
@@ -360,7 +332,7 @@ void Dictionary::addSubwords(
   }
 }
 
-// Byte and character n-grams over the words of the line joined by single
+// Byte n-grams over the words of the line joined by single
 // spaces, so n-grams cross word boundaries. The text is padded with a space
 // on each side, which makes the first and last words look like the others.
 void Dictionary::addTextNgrams(
@@ -397,8 +369,6 @@ void Dictionary::reset(std::istream& in) const {
   }
 }
 
-// Reads one supervised line: folded non-label tokens (ending with EOS when
-// the line ends with a newline) and the ids of its known labels.
 int32_t Dictionary::readLine(
     std::istream& in,
     std::vector<std::string>& tokens,
@@ -436,15 +406,10 @@ void Dictionary::addToken(
 void Dictionary::addFeatures(
     const std::vector<std::string>& tokens,
     std::vector<int32_t>& words) const {
-  std::vector<int32_t> word_hashes;
   words.clear();
   for (const auto& token : tokens) {
-    uint32_t h = hash(token);
-    int32_t wid = getId(token, h);
-    addSubwords(words, token, wid);
-    word_hashes.push_back(h);
+    addSubwords(words, token, getId(token));
   }
-  addWordNgrams(words, word_hashes, args_->wordNgrams);
   addTextNgrams(words, tokens);
 }
 

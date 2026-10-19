@@ -20,14 +20,11 @@ DEFAULTS = {
     "dim": 100,
     "epoch": 5,
     "minCount": 1,
-    "minCountLabel": 0,
     "minn": 0,
     "maxn": 0,
-    "wordNgrams": 1,
     "loss": "softmax",
     "bucket": 2000000,
     "thread": max(1, multiprocessing.cpu_count() - 1),
-    "lrUpdateRate": 100,
     "label": "__label__",
     "verbose": 2,
     "seed": 0,
@@ -35,30 +32,29 @@ DEFAULTS = {
     "maxb": 0,
     "maxBytes": 0,
     "wordlist": "",
-    "maxVocab": 0,
+    "lexicon": "",
+    "lexThreshold": 0.5,
+    "lexMinWords": 2,
+    "lexTopK": 5,
     "cropProb": 0.0,
     "cropMin": 1,
     "cropMax": 0,
     "normProb": 0.0,
     "stripProb": 0.0,
-    "saveEpochs": False,
-    "validation": "",
 }
 
 ALIASES = {
     "min_count": "minCount",
-    "min_count_label": "minCountLabel",
-    "word_ngrams": "wordNgrams",
-    "lr_update_rate": "lrUpdateRate",
     "label_prefix": "label",
     "max_bytes": "maxBytes",
-    "max_vocab": "maxVocab",
     "crop_prob": "cropProb",
     "crop_min": "cropMin",
     "crop_max": "cropMax",
     "norm_prob": "normProb",
     "strip_prob": "stripProb",
-    "save_epochs": "saveEpochs",
+    "lex_threshold": "lexThreshold",
+    "lex_min_words": "lexMinWords",
+    "lex_top_k": "lexTopK",
 }
 
 
@@ -93,9 +89,9 @@ class _Model:
         """(number of examples, precision@k, recall@k) on a labeled file."""
         return self.f.test(path, k, threshold)
 
-    def test_label(self, path, k=1, threshold=0.0):
-        """Precision, recall and F1 of every label on a labeled file."""
-        return self.f.testLabel(path, k, threshold)
+    def set_lexicon_threshold(self, threshold):
+        """Share of a line's words for the lexicon check; 0 turns it off."""
+        self.f.setLexiconThreshold(threshold)
 
     def save_model(self, path):
         self.f.saveModel(path)
@@ -138,15 +134,19 @@ def train_supervised(**kwargs):
     (``__label__NAME`` by default) per line. Each example is represented by
     the average of its feature vectors, and the features combine freely:
 
-    - words (minCount, wordlist, maxVocab)
+    - words (minCount, wordlist)
     - minn/maxn: character n-grams inside each word
-    - wordNgrams: hashed word n-grams
     - minb/maxb: byte n-grams over the whole text; maxBytes limits how much
       of the text they read
 
     crop_prob/crop_min/crop_max train on random character spans of lines,
     norm_prob on normalized lines and strip_prob on lines without optional
     diacritics.
+
+    lexicon is a file of LABEL<TAB>WORD lines kept in the model: at
+    prediction, a label is kept only if its words cover lex_threshold of the
+    line (lines of at least lex_min_words words), else the next of the top
+    lex_top_k labels that does.
     """
     args = dict(DEFAULTS)
     for name, value in kwargs.items():
@@ -161,7 +161,7 @@ def train_supervised(**kwargs):
     for name, value in args.items():
         setattr(a, name, value)
     # Without hashed features the bucket table is unused; keep it empty.
-    if a.wordNgrams <= 1 and a.maxn == 0 and a.maxb == 0:
+    if a.maxn == 0 and a.maxb == 0:
         a.bucket = 0
     f = _core.bytefast()
     _core.train(f, a)

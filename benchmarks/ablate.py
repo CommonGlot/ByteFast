@@ -23,8 +23,8 @@ VARIANTS is a JSON file:
 A variant's own "grid" replaces --grid for that variant (for published
 recipes that must run with their exact settings).
 
-  python3 benchmarks/ablate.py --data data/wili --variants benchmarks/ablations/units.json \\
-      --out results/wili-units.jsonl --threads 32 --grid lr=0.1,0.5,1.0 epoch=5,15
+  python3 benchmarks/ablate.py --data data/wili --variants benchmarks/ablations/features.json \\
+      --out results/wili-features.jsonl --threads 32 --grid lr=0.1,0.5,1.0 epoch=5,15
 """
 import argparse
 import itertools

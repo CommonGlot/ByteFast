@@ -8,7 +8,7 @@
 
 CXX = c++
 CXXFLAGS = -pthread -std=c++17 -march=native
-OBJS = args.o safetensors.o matrix.o dictionary.o loss.o densematrix.o vector.o model.o utils.o meter.o bytefast.o
+OBJS = args.o safetensors.o matrix.o dictionary.o lexicon.o loss.o densematrix.o vector.o model.o utils.o meter.o bytefast.o
 INCLUDES = -I.
 
 opt: CXXFLAGS += -O3 -funroll-loops -DNDEBUG
@@ -49,6 +49,9 @@ matrix.o: src/matrix.cc src/matrix.h src/*.h
 
 dictionary.o: src/dictionary.cc src/dictionary.h src/args.h src/*.h
 	$(CXX) $(CXXFLAGS) -c src/dictionary.cc
+
+lexicon.o: src/lexicon.cc src/lexicon.h src/*.h
+	$(CXX) $(CXXFLAGS) -c src/lexicon.cc
 
 loss.o: src/loss.cc src/loss.h src/matrix.h src/real.h src/*.h
 	$(CXX) $(CXXFLAGS) -c src/loss.cc

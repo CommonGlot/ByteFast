@@ -4,10 +4,9 @@
   "variants": [
     {"name": "fasttext-default", "flags": "-dim 100 -minCount 1",
      "grid": {"lr": ["0.1"], "epoch": ["5"]}},
-    {"name": "fasttext-bigram-tuned", "flags": "-dim 64 -minCount 1 -wordNgrams 2 -bucket 1048576"},
-    {"name": "glotlid-recipe", "flags": "-dim 256 -minCount 1000 -minCountLabel 0 -wordNgrams 1 -bucket 1000000 -minn 2 -maxn 5",
+    {"name": "glotlid-recipe", "flags": "-dim 256 -minCount 1000 -bucket 1000000 -minn 2 -maxn 5",
      "grid": {"lr": ["0.8"], "epoch": ["2"]}},
-    {"name": "glotlid-recipe-tuned", "flags": "-dim 256 -minCount 1000 -minCountLabel 0 -wordNgrams 1 -bucket 1000000 -minn 2 -maxn 5"},
+    {"name": "glotlid-recipe-tuned", "flags": "-dim 256 -minCount 1000 -bucket 1000000 -minn 2 -maxn 5"},
     {"name": "bytes-small", "flags": "-dim 32 -bucket 16384 -minCount 1000000000 -minb 2 -maxb 5 -maxBytes 512"},
     {"name": "fasttext-proto-baseline", "flags": "-dim 32 -bucket 16384 -minCount 1 -minn 2 -maxn 5",
      "grid": {"lr": ["0.3"], "epoch": ["40"]}}

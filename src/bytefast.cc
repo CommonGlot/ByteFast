@@ -11,6 +11,7 @@
 #include "safetensors.h"
 
 #include <algorithm>
+#include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <numeric>
@@ -26,6 +27,8 @@ namespace bytefast {
 // metadata.
 const char* const kFormat = "bytefast";
 const char* const kFormatVersion = "1";
+// Tokens a thread processes between updates of the shared progress counter.
+const int64_t kLrUpdateRate = 100;
 
 std::shared_ptr<Loss> ByteFast::createLoss(std::shared_ptr<Matrix>& output) {
   loss_name lossName = args_->loss;
@@ -64,6 +67,7 @@ void ByteFast::saveModel(const std::string& filename) {
   out.metadata("format_version", kFormatVersion);
   args_->save(out);
   dict_->save(out);
+  lexicon_.save(out);
   input_->save(out, "input");
   output_->save(out, "output");
   out.write(filename);
@@ -81,6 +85,7 @@ void ByteFast::loadModel(const std::string& filename) {
   args_ = std::make_shared<Args>();
   args_->load(in);
   dict_ = std::make_shared<Dictionary>(args_, in);
+  lexicon_.load(in);
   input_ = std::make_shared<DenseMatrix>();
   output_ = std::make_shared<DenseMatrix>();
   input_->load(in, "input");
@@ -144,7 +149,7 @@ void ByteFast::supervised(
 
 std::tuple<int64_t, double, double>
 ByteFast::test(std::istream& in, int32_t k, real threshold) {
-  Meter meter(false);
+  Meter meter;
   test(in, k, threshold, meter);
 
   return std::tuple<int64_t, double, double>(
@@ -153,36 +158,64 @@ ByteFast::test(std::istream& in, int32_t k, real threshold) {
 
 void ByteFast::test(std::istream& in, int32_t k, real threshold, Meter& meter)
     const {
-  std::vector<int32_t> line;
+  std::vector<std::string> tokens;
   std::vector<int32_t> labels;
   Predictions predictions;
-  Model::State state(args_->dim, dict_->nlabels(), 0);
   in.clear();
   in.seekg(0, std::ios_base::beg);
 
   while (in.peek() != EOF) {
-    line.clear();
-    labels.clear();
-    dict_->getLine(in, line, labels);
-
-    if (!labels.empty() && !line.empty()) {
+    dict_->readLine(in, tokens, labels);
+    if (!labels.empty()) {
       predictions.clear();
-      predict(k, line, predictions, threshold);
-      meter.log(labels, predictions);
+      predict(k, tokens, predictions, threshold);
+      if (!predictions.empty()) {
+        meter.log(labels, predictions);
+      }
     }
   }
 }
 
 void ByteFast::predict(
     int32_t k,
-    const std::vector<int32_t>& words,
+    const std::vector<std::string>& tokens,
     Predictions& predictions,
     real threshold) const {
-  if (words.empty()) {
+  std::vector<int32_t> features;
+  dict_->addFeatures(tokens, features);
+  if (features.empty()) {
     return;
   }
   Model::State state(args_->dim, dict_->nlabels(), 0);
-  model_->predict(words, k, threshold, predictions, state);
+  if (lexicon_.empty() || args_->lexThreshold <= 0) {
+    model_->predict(features, k, threshold, predictions, state);
+    return;
+  }
+  // The first of the top -lexTopK labels that passes the check goes first;
+  // if none passes, the order is kept.
+  model_->predict(features, std::max(k, args_->lexTopK), 0.0, predictions, state);
+  const std::vector<uint64_t> words = Lexicon::words(tokens);
+  const size_t tried = std::min<size_t>(args_->lexTopK, predictions.size());
+  for (size_t i = 0; i < tried; i++) {
+    if (lexicon_.passes(predictions[i].second, words, args_->lexThreshold,
+            args_->lexMinWords)) {
+      std::rotate(predictions.begin(), predictions.begin() + i,
+          predictions.begin() + i + 1);
+      break;
+    }
+  }
+  if (predictions.size() > size_t(k)) {
+    predictions.resize(k);
+  }
+  const real logThreshold = std::log(threshold);
+  predictions.erase(
+      std::remove_if(predictions.begin(), predictions.end(),
+          [&](const std::pair<real, int32_t>& p) { return p.first < logThreshold; }),
+      predictions.end());
+}
+
+void ByteFast::setLexiconThreshold(real threshold) {
+  args_->lexThreshold = threshold;
 }
 
 bool ByteFast::predictLine(
@@ -195,10 +228,11 @@ bool ByteFast::predictLine(
     return false;
   }
 
-  std::vector<int32_t> words, labels;
-  dict_->getLine(in, words, labels);
+  std::vector<std::string> tokens;
+  std::vector<int32_t> labels;
+  dict_->readLine(in, tokens, labels);
   Predictions linePredictions;
-  predict(k, words, linePredictions, threshold);
+  predict(k, tokens, linePredictions, threshold);
   for (const auto& p : linePredictions) {
     predictions.push_back(
         std::make_pair(std::exp(p.first), dict_->getLabel(p.second)));
@@ -235,7 +269,7 @@ void ByteFast::trainThread(int32_t threadId, const TrainCallback& callback) {
       real lr = args_->lr * (1.0 - progress);
       localTokenCount += dict_->getLine(ifs, line, labels, state.rng);
       supervised(state, lr, line, labels);
-      if (localTokenCount > args_->lrUpdateRate) {
+      if (localTokenCount > kLrUpdateRate) {
         tokenCount_ += localTokenCount;
         localTokenCount = 0;
         if (threadId == 0 && args_->verbose > 1) {
@@ -283,6 +317,10 @@ void ByteFast::train(const Args& args, const TrainCallback& callback) {
   dict_->readFromFile(ifs);
   ifs.close();
   trainTokens_ = dict_->ntokens();
+  lexicon_ = Lexicon();
+  if (!args_->lexicon.empty()) {
+    lexicon_.build(args_->lexicon, *dict_, args_->label, args_->verbose);
+  }
 
   input_ = createRandomMatrix();
   output_ = createTrainOutputMatrix();
@@ -313,8 +351,6 @@ void ByteFast::startThreads(const TrainCallback& callback) {
     trainThread(0, callback);
   }
   const int64_t ntokens = trainTokens_;
-  const bool checkpoints = args_->saveEpochs || !args_->validation.empty();
-  int32_t nextEpoch = 1;
   // Same condition as trainThread
   while (keepTraining(ntokens)) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -323,19 +359,9 @@ void ByteFast::startThreads(const TrainCallback& callback) {
       std::cerr << "\r";
       printInfo(progress, loss_, std::cerr);
     }
-    // The workers keep training while a checkpoint is written or scored,
-    // as in Hogwild!; the learning-rate schedule is not affected.
-    if (checkpoints && nextEpoch < args_->epoch &&
-        tokenCount_ >= int64_t(nextEpoch) * ntokens) {
-      epochCheckpoint(nextEpoch++);
-    }
   }
   for (int32_t i = 0; i < threads.size(); i++) {
     threads[i].join();
-  }
-  if (checkpoints && nextEpoch < args_->epoch && !trainException_) {
-    std::cerr << "\nno checkpoint for epochs " << nextEpoch << "-" << args_->epoch - 1
-              << ": training finished before they were seen" << std::endl;
   }
   if (trainException_) {
     std::exception_ptr exception = trainException_;
@@ -346,30 +372,6 @@ void ByteFast::startThreads(const TrainCallback& callback) {
     std::cerr << "\r";
     printInfo(1.0, loss_, std::cerr);
     std::cerr << std::endl;
-  }
-  if (!args_->validation.empty()) {
-    epochCheckpoint(args_->epoch);
-  }
-}
-
-// After epoch `epoch` (of args_->epoch): save OUTPUT.epN.bin with
-// -saveEpochs (not after the last epoch, whose model is saved as usual) and
-// print precision@1 on -validation.
-void ByteFast::epochCheckpoint(int32_t epoch) {
-  if (args_->saveEpochs && epoch < args_->epoch) {
-    saveModel(
-        args_->output + ".ep" + std::to_string(epoch) + ".safetensors");
-  }
-  if (!args_->validation.empty()) {
-    std::ifstream ifs(args_->validation);
-    if (!ifs.is_open()) {
-      throw std::invalid_argument(args_->validation + " cannot be opened for validation!");
-    }
-    Meter meter(false);
-    test(ifs, 1, 0.0, meter);
-    std::cerr << "\nepoch " << epoch << "/" << args_->epoch << " validation: N "
-              << meter.nexamples() << "  P@1 " << std::fixed << std::setprecision(4)
-              << meter.precision() << std::endl;
   }
 }
 

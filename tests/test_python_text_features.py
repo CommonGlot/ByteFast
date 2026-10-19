@@ -42,7 +42,6 @@ def main():
         configs = {
             "subwords": dict(minn=2, maxn=5),
             "bytes": dict(minb=2, maxb=5, bucket=50000, minCount=10 ** 9),
-            "bytes+bigrams": dict(minb=2, maxb=5, bucket=50000, word_ngrams=2),
             "bytes+words": dict(minb=2, maxb=5, bucket=50000, max_bytes=64),
         }
         for name, cfg in configs.items():
@@ -56,13 +55,13 @@ def main():
             assert loaded.predict(query)[0] == model.predict(query)[0], name
             args = loaded.f.getArgs()
             for key, value in cfg.items():
-                attr = {"max_bytes": "maxBytes", "word_ngrams": "wordNgrams"}.get(key, key)
+                attr = {"max_bytes": "maxBytes"}.get(key, key)
                 if attr == "minCount":
                     continue  # a training-time setting
                 got = getattr(args, attr)
                 assert got == value, (name, attr, got, value)
 
-        # Vocabulary control: wordlist and maxVocab.
+        # Vocabulary control: a wordlist.
         wordlist = root / "words.txt"
         # Text after the word is ignored; entries match words exactly, so
         # "investors" does not match "Investors" and "Telescope" is not in
@@ -71,8 +70,23 @@ def main():
         listed = train(data, wordlist=str(wordlist), minb=2, maxb=4, bucket=20000)
         assert sorted(listed.get_words()) == [
             "</s>", "bank", "telescope"], listed.get_words()
-        capped = train(data, max_vocab=5, minn=2, maxn=4)
-        assert len(capped.get_words()) == 5
+
+        # The lexicon check: sports and science have lexicons without the
+        # query's words and finance one with all of them, so finance comes
+        # first (a label without a lexicon would always pass); it is kept in
+        # the model file, and threshold 0 turns it off.
+        lexicon = root / "lexicon.tsv"
+        lexicon.write_text("sports\tzzz\nscience\tzzz\n" + "".join(
+            "__label__finance\t%s\n" % w for w in query.split()), encoding="utf-8")
+        checked = train(data, minb=2, maxb=5, bucket=50000, lexicon=str(lexicon))
+        assert checked.predict(query)[0] == ("__label__finance",)
+        assert checked.predict("goal")[0] == ("__label__sports",)  # one word: not checked
+        path = root / "lexicon.safetensors"
+        checked.save_model(str(path))
+        loaded = bytefast.load_model(str(path))
+        assert loaded.predict(query)[0] == ("__label__finance",)
+        loaded.set_lexicon_threshold(0.0)
+        assert loaded.predict(query)[0] == ("__label__sports",)
 
         # Training on random character spans, normalized and stripped lines.
         cropped = train(data, minb=2, maxb=5, bucket=50000, minCount=10 ** 9,
@@ -82,7 +96,8 @@ def main():
 
         for bad in ({"minb": 3, "maxb": 2}, {"maxb": 4, "minb": 1, "bucket": 0},
                     {"max_bytes": -1}, {"crop_prob": 1.5},
-                    {"crop_prob": 0.5, "crop_max": 0}, {"strip_prob": -0.1}):
+                    {"crop_prob": 0.5, "crop_max": 0}, {"strip_prob": -0.1},
+                    {"lex_threshold": 1.5}, {"lex_top_k": 0}):
             try:
                 train(data, **bad)
             except ValueError:

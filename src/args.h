@@ -22,20 +22,14 @@ class SafeTensorsWriter;
 enum class loss_name : int { softmax = 3 };
 
 class Args {
- protected:
-  std::string boolToString(bool) const;
-
  public:
   Args();
   std::string input;
   std::string output;
   double lr;
-  int lrUpdateRate;
   int dim;
   int epoch;
   int minCount;
-  int minCountLabel;
-  int wordNgrams;
   loss_name loss;
   int bucket;
   int minn;
@@ -45,15 +39,18 @@ class Args {
   int maxb;
   int maxBytes;
   std::string wordlist;
-  int maxVocab;
+  // Percent-threshold lexicon check at prediction (stored in models; the
+  // words come from -lexicon at training).
+  std::string lexicon;
+  double lexThreshold;
+  int lexMinWords;
+  int lexTopK;
   // Training only (not stored in models).
   double cropProb;
   int cropMin;
   int cropMax;
   double normProb;
   double stripProb;
-  bool saveEpochs;
-  std::string validation;
   int thread;
   std::string label;
   int verbose;

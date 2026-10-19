@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <iomanip>
 #include <iostream>
 #include <queue>
 #include <sstream>
@@ -23,8 +22,6 @@ void printUsage() {
       << "The commands supported by bytefast are:\n\n"
       << "  supervised              train a supervised classifier\n"
       << "  test                    evaluate a supervised classifier\n"
-      << "  test-label              print labels with precision and recall "
-         "scores\n"
       << "  predict                 predict most likely labels\n"
       << "  predict-prob            predict most likely labels with "
          "probabilities\n"
@@ -43,30 +40,21 @@ void printTestUsage() {
 
 void printPredictUsage() {
   std::cerr
-      << "usage: bytefast predict[-prob] <model> <test-data> [<k>] [<th>] [<threads>]\n\n"
+      << "usage: bytefast predict[-prob] <model> <test-data> [<k>] [<th>] [<threads>] "
+         "[<lex>]\n\n"
       << "  <model>      model filename\n"
       << "  <test-data>  test data filename (if -, read from stdin)\n"
       << "  <k>          (optional; 1 by default) predict top k labels\n"
       << "  <th>         (optional; 0.0 by default) probability threshold\n"
       << "  <threads>    (optional; 1 by default) threads; output order is kept\n"
-      << std::endl;
-}
-
-void printTestLabelUsage() {
-  std::cerr
-      << "usage: bytefast test-label <model> <test-data> [<k>] [<th>]\n\n"
-      << "  <model>      model filename\n"
-      << "  <test-data>  test data filename\n"
-      << "  <k>          (optional; 1 by default) predict top k labels\n"
-      << "  <th>         (optional; 0.0 by default) probability threshold\n"
+      << "  <lex>        (optional; the model's -lexThreshold by default) lexicon\n"
+      << "               check threshold, 0 turns the check off\n"
       << std::endl;
 }
 
 void test(const std::vector<std::string>& args) {
-  bool perLabel = args[1] == "test-label";
-
   if (args.size() < 4 || args.size() > 6) {
-    perLabel ? printTestLabelUsage() : printTestUsage();
+    printTestUsage();
     exit(EXIT_FAILURE);
   }
 
@@ -78,7 +66,7 @@ void test(const std::vector<std::string>& args) {
   ByteFast fasttext;
   fasttext.loadModel(model);
 
-  Meter meter(false);
+  Meter meter;
 
   if (input == "-") {
     fasttext.test(std::cin, k, threshold, meter);
@@ -91,26 +79,6 @@ void test(const std::vector<std::string>& args) {
     fasttext.test(ifs, k, threshold, meter);
   }
 
-  if (perLabel) {
-    std::cout << std::fixed << std::setprecision(6);
-    auto writeMetric = [](const std::string& name, double value) {
-      std::cout << name << " : ";
-      if (std::isfinite(value)) {
-        std::cout << value;
-      } else {
-        std::cout << "--------";
-      }
-      std::cout << "  ";
-    };
-
-    std::shared_ptr<const Dictionary> dict = fasttext.getDictionary();
-    for (int32_t labelId = 0; labelId < dict->nlabels(); labelId++) {
-      writeMetric("F1-Score", meter.f1Score(labelId));
-      writeMetric("Precision", meter.precision(labelId));
-      writeMetric("Recall", meter.recall(labelId));
-      std::cout << " " << dict->getLabel(labelId) << std::endl;
-    }
-  }
   meter.writeGeneralMetrics(std::cout, k);
 
   exit(0);
@@ -194,7 +162,7 @@ void predictParallel(
 }
 
 void predict(const std::vector<std::string>& args) {
-  if (args.size() < 4 || args.size() > 7) {
+  if (args.size() < 4 || args.size() > 8) {
     printPredictUsage();
     exit(EXIT_FAILURE);
   }
@@ -206,7 +174,7 @@ void predict(const std::vector<std::string>& args) {
     if (args.size() >= 6) {
       threshold = std::stof(args[5]);
     }
-    if (args.size() == 7) {
+    if (args.size() >= 7) {
       threads = std::stoi(args[6]);
     }
   }
@@ -218,6 +186,9 @@ void predict(const std::vector<std::string>& args) {
   bool printProb = args[1] == "predict-prob";
   ByteFast fasttext;
   fasttext.loadModel(std::string(args[2]));
+  if (args.size() == 8) {
+    fasttext.setLexiconThreshold(std::stof(args[7]));
+  }
 
   std::ifstream ifs;
   std::string infile(args[3]);
@@ -269,7 +240,7 @@ int main(int argc, char** argv) {
   std::string command(args[1]);
   if (command == "supervised") {
     train(args);
-  } else if (command == "test" || command == "test-label") {
+  } else if (command == "test") {
     test(args);
   } else if (command == "predict" || command == "predict-prob") {
     predict(args);

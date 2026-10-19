@@ -23,8 +23,6 @@ Args::Args() {
   dim = 100;
   epoch = 5;
   minCount = 1;
-  minCountLabel = 0;
-  wordNgrams = 1;
   loss = loss_name::softmax;
   bucket = 2000000;
   minn = 0;
@@ -33,16 +31,16 @@ Args::Args() {
   maxb = 0;
   maxBytes = 0;
   wordlist = "";
-  maxVocab = 0;
+  lexicon = "";
+  lexThreshold = 0.5;
+  lexMinWords = 2;
+  lexTopK = 5;
   cropProb = 0.0;
   cropMin = 1;
   cropMax = 0;
   normProb = 0.0;
   stripProb = 0.0;
-  saveEpochs = false;
-  validation = "";
   thread = 12;
-  lrUpdateRate = 100;
   label = "__label__";
   verbose = 2;
   seed = 0;
@@ -64,14 +62,6 @@ loss_name Args::lossFromString(const std::string& name) {
   throw std::invalid_argument("Unknown loss: " + name);
 }
 
-std::string Args::boolToString(bool b) const {
-  if (b) {
-    return "true";
-  } else {
-    return "false";
-  }
-}
-
 void Args::parseArgs(const std::vector<std::string>& args) {
   for (int ai = 2; ai < args.size(); ai += 2) {
     if (args[ai][0] != '-') {
@@ -90,18 +80,12 @@ void Args::parseArgs(const std::vector<std::string>& args) {
         output = std::string(args.at(ai + 1));
       } else if (args[ai] == "-lr") {
         lr = std::stof(args.at(ai + 1));
-      } else if (args[ai] == "-lrUpdateRate") {
-        lrUpdateRate = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-dim") {
         dim = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-epoch") {
         epoch = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-minCount") {
         minCount = std::stoi(args.at(ai + 1));
-      } else if (args[ai] == "-minCountLabel") {
-        minCountLabel = std::stoi(args.at(ai + 1));
-      } else if (args[ai] == "-wordNgrams") {
-        wordNgrams = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-loss") {
         loss = lossFromString(args.at(ai + 1));
       } else if (args[ai] == "-bucket") {
@@ -118,8 +102,14 @@ void Args::parseArgs(const std::vector<std::string>& args) {
         maxBytes = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-wordlist") {
         wordlist = std::string(args.at(ai + 1));
-      } else if (args[ai] == "-maxVocab") {
-        maxVocab = std::stoi(args.at(ai + 1));
+      } else if (args[ai] == "-lexicon") {
+        lexicon = std::string(args.at(ai + 1));
+      } else if (args[ai] == "-lexThreshold") {
+        lexThreshold = std::stod(args.at(ai + 1));
+      } else if (args[ai] == "-lexMinWords") {
+        lexMinWords = std::stoi(args.at(ai + 1));
+      } else if (args[ai] == "-lexTopK") {
+        lexTopK = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-cropProb") {
         cropProb = std::stod(args.at(ai + 1));
       } else if (args[ai] == "-cropMin") {
@@ -130,11 +120,6 @@ void Args::parseArgs(const std::vector<std::string>& args) {
         normProb = std::stod(args.at(ai + 1));
       } else if (args[ai] == "-stripProb") {
         stripProb = std::stod(args.at(ai + 1));
-      } else if (args[ai] == "-saveEpochs") {
-        saveEpochs = true;
-        ai--;
-      } else if (args[ai] == "-validation") {
-        validation = std::string(args.at(ai + 1));
       } else if (args[ai] == "-thread") {
         thread = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-label") {
@@ -181,7 +166,7 @@ bool Args::usesTextFeatures() const {
 }
 
 bool Args::usesHashedFeatures() const {
-  return wordNgrams > 1 || maxn > 0 || maxb > 0;
+  return maxn > 0 || maxb > 0;
 }
 
 void Args::validate() const {
@@ -191,8 +176,11 @@ void Args::validate() const {
   if (maxBytes < 0) {
     throw std::invalid_argument("-maxBytes must be >= 0 (0 = no limit)");
   }
-  if (maxVocab < 0) {
-    throw std::invalid_argument("-maxVocab must be >= 0 (0 = no limit)");
+  if (!(lexThreshold >= 0.0 && lexThreshold <= 1.0)) {
+    throw std::invalid_argument("-lexThreshold must be in [0, 1]");
+  }
+  if (lexMinWords < 1 || lexTopK < 1) {
+    throw std::invalid_argument("-lexMinWords and -lexTopK must be >= 1");
   }
   if (maxb > 0 && bucket <= 0) {
     throw std::invalid_argument("-minb/-maxb need -bucket > 0");
@@ -229,10 +217,6 @@ void Args::printDictionaryHelp() {
   std::cerr << "\nThe following arguments for the dictionary are optional:\n"
             << "  -minCount           minimal number of word occurences ["
             << minCount << "]\n"
-            << "  -minCountLabel      minimal number of label occurences ["
-            << minCountLabel << "]\n"
-            << "  -wordNgrams         max length of word ngram [" << wordNgrams
-            << "]\n"
             << "  -bucket             number of buckets [" << bucket << "]\n"
             << "  -minn               min length of char ngram [" << minn
             << "]\n"
@@ -246,8 +230,15 @@ void Args::printDictionaryHelp() {
             << maxBytes << "]\n"
             << "  -wordlist           file with the allowed vocabulary, one word per line ["
             << wordlist << "]\n"
-            << "  -maxVocab           keep at most this many words, 0 = no limit ["
-            << maxVocab << "]\n"
+            << "  -lexicon            file of LABEL<TAB>WORD lines: a prediction keeps a\n"
+            << "                      label only if its words cover -lexThreshold of the\n"
+            << "                      line, else the next of the top -lexTopK that does ["
+            << lexicon << "]\n"
+            << "  -lexThreshold       share of the line's words in the label's lexicon ["
+            << lexThreshold << "]\n"
+            << "  -lexMinWords        lines with fewer words are not checked ["
+            << lexMinWords << "]\n"
+            << "  -lexTopK            labels tried for the check [" << lexTopK << "]\n"
             << "  -cropProb           probability of training on a random span of a line ["
             << cropProb << "]\n"
             << "  -cropMin            min span length in characters [" << cropMin << "]\n"
@@ -267,9 +258,6 @@ void Args::printTrainingHelp() {
   std::cerr
       << "\nThe following arguments for training are optional:\n"
       << "  -lr                 learning rate [" << lr << "]\n"
-      << "  -lrUpdateRate       change the rate of updates for the learning "
-         "rate ["
-      << lrUpdateRate << "]\n"
       << "  -dim                size of word vectors [" << dim << "]\n"
       << "  -epoch              number of epochs [" << epoch << "]\n"
       << "  -loss               loss function {softmax} ["
@@ -277,13 +265,6 @@ void Args::printTrainingHelp() {
       << "  -thread             number of threads (set to 1 to ensure "
          "reproducible results) ["
       << thread << "]\n"
-      << "  -saveEpochs         also save the model after every epoch but the "
-         "last, as\n"
-      << "                      OUTPUT.epN.safetensors (needs -thread > 1) ["
-      << boolToString(saveEpochs) << "]\n"
-      << "  -validation         print precision@1 on this labeled file after "
-         "every epoch ["
-      << validation << "]\n"
       << "  -seed               random generator seed  [" << seed << "]\n";
 }
 
@@ -293,7 +274,6 @@ void Args::save(SafeTensorsWriter& out) const {
       {"dim", std::to_string(dim)},
       {"epoch", std::to_string(epoch)},
       {"minCount", std::to_string(minCount)},
-      {"wordNgrams", std::to_string(wordNgrams)},
       {"loss", lossToString(loss)},
       {"bucket", std::to_string(bucket)},
       {"minn", std::to_string(minn)},
@@ -301,9 +281,10 @@ void Args::save(SafeTensorsWriter& out) const {
       {"minb", std::to_string(minb)},
       {"maxb", std::to_string(maxb)},
       {"maxBytes", std::to_string(maxBytes)},
-      {"maxVocab", std::to_string(maxVocab)},
       {"label", label},
-      {"lrUpdateRate", std::to_string(lrUpdateRate)}};
+      {"lexThreshold", std::to_string(lexThreshold)},
+      {"lexMinWords", std::to_string(lexMinWords)},
+      {"lexTopK", std::to_string(lexTopK)}};
   for (const auto& field : fields) {
     out.metadata("args." + field.first, field.second);
   }
@@ -316,7 +297,6 @@ void Args::load(SafeTensorsReader& in) {
   dim = get("dim");
   epoch = get("epoch");
   minCount = get("minCount");
-  wordNgrams = get("wordNgrams");
   loss = lossFromString(in.metadata("args.loss"));
   bucket = get("bucket");
   minn = get("minn");
@@ -324,17 +304,22 @@ void Args::load(SafeTensorsReader& in) {
   minb = get("minb");
   maxb = get("maxb");
   maxBytes = get("maxBytes");
-  // Options of earlier versions that were removed.
-  for (const char* removed : {"maxc", "hashWords"}) {
-    if (in.hasMetadata(std::string("args.") + removed) && get(removed) != 0) {
+  // Options of earlier versions that were removed (wordNgrams 1 is off).
+  for (const char* removed : {"maxc", "hashWords", "wordNgrams"}) {
+    const int off = std::string(removed) == "wordNgrams" ? 1 : 0;
+    if (in.hasMetadata(std::string("args.") + removed) && get(removed) != off) {
       throw std::invalid_argument(
           std::string("This model uses -") + removed +
           ", which ByteFast no longer supports");
     }
   }
-  maxVocab = get("maxVocab");
   label = in.metadata("args.label");
-  lrUpdateRate = get("lrUpdateRate");
+  // Models saved before the lexicon check keep the defaults.
+  if (in.hasMetadata("args.lexThreshold")) {
+    lexThreshold = std::stod(in.metadata("args.lexThreshold"));
+    lexMinWords = get("lexMinWords");
+    lexTopK = get("lexTopK");
+  }
   validate();
 }
 

@@ -49,13 +49,8 @@ class Dictionary {
   void addTextNgrams(std::vector<int32_t>&, const std::vector<std::string>&)
       const;
   void applyWordlist();
-  void applyMaxVocab();
-  int32_t readLine(std::istream&, std::vector<std::string>&,
-      std::vector<int32_t>&) const;
   void addToken(const std::string&, std::vector<std::string>&,
       std::vector<int32_t>&) const;
-  void addFeatures(const std::vector<std::string>&, std::vector<int32_t>&)
-      const;
   void cropTokens(std::vector<std::string>&, std::minstd_rand&) const;
 
   std::shared_ptr<Args> args_;
@@ -66,11 +61,6 @@ class Dictionary {
   int32_t nwords_;
   int32_t nlabels_;
   int64_t ntokens_;
-
-  void addWordNgrams(
-      std::vector<int32_t>& line,
-      const std::vector<int32_t>& hashes,
-      int32_t n) const;
 
  public:
   static const std::string EOS;
@@ -97,12 +87,19 @@ class Dictionary {
   void save(SafeTensorsWriter&) const;
   void load(SafeTensorsReader&);
   std::vector<int64_t> getCounts(entry_type) const;
+  // One supervised line: its tokens (ending with EOS when the line ends with
+  // a newline) and the ids of its known labels.
+  int32_t readLine(std::istream&, std::vector<std::string>&,
+      std::vector<int32_t>&) const;
+  // Feature ids of the tokens of a line.
+  void addFeatures(const std::vector<std::string>&, std::vector<int32_t>&)
+      const;
   int32_t getLine(std::istream&, std::vector<int32_t>&, std::vector<int32_t>&)
       const;
   int32_t getLine(std::istream&, std::vector<int32_t>&, std::vector<int32_t>&,
       std::minstd_rand&) const;
 
-  void threshold(int64_t, int64_t);
+  void threshold(int64_t);
   void init();
 };
 

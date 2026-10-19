@@ -78,10 +78,11 @@ int32_t bytefast_predict(
     std::string line(text ? text : "", length);
     line.push_back('\n');
     std::istringstream in(line);
-    std::vector<int32_t> words, labels;
-    model->model.getDictionary()->getLine(in, words, labels);
+    std::vector<std::string> tokens;
+    std::vector<int32_t> labels;
+    model->model.getDictionary()->readLine(in, tokens, labels);
     bytefast::Predictions predictions;
-    model->model.predict(k, words, predictions, threshold);
+    model->model.predict(k, tokens, predictions, threshold);
     int32_t n = 0;
     for (const auto& p : predictions) {
       out[n].label = p.second;

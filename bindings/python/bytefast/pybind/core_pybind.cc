@@ -17,7 +17,6 @@
 #include <sstream>
 #include <stdexcept>
 
-using namespace pybind11::literals;
 namespace py = pybind11;
 
 py::str castToPythonString(const std::string& s, const char* onUnicodeError) {
@@ -51,12 +50,9 @@ PYBIND11_MODULE(_core_pybind, m) {
       .def_readwrite("input", &bytefast::Args::input)
       .def_readwrite("output", &bytefast::Args::output)
       .def_readwrite("lr", &bytefast::Args::lr)
-      .def_readwrite("lrUpdateRate", &bytefast::Args::lrUpdateRate)
       .def_readwrite("dim", &bytefast::Args::dim)
       .def_readwrite("epoch", &bytefast::Args::epoch)
       .def_readwrite("minCount", &bytefast::Args::minCount)
-      .def_readwrite("minCountLabel", &bytefast::Args::minCountLabel)
-      .def_readwrite("wordNgrams", &bytefast::Args::wordNgrams)
       .def_readwrite("loss", &bytefast::Args::loss)
       .def_readwrite("bucket", &bytefast::Args::bucket)
       .def_readwrite("minn", &bytefast::Args::minn)
@@ -65,14 +61,15 @@ PYBIND11_MODULE(_core_pybind, m) {
       .def_readwrite("maxb", &bytefast::Args::maxb)
       .def_readwrite("maxBytes", &bytefast::Args::maxBytes)
       .def_readwrite("wordlist", &bytefast::Args::wordlist)
-      .def_readwrite("maxVocab", &bytefast::Args::maxVocab)
+      .def_readwrite("lexicon", &bytefast::Args::lexicon)
+      .def_readwrite("lexThreshold", &bytefast::Args::lexThreshold)
+      .def_readwrite("lexMinWords", &bytefast::Args::lexMinWords)
+      .def_readwrite("lexTopK", &bytefast::Args::lexTopK)
       .def_readwrite("cropProb", &bytefast::Args::cropProb)
       .def_readwrite("cropMin", &bytefast::Args::cropMin)
       .def_readwrite("cropMax", &bytefast::Args::cropMax)
       .def_readwrite("normProb", &bytefast::Args::normProb)
       .def_readwrite("stripProb", &bytefast::Args::stripProb)
-      .def_readwrite("saveEpochs", &bytefast::Args::saveEpochs)
-      .def_readwrite("validation", &bytefast::Args::validation)
       .def_readwrite("thread", &bytefast::Args::thread)
       .def_readwrite("label", &bytefast::Args::label)
       .def_readwrite("verbose", &bytefast::Args::verbose)
@@ -106,11 +103,16 @@ PYBIND11_MODULE(_core_pybind, m) {
             if (!ifs.is_open()) {
               throw std::invalid_argument("Test file cannot be opened!");
             }
-            bytefast::Meter meter(false);
+            bytefast::Meter meter;
             m.test(ifs, k, threshold, meter);
             ifs.close();
             return std::tuple<int64_t, double, double>(
                 meter.nexamples(), meter.precision(), meter.recall());
+          })
+      .def(
+          "setLexiconThreshold",
+          [](bytefast::ByteFast& m, bytefast::real threshold) {
+            m.setLexiconThreshold(threshold);
           })
       .def(
           "getVocab",
@@ -187,28 +189,5 @@ PYBIND11_MODULE(_core_pybind, m) {
             }
 
             return make_pair(allLabels, allProbabilities);
-          })
-      .def(
-          "testLabel",
-          [](bytefast::ByteFast& m,
-             const std::string filename,
-             int32_t k,
-             bytefast::real threshold) {
-            std::ifstream ifs(filename);
-            if (!ifs.is_open()) {
-              throw std::invalid_argument("Test file cannot be opened!");
-            }
-            bytefast::Meter meter(false);
-            m.test(ifs, k, threshold, meter);
-            std::shared_ptr<const bytefast::Dictionary> d = m.getDictionary();
-            std::unordered_map<std::string, py::dict> returnedValue;
-            for (int32_t i = 0; i < d->nlabels(); i++) {
-              returnedValue[d->getLabel(i)] = py::dict(
-                  "precision"_a = meter.precision(i),
-                  "recall"_a = meter.recall(i),
-                  "f1score"_a = meter.f1Score(i));
-            }
-
-            return returnedValue;
           });
 }
