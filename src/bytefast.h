@@ -19,6 +19,7 @@
 #include <tuple>
 
 #include "args.h"
+#include "safetensors.h"
 #include "densematrix.h"
 #include "dictionary.h"
 #include "lexicon.h"
@@ -40,6 +41,18 @@ class ByteFast {
   std::shared_ptr<Args> args_;
   std::shared_ptr<Dictionary> dict_;
   Lexicon lexicon_;
+  // Training weight of every label (-labelWeights).
+  std::vector<real> labelWeights_;
+  // Models for groups of close labels: when the top label is one of an
+  // expert's labels and its probability is below the expert's gate, the
+  // expert picks the label.
+  struct Expert {
+    std::shared_ptr<ByteFast> model;
+    real gate;
+    std::vector<int32_t> toMain; // expert label id -> label id here, or -1
+  };
+  std::vector<Expert> experts_;
+  std::vector<int32_t> expertOf_; // label id -> index in experts_, or -1
   std::shared_ptr<Matrix> input_;
   std::shared_ptr<Matrix> output_;
   std::shared_ptr<Model> model_;
@@ -64,6 +77,10 @@ class ByteFast {
       const std::vector<int32_t>& labels);
   bool keepTraining(const int64_t ntokens) const;
   void buildModel();
+  void readLabelWeights();
+  void save(SafeTensorsWriter& out) const;
+  void load(SafeTensorsReader& in);
+  void attachExpert(std::shared_ptr<ByteFast> expert, real gate);
   std::tuple<int64_t, double, double> progressInfo(real progress);
 
  public:
@@ -106,6 +123,13 @@ class ByteFast {
 
   // Share of words for the lexicon check; 0 turns it off.
   void setLexiconThreshold(real threshold);
+
+  // Stores `expert` in this model (saved with it): lines whose top label is
+  // one of the expert's labels, with a probability below `gate`, get the
+  // expert's label. An expert's labels must be labels of this model and not
+  // belong to another expert.
+  void addExpert(const std::string& expertModel, real gate);
+  int32_t numExperts() const;
 
   class AbortError : public std::runtime_error {
    public:

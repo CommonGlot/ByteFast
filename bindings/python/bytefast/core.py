@@ -12,41 +12,21 @@ LOSSES = {
     "softmax": _core.loss_name.softmax,
 }
 
-# Training arguments and their defaults. The snake_case aliases below are
-# accepted as keyword arguments too.
-DEFAULTS = {
-    "input": "",
-    "lr": 0.1,
-    "dim": 100,
-    "epoch": 5,
-    "minCount": 1,
-    "minn": 0,
-    "maxn": 0,
-    "loss": "softmax",
-    "bucket": 2000000,
-    "thread": max(1, multiprocessing.cpu_count() - 1),
-    "label": "__label__",
-    "verbose": 2,
-    "seed": 0,
-    "minb": 0,
-    "maxb": 0,
-    "maxBytes": 0,
-    "wordlist": "",
-    "lexicon": "",
-    "lexThreshold": 0.5,
-    "lexMinWords": 2,
-    "lexTopK": 5,
-    "cropProb": 0.0,
-    "cropMin": 1,
-    "cropMax": 0,
-    "normProb": 0.0,
-    "stripProb": 0.0,
+# Training arguments (the defaults are those of `bytefast supervised`). The
+# snake_case aliases below are accepted as keyword arguments too.
+NAMES = {
+    "input", "lr", "dim", "epoch", "minCount", "minn", "maxn", "loss",
+    "bucket", "thread", "label", "verbose", "seed", "minb", "maxb",
+    "maxBytes", "wordlist", "maxVocab", "lexicon", "lexThreshold", "lexMinWords",
+    "lexTopK", "cropProb", "cropMin", "cropMax", "normProb", "stripProb",
+    "labelWeights",
 }
 
 ALIASES = {
     "min_count": "minCount",
     "label_prefix": "label",
     "max_bytes": "maxBytes",
+    "max_vocab": "maxVocab",
     "crop_prob": "cropProb",
     "crop_min": "cropMin",
     "crop_max": "cropMax",
@@ -55,6 +35,7 @@ ALIASES = {
     "lex_threshold": "lexThreshold",
     "lex_min_words": "lexMinWords",
     "lex_top_k": "lexTopK",
+    "label_weights": "labelWeights",
 }
 
 
@@ -93,6 +74,15 @@ class _Model:
         """Share of a line's words for the lexicon check; 0 turns it off."""
         self.f.setLexiconThreshold(threshold)
 
+    def add_expert(self, expert_path, gate=0.8):
+        """Store the model at expert_path in this model, for its labels.
+
+        When the top label of a line is one of the expert's labels and its
+        probability is below gate, the expert picks the label. Saved with
+        the model.
+        """
+        self.f.addExpert(str(expert_path), gate)
+
     def save_model(self, path):
         self.f.saveModel(path)
 
@@ -127,14 +117,17 @@ def load_model(path):
     return _Model(f)
 
 
-def train_supervised(**kwargs):
+def train_supervised(preset=None, **kwargs):
     """Train a classifier and return the model object.
+
+    preset="lid" or "lid-accurate" starts from the language-ID settings
+    (docs/architecture.md); other arguments override them.
 
     input is a UTF-8 file with one example per line and at least one label
     (``__label__NAME`` by default) per line. Each example is represented by
     the average of its feature vectors, and the features combine freely:
 
-    - words (minCount, wordlist)
+    - words (minCount, wordlist, maxVocab)
     - minn/maxn: character n-grams inside each word
     - minb/maxb: byte n-grams over the whole text; maxBytes limits how much
       of the text they read
@@ -146,18 +139,22 @@ def train_supervised(**kwargs):
     lexicon is a file of LABEL<TAB>WORD lines kept in the model: at
     prediction, a label is kept only if its words cover lex_threshold of the
     line (lines of at least lex_min_words words), else the next of the top
-    lex_top_k labels that does.
+    lex_top_k labels that does. label_weights is a file of LABEL<TAB>WEIGHT
+    lines: each line of a label is trained WEIGHT times in expectation.
     """
-    args = dict(DEFAULTS)
+    args = {"thread": max(1, multiprocessing.cpu_count() - 1)}
     for name, value in kwargs.items():
         name = ALIASES.get(name, name)
-        if name not in DEFAULTS:
+        if name not in NAMES:
             raise TypeError("unexpected keyword argument '%s'" % name)
         args[name] = value
-    if args["loss"] not in LOSSES:
-        raise ValueError("Unrecognized loss name: %s" % args["loss"])
-    args["loss"] = LOSSES[args["loss"]]
+    if "loss" in args:
+        if args["loss"] not in LOSSES:
+            raise ValueError("Unrecognized loss name: %s" % args["loss"])
+        args["loss"] = LOSSES[args["loss"]]
     a = _core.args()
+    if preset is not None:
+        a.applyPreset(preset)
     for name, value in args.items():
         setattr(a, name, value)
     # Without hashed features the bucket table is unused; keep it empty.

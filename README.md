@@ -84,7 +84,7 @@ layer maps that average to the labels.
 
 | Feature | Options | Default (supervised) |
 | --- | --- | --- |
-| Word vectors | `-minCount N`, `-wordlist FILE` | on, `minCount 1` |
+| Word vectors | `-minCount N`, `-wordlist FILE`, `-maxVocab N` | on, `minCount 1` |
 | Character n-grams inside words | `-minn N -maxn N` | off (`maxn 0`) |
 | Byte n-grams over the text | `-minb N -maxb N` | off (`maxb 0`) |
 | Bytes of text read by byte n-grams | `-maxBytes N` | 0 (all) |
@@ -121,6 +121,16 @@ data:
   `tools/gen_strip_table.py`. On UDHR it raised macro F1 from 0.815 to 0.824
   (2M GlotLID lines, `-stripProb 0.3`).
 
+- `-labelWeights FILE`: `LABEL<TAB>WEIGHT` lines; each line of a label is
+  trained `WEIGHT` times in expectation (`floor(WEIGHT)` times, plus once
+  more with the remaining fraction as probability), which resamples labels
+  without rewriting the data. Labels not in the file keep weight 1.
+- `-preset lid` / `-preset lid-accurate`: the language-ID settings of
+  [docs/architecture.md](docs/architecture.md) (bytes 2-5, the 20k most
+  frequent words, crops, normalized and stripped lines, 3 epochs at lr 0.8;
+  `lid-accurate` adds subwords). Options given with a preset override it.
+  [recipes/lid](recipes/lid) builds the whole model from a corpus.
+
 ### Lexicon check
 
 `-lexicon FILE` stores per-label word lists in the model, for the
@@ -139,9 +149,22 @@ thread count (0 turns the check off), and Python has
 built from its training data, it raised CommonLID macro F1 from 0.601 to
 0.607 and its 5-word view from 0.535 to 0.547.
 
+### Experts
+
+`bytefast add-expert MODEL EXPERT OUTPUT [GATE]` stores `EXPERT`, a model
+trained on the lines of a group of close labels, inside `MODEL`. When the top
+label of a line is one of the expert's labels and its probability is below
+`GATE` (0.8), the expert picks the label, which keeps the main model's
+probability for it. Several experts can be added (their labels must not
+overlap); they are saved as `expertN.*` tensors in the same file, and the C
+API, Python, Rust and JS use them. In Python: `model.add_expert(path,
+gate=0.8)`. On FLORES the five language-ID experts raised macro F1 from 0.930
+to 0.939.
+
 `./bytefast supervised -h` lists every option. In Python the same names are
 keyword arguments of `bytefast.train_supervised`, with snake_case aliases
-such as `max_bytes` and `lex_threshold`.
+such as `max_bytes`, `max_vocab`, `label_weights` and `lex_threshold`, and
+`preset=` selects a preset.
 
 ## Model files
 

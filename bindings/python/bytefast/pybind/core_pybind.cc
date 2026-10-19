@@ -61,6 +61,7 @@ PYBIND11_MODULE(_core_pybind, m) {
       .def_readwrite("maxb", &bytefast::Args::maxb)
       .def_readwrite("maxBytes", &bytefast::Args::maxBytes)
       .def_readwrite("wordlist", &bytefast::Args::wordlist)
+      .def_readwrite("maxVocab", &bytefast::Args::maxVocab)
       .def_readwrite("lexicon", &bytefast::Args::lexicon)
       .def_readwrite("lexThreshold", &bytefast::Args::lexThreshold)
       .def_readwrite("lexMinWords", &bytefast::Args::lexMinWords)
@@ -73,7 +74,9 @@ PYBIND11_MODULE(_core_pybind, m) {
       .def_readwrite("thread", &bytefast::Args::thread)
       .def_readwrite("label", &bytefast::Args::label)
       .def_readwrite("verbose", &bytefast::Args::verbose)
-      .def_readwrite("seed", &bytefast::Args::seed);
+      .def_readwrite("seed", &bytefast::Args::seed)
+      .def_readwrite("labelWeights", &bytefast::Args::labelWeights)
+      .def("applyPreset", &bytefast::Args::applyPreset);
 
   py::enum_<bytefast::loss_name>(m, "loss_name", py::module_local())
       .value("softmax", bytefast::loss_name::softmax)
@@ -108,6 +111,11 @@ PYBIND11_MODULE(_core_pybind, m) {
             ifs.close();
             return std::tuple<int64_t, double, double>(
                 meter.nexamples(), meter.precision(), meter.recall());
+          })
+      .def(
+          "addExpert",
+          [](bytefast::ByteFast& m, const std::string& path, bytefast::real gate) {
+            m.addExpert(path, gate);
           })
       .def(
           "setLexiconThreshold",

@@ -61,7 +61,7 @@ def main():
                 got = getattr(args, attr)
                 assert got == value, (name, attr, got, value)
 
-        # Vocabulary control: a wordlist.
+        # Vocabulary control: a wordlist and the most frequent words.
         wordlist = root / "words.txt"
         # Text after the word is ignored; entries match words exactly, so
         # "investors" does not match "Investors" and "Telescope" is not in
@@ -70,6 +70,8 @@ def main():
         listed = train(data, wordlist=str(wordlist), minb=2, maxb=4, bucket=20000)
         assert sorted(listed.get_words()) == [
             "</s>", "bank", "telescope"], listed.get_words()
+        capped = train(data, max_vocab=5, minn=2, maxn=4)
+        assert len(capped.get_words()) == 5
 
         # The lexicon check: sports and science have lexicons without the
         # query's words and finance one with all of them, so finance comes
@@ -87,6 +89,42 @@ def main():
         assert loaded.predict(query)[0] == ("__label__finance",)
         loaded.set_lexicon_threshold(0.0)
         assert loaded.predict(query)[0] == ("__label__sports",)
+
+        # Presets: the language-ID settings, overridable.
+        lid = train(data, preset="lid", minCount=1, bucket=50000, epoch=15, lr=0.5)
+        args = lid.f.getArgs()
+        assert (args.minb, args.maxb, args.maxBytes, args.minn, args.maxVocab) == (2, 5, 512, 0, 20000)
+        assert args.bucket == 50000
+        accurate = train(data, preset="lid-accurate", minCount=1, bucket=50000)
+        assert (accurate.f.getArgs().minn, accurate.f.getArgs().maxn) == (2, 5)
+        assert lid.predict(query)[0] == ("__label__sports",)
+
+        # Label weights: a label of weight 0 is never trained.
+        weights = root / "weights.tsv"
+        weights.write_text("sports\t0\n__label__science\t2.5\n", encoding="utf-8")
+        weighted = train(data, minb=2, maxb=5, bucket=50000, label_weights=str(weights))
+        assert weighted.predict(query)[0] != ("__label__sports",)
+
+        # An expert for finance and science, stored in the model file.
+        expert_data = root / "expert.txt"
+        expert_data.write_text("".join(
+            l for l in data.read_text(encoding="utf-8").splitlines(True)
+            if not l.startswith("__label__sports")), encoding="utf-8")
+        expert = train(expert_data, minb=2, maxb=5, bucket=50000)
+        expert.save_model(str(root / "expert.safetensors"))
+        main = train(data, minb=2, maxb=5, bucket=50000)
+        main.add_expert(root / "expert.safetensors", gate=1.0)
+        main.save_model(str(root / "experts.safetensors"))
+        with_expert = bytefast.load_model(str(root / "experts.safetensors"))
+        line = "Researchers sequenced the genome of a rare plant."
+        assert with_expert.predict(line)[0] == expert.predict(line)[0]
+        assert with_expert.predict(query)[0] == ("__label__sports",)
+        try:
+            main.add_expert(root / "expert.safetensors")
+        except ValueError:
+            pass  # its labels already belong to an expert
+        else:
+            raise AssertionError("accepted a second expert for the same labels")
 
         # Training on random character spans, normalized and stripped lines.
         cropped = train(data, minb=2, maxb=5, bucket=50000, minCount=10 ** 9,

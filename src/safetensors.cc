@@ -194,7 +194,7 @@ size_t dtypeSize(const std::string& dtype) {
 void SafeTensorsWriter::metadata(
     const std::string& key,
     const std::string& value) {
-  metadata_[key] = value;
+  metadata_[prefix_ + key] = value;
 }
 
 void SafeTensorsWriter::tensor(
@@ -210,7 +210,7 @@ void SafeTensorsWriter::tensor(
   if (size_t(count) * dtypeSize(dtype) != bytes) {
     throw std::invalid_argument("Tensor " + name + " has the wrong size");
   }
-  tensors_.push_back({name, dtype, shape, data, bytes});
+  tensors_.push_back({prefix_ + name, dtype, shape, data, bytes});
 }
 
 void SafeTensorsWriter::tensor(
@@ -332,17 +332,17 @@ SafeTensorsReader::SafeTensorsReader(const std::string& path)
 }
 
 bool SafeTensorsReader::has(const std::string& name) const {
-  return tensors_.count(name) != 0;
+  return tensors_.count(prefix_ + name) != 0;
 }
 
 bool SafeTensorsReader::hasMetadata(const std::string& key) const {
-  return metadata_.count(key) != 0;
+  return metadata_.count(prefix_ + key) != 0;
 }
 
 const std::string& SafeTensorsReader::metadata(const std::string& key) const {
-  auto it = metadata_.find(key);
+  auto it = metadata_.find(prefix_ + key);
   if (it == metadata_.end()) {
-    throw std::invalid_argument(path_ + ": missing metadata " + key);
+    throw std::invalid_argument(path_ + ": missing metadata " + prefix_ + key);
   }
   return it->second;
 }
@@ -353,9 +353,9 @@ int64_t SafeTensorsReader::metadataInt(const std::string& key) const {
 
 const SafeTensorsReader::Entry& SafeTensorsReader::entry(
     const std::string& name) const {
-  auto it = tensors_.find(name);
+  auto it = tensors_.find(prefix_ + name);
   if (it == tensors_.end()) {
-    throw std::invalid_argument(path_ + ": missing tensor " + name);
+    throw std::invalid_argument(path_ + ": missing tensor " + prefix_ + name);
   }
   return it->second;
 }

@@ -11,6 +11,7 @@
 #include "safetensors.h"
 
 #include <algorithm>
+#include <fstream>
 #include <cmath>
 #include <iomanip>
 #include <iostream>
@@ -65,12 +66,27 @@ void ByteFast::saveModel(const std::string& filename) {
   SafeTensorsWriter out;
   out.metadata("format", kFormat);
   out.metadata("format_version", kFormatVersion);
+  save(out);
+  out.write(filename);
+}
+
+// Experts are stored after the model under the names expertN.*.
+void ByteFast::save(SafeTensorsWriter& out) const {
   args_->save(out);
   dict_->save(out);
   lexicon_.save(out);
   input_->save(out, "input");
   output_->save(out, "output");
-  out.write(filename);
+  if (!experts_.empty()) {
+    out.metadata("experts", std::to_string(experts_.size()));
+  }
+  for (size_t i = 0; i < experts_.size(); i++) {
+    const std::string prefix = "expert" + std::to_string(i) + ".";
+    out.metadata(prefix + "gate", std::to_string(experts_[i].gate));
+    out.setPrefix(prefix);
+    experts_[i].model->save(out);
+    out.setPrefix("");
+  }
 }
 
 void ByteFast::loadModel(const std::string& filename) {
@@ -82,6 +98,10 @@ void ByteFast::loadModel(const std::string& filename) {
       in.metadata("format_version") != kFormatVersion) {
     throw std::invalid_argument(filename + " is not a ByteFast model");
   }
+  load(in);
+}
+
+void ByteFast::load(SafeTensorsReader& in) {
   args_ = std::make_shared<Args>();
   args_->load(in);
   dict_ = std::make_shared<Dictionary>(args_, in);
@@ -91,6 +111,60 @@ void ByteFast::loadModel(const std::string& filename) {
   input_->load(in, "input");
   output_->load(in, "output");
   buildModel();
+  experts_.clear();
+  expertOf_.assign(dict_->nlabels(), -1);
+  const int64_t n = in.hasMetadata("experts") ? in.metadataInt("experts") : 0;
+  for (int64_t i = 0; i < n; i++) {
+    const std::string prefix = "expert" + std::to_string(i) + ".";
+    const real gate = std::stof(in.metadata(prefix + "gate"));
+    auto expert = std::make_shared<ByteFast>();
+    in.setPrefix(prefix);
+    expert->load(in);
+    in.setPrefix("");
+    attachExpert(expert, gate);
+  }
+}
+
+void ByteFast::addExpert(const std::string& expertModel, real gate) {
+  if (!(gate > 0 && gate <= 1)) {
+    throw std::invalid_argument("The expert gate must be in (0, 1]");
+  }
+  auto expert = std::make_shared<ByteFast>();
+  expert->loadModel(expertModel);
+  if (expert->numExperts() > 0) {
+    throw std::invalid_argument(expertModel + " has experts of its own");
+  }
+  if (expertOf_.size() != size_t(dict_->nlabels())) {
+    expertOf_.assign(dict_->nlabels(), -1);
+  }
+  attachExpert(expert, gate);
+}
+
+void ByteFast::attachExpert(std::shared_ptr<ByteFast> expert, real gate) {
+  Expert e{expert, gate, {}};
+  const int32_t index = experts_.size();
+  int32_t known = 0;
+  for (int32_t i = 0; i < expert->dict_->nlabels(); i++) {
+    const int32_t id = getLabelId(expert->dict_->getLabel(i));
+    e.toMain.push_back(id);
+    if (id < 0) {
+      continue;
+    }
+    if (expertOf_[id] >= 0) {
+      throw std::invalid_argument(
+          expert->dict_->getLabel(i) + " already belongs to an expert");
+    }
+    expertOf_[id] = index;
+    known++;
+  }
+  if (known == 0) {
+    throw std::invalid_argument("The expert has none of this model's labels");
+  }
+  experts_.push_back(e);
+}
+
+int32_t ByteFast::numExperts() const {
+  return experts_.size();
 }
 
 std::vector<int64_t> ByteFast::getTargetCounts() const {
@@ -141,10 +215,60 @@ void ByteFast::supervised(
   if (labels.size() == 0 || line.size() == 0) {
     return;
   }
-  // A line with several labels trains on one of them, chosen at random.
+  // A line with several labels trains on one of them, chosen at random. A
+  // label of weight w trains floor(w) times, plus once more with
+  // probability w - floor(w).
   std::uniform_int_distribution<> uniform(0, labels.size() - 1);
   int32_t i = uniform(state.rng);
-  model_->update(line, labels, i, lr, state);
+  int32_t repeats = 1;
+  if (!labelWeights_.empty()) {
+    const real w = labelWeights_[labels[i]];
+    repeats = int32_t(w);
+    if (std::uniform_real_distribution<real>(0, 1)(state.rng) < w - repeats) {
+      repeats++;
+    }
+  }
+  for (int32_t r = 0; r < repeats; r++) {
+    model_->update(line, labels, i, lr, state);
+  }
+}
+
+// -labelWeights: LABEL<TAB>WEIGHT lines; the label prefix is optional and
+// labels that are not in the training data are skipped.
+void ByteFast::readLabelWeights() {
+  labelWeights_.clear();
+  if (args_->labelWeights.empty()) {
+    return;
+  }
+  std::ifstream ifs(args_->labelWeights);
+  if (!ifs.is_open()) {
+    throw std::invalid_argument(args_->labelWeights + " cannot be opened!");
+  }
+  labelWeights_.assign(dict_->nlabels(), 1.0);
+  std::string line;
+  int32_t n = 0;
+  while (std::getline(ifs, line)) {
+    const size_t tab = line.find('\t');
+    if (tab == std::string::npos) {
+      continue;
+    }
+    std::string label = line.substr(0, tab);
+    int32_t id = getLabelId(label);
+    if (id < 0) {
+      id = getLabelId(args_->label + label);
+    }
+    const real w = std::stof(line.substr(tab + 1));
+    if (!(w >= 0)) {
+      throw std::invalid_argument("Label weights must be >= 0: " + line);
+    }
+    if (id >= 0) {
+      labelWeights_[id] = w;
+      n++;
+    }
+  }
+  if (args_->verbose > 0) {
+    std::cerr << "Label weights: " << n << " labels" << std::endl;
+  }
 }
 
 std::tuple<int64_t, double, double>
@@ -187,21 +311,43 @@ void ByteFast::predict(
     return;
   }
   Model::State state(args_->dim, dict_->nlabels(), 0);
-  if (lexicon_.empty() || args_->lexThreshold <= 0) {
+  const bool check = !lexicon_.empty() && args_->lexThreshold > 0;
+  if (!check && experts_.empty()) {
     model_->predict(features, k, threshold, predictions, state);
     return;
   }
-  // The first of the top -lexTopK labels that passes the check goes first;
-  // if none passes, the order is kept.
-  model_->predict(features, std::max(k, args_->lexTopK), 0.0, predictions, state);
-  const std::vector<uint64_t> words = Lexicon::words(tokens);
-  const size_t tried = std::min<size_t>(args_->lexTopK, predictions.size());
-  for (size_t i = 0; i < tried; i++) {
-    if (lexicon_.passes(predictions[i].second, words, args_->lexThreshold,
-            args_->lexMinWords)) {
-      std::rotate(predictions.begin(), predictions.begin() + i,
-          predictions.begin() + i + 1);
-      break;
+  model_->predict(features, check ? std::max(k, args_->lexTopK) : k, 0.0,
+      predictions, state);
+  // The first of the top -lexTopK labels that passes the lexicon check goes
+  // first; if none passes, the order is kept.
+  if (check) {
+    const std::vector<uint64_t> words = Lexicon::words(tokens);
+    const size_t tried = std::min<size_t>(args_->lexTopK, predictions.size());
+    for (size_t i = 0; i < tried; i++) {
+      if (lexicon_.passes(predictions[i].second, words, args_->lexThreshold,
+              args_->lexMinWords)) {
+        std::rotate(predictions.begin(), predictions.begin() + i,
+            predictions.begin() + i + 1);
+        break;
+      }
+    }
+  }
+  // An expert replaces an unsure top label of its group with its own pick,
+  // which gets this model's probability for that label.
+  const int32_t top = predictions.empty() ? -1 : predictions[0].second;
+  if (top >= 0 && expertOf_[top] >= 0 &&
+      state.output[top] < experts_[expertOf_[top]].gate) {
+    const Expert& e = experts_[expertOf_[top]];
+    Predictions picked;
+    e.model->predict(1, tokens, picked, 0.0);
+    const int32_t label = picked.empty() ? -1 : e.toMain[picked[0].second];
+    if (label >= 0 && label != top) {
+      predictions.erase(
+          std::remove_if(predictions.begin(), predictions.end(),
+              [&](const std::pair<real, int32_t>& p) { return p.second == label; }),
+          predictions.end());
+      predictions.insert(predictions.begin(),
+          std::make_pair(model_->std_log(state.output[label]), label));
     }
   }
   if (predictions.size() > size_t(k)) {
@@ -321,6 +467,9 @@ void ByteFast::train(const Args& args, const TrainCallback& callback) {
   if (!args_->lexicon.empty()) {
     lexicon_.build(args_->lexicon, *dict_, args_->label, args_->verbose);
   }
+  readLabelWeights();
+  experts_.clear();
+  expertOf_.assign(dict_->nlabels(), -1);
 
   input_ = createRandomMatrix();
   output_ = createTrainOutputMatrix();

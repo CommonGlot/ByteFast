@@ -31,6 +31,7 @@ Args::Args() {
   maxb = 0;
   maxBytes = 0;
   wordlist = "";
+  maxVocab = 0;
   lexicon = "";
   lexThreshold = 0.5;
   lexMinWords = 2;
@@ -40,6 +41,7 @@ Args::Args() {
   cropMax = 0;
   normProb = 0.0;
   stripProb = 0.0;
+  labelWeights = "";
   thread = 12;
   label = "__label__";
   verbose = 2;
@@ -62,7 +64,46 @@ loss_name Args::lossFromString(const std::string& name) {
   throw std::invalid_argument("Unknown loss: " + name);
 }
 
+// The language-ID settings of docs/architecture.md. lid: byte n-grams 2-5 and
+// the 20,000 most frequent words, trained on character spans, normalized and
+// stripped lines. lid-accurate adds subwords 2-5 and a larger table.
+void Args::applyPreset(const std::string& name) {
+  if (name != "lid" && name != "lid-accurate") {
+    throw std::invalid_argument("Unknown preset: " + name + " (lid, lid-accurate)");
+  }
+  dim = 64;
+  epoch = 3;
+  lr = 0.8;
+  minCount = 1;
+  maxVocab = 20000;
+  minb = 2;
+  maxb = 5;
+  bucket = 262144;
+  maxBytes = 512;
+  cropProb = 0.3;
+  cropMin = 5;
+  cropMax = 20;
+  normProb = 0.3;
+  stripProb = 0.1;
+  if (name == "lid-accurate") {
+    minn = 2;
+    maxn = 5;
+    bucket = 1048576;
+  }
+}
+
 void Args::parseArgs(const std::vector<std::string>& args) {
+  // A preset applies first, wherever it is given.
+  for (int ai = 2; ai + 1 < args.size(); ai += 2) {
+    if (args[ai] == "-preset") {
+      try {
+        applyPreset(args[ai + 1]);
+      } catch (const std::invalid_argument& e) {
+        std::cerr << e.what() << std::endl;
+        exit(EXIT_FAILURE);
+      }
+    }
+  }
   for (int ai = 2; ai < args.size(); ai += 2) {
     if (args[ai][0] != '-') {
       std::cerr << "Provided argument without a dash! Usage:" << std::endl;
@@ -74,6 +115,8 @@ void Args::parseArgs(const std::vector<std::string>& args) {
         std::cerr << "Here is the help! Usage:" << std::endl;
         printHelp();
         exit(EXIT_FAILURE);
+      } else if (args[ai] == "-preset") {
+        args.at(ai + 1);
       } else if (args[ai] == "-input") {
         input = std::string(args.at(ai + 1));
       } else if (args[ai] == "-output") {
@@ -102,6 +145,8 @@ void Args::parseArgs(const std::vector<std::string>& args) {
         maxBytes = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-wordlist") {
         wordlist = std::string(args.at(ai + 1));
+      } else if (args[ai] == "-maxVocab") {
+        maxVocab = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-lexicon") {
         lexicon = std::string(args.at(ai + 1));
       } else if (args[ai] == "-lexThreshold") {
@@ -120,6 +165,8 @@ void Args::parseArgs(const std::vector<std::string>& args) {
         normProb = std::stod(args.at(ai + 1));
       } else if (args[ai] == "-stripProb") {
         stripProb = std::stod(args.at(ai + 1));
+      } else if (args[ai] == "-labelWeights") {
+        labelWeights = std::string(args.at(ai + 1));
       } else if (args[ai] == "-thread") {
         thread = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-label") {
@@ -176,6 +223,9 @@ void Args::validate() const {
   if (maxBytes < 0) {
     throw std::invalid_argument("-maxBytes must be >= 0 (0 = no limit)");
   }
+  if (maxVocab < 0) {
+    throw std::invalid_argument("-maxVocab must be >= 0 (0 = no limit)");
+  }
   if (!(lexThreshold >= 0.0 && lexThreshold <= 1.0)) {
     throw std::invalid_argument("-lexThreshold must be in [0, 1]");
   }
@@ -210,6 +260,8 @@ void Args::printBasicHelp() {
             << "  -input              training file path\n"
             << "  -output             output file path\n"
             << "\nThe following arguments are optional:\n"
+            << "  -preset             lid or lid-accurate: the language-ID settings\n"
+            << "                      (other options override them)\n"
             << "  -verbose            verbosity level [" << verbose << "]\n";
 }
 
@@ -230,6 +282,8 @@ void Args::printDictionaryHelp() {
             << maxBytes << "]\n"
             << "  -wordlist           file with the allowed vocabulary, one word per line ["
             << wordlist << "]\n"
+            << "  -maxVocab           keep at most this many words, 0 = no limit ["
+            << maxVocab << "]\n"
             << "  -lexicon            file of LABEL<TAB>WORD lines: a prediction keeps a\n"
             << "                      label only if its words cover -lexThreshold of the\n"
             << "                      line, else the next of the top -lexTopK that does ["
@@ -251,6 +305,9 @@ void Args::printDictionaryHelp() {
             << "                      diacritics (tones, accents, Arabic/Hebrew "
                "vowel marks) ["
             << stripProb << "]\n"
+            << "  -labelWeights       file of LABEL<TAB>WEIGHT lines: each line of a label is\n"
+            << "                      trained WEIGHT times in expectation (1 by default) ["
+            << labelWeights << "]\n"
             << "  -label              labels prefix [" << label << "]\n";
 }
 
@@ -281,6 +338,7 @@ void Args::save(SafeTensorsWriter& out) const {
       {"minb", std::to_string(minb)},
       {"maxb", std::to_string(maxb)},
       {"maxBytes", std::to_string(maxBytes)},
+      {"maxVocab", std::to_string(maxVocab)},
       {"label", label},
       {"lexThreshold", std::to_string(lexThreshold)},
       {"lexMinWords", std::to_string(lexMinWords)},
@@ -312,6 +370,9 @@ void Args::load(SafeTensorsReader& in) {
           std::string("This model uses -") + removed +
           ", which ByteFast no longer supports");
     }
+  }
+  if (in.hasMetadata("args.maxVocab")) {
+    maxVocab = get("maxVocab");
   }
   label = in.metadata("args.label");
   // Models saved before the lexicon check keep the defaults.

@@ -39,6 +39,7 @@ class Args {
   int maxb;
   int maxBytes;
   std::string wordlist;
+  int maxVocab;
   // Percent-threshold lexicon check at prediction (stored in models; the
   // words come from -lexicon at training).
   std::string lexicon;
@@ -51,12 +52,16 @@ class Args {
   int cropMax;
   double normProb;
   double stripProb;
+  // LABEL<TAB>WEIGHT lines: a line is trained WEIGHT times in expectation.
+  std::string labelWeights;
   int thread;
   std::string label;
   int verbose;
   int seed;
 
   void parseArgs(const std::vector<std::string>& args);
+  // Sets the options of a named recipe; options given after it override.
+  void applyPreset(const std::string& name);
   void printHelp();
   void printBasicHelp();
   void printDictionaryHelp();

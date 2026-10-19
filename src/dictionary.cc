@@ -222,6 +222,7 @@ void Dictionary::readFromFile(std::istream& in) {
   }
   applyWordlist();
   threshold(args_->minCount);
+  applyMaxVocab();
   initNgrams();
   if (args_->verbose > 0) {
     std::cerr << "\rRead " << ntokens_ / 1000000 << "M words" << std::endl;
@@ -264,6 +265,20 @@ void Dictionary::applyWordlist() {
   if (args_->verbose > 0) {
     std::cerr << "Wordlist entries: " << allowed.size() << std::endl;
   }
+}
+
+// Keep the -maxVocab most frequent words; ties are broken by the word itself
+// so that the selected vocabulary does not depend on sort order.
+void Dictionary::applyMaxVocab() {
+  if (args_->maxVocab <= 0 || nwords_ <= args_->maxVocab) {
+    return;
+  }
+  auto wordsEnd = words_.begin() + nwords_;
+  std::sort(words_.begin(), wordsEnd, [](const entry& a, const entry& b) {
+    return a.count != b.count ? a.count > b.count : a.word < b.word;
+  });
+  words_.erase(words_.begin() + args_->maxVocab, wordsEnd);
+  threshold(1);
 }
 
 // Drops words seen fewer than t times; labels are always kept.

@@ -49,6 +49,7 @@ class Dictionary {
   void addTextNgrams(std::vector<int32_t>&, const std::vector<std::string>&)
       const;
   void applyWordlist();
+  void applyMaxVocab();
   void addToken(const std::string&, std::vector<std::string>&,
       std::vector<int32_t>&) const;
   void cropTokens(std::vector<std::string>&, std::minstd_rand&) const;

@@ -25,7 +25,33 @@ void printUsage() {
       << "  predict                 predict most likely labels\n"
       << "  predict-prob            predict most likely labels with "
          "probabilities\n"
+      << "  add-expert              store an expert model for a group of labels "
+         "in a model\n"
       << std::endl;
+}
+
+void printAddExpertUsage() {
+  std::cerr
+      << "usage: bytefast add-expert <model> <expert> <output> [<gate>]\n\n"
+      << "  <model>      model filename\n"
+      << "  <expert>     model trained on the lines of a group of the model's labels\n"
+      << "  <output>     model filename to write (model and its experts)\n"
+      << "  <gate>       (optional; 0.8 by default) the expert picks the label when\n"
+      << "               the top label is in its group with a probability below this\n"
+      << std::endl;
+}
+
+void addExpert(const std::vector<std::string>& args) {
+  if (args.size() < 5 || args.size() > 6) {
+    printAddExpertUsage();
+    exit(EXIT_FAILURE);
+  }
+  ByteFast model;
+  model.loadModel(args[2]);
+  model.addExpert(args[3], args.size() == 6 ? std::stof(args[5]) : 0.8);
+  model.saveModel(args[4]);
+  std::cerr << args[4] << ": " << model.numExperts() << " experts" << std::endl;
+  exit(0);
 }
 
 void printTestUsage() {
@@ -244,6 +270,8 @@ int main(int argc, char** argv) {
     test(args);
   } else if (command == "predict" || command == "predict-prob") {
     predict(args);
+  } else if (command == "add-expert") {
+    addExpert(args);
   } else {
     printUsage();
     exit(EXIT_FAILURE);
