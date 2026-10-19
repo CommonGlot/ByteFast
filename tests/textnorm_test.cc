@@ -20,13 +20,7 @@ namespace {
 
 std::vector<uint32_t> bytes(const std::string& s, int minN, int maxN) {
   std::vector<uint32_t> out;
-  text::byteNgrams(s, minN, maxN, [&](uint32_t h, size_t) { out.push_back(h); });
-  return out;
-}
-
-std::vector<uint32_t> chars(const std::string& s, int minN, int maxN) {
-  std::vector<uint32_t> out;
-  text::charNgrams(s, minN, maxN, [&](uint32_t h, size_t) { out.push_back(h); });
+  text::byteNgrams(s, minN, maxN, [&](uint32_t h) { out.push_back(h); });
   return out;
 }
 
@@ -41,37 +35,21 @@ int main() {
   // Byte n-grams: every start position, every length in [min, max].
   assert(bytes("abcd", 2, 3).size() == 5); // ab abc bc bcd cd
   assert(bytes("a", 2, 5).empty());
-  // "é" is two bytes: one byte bigram, but a single character.
+  // "é" is two bytes, so it has one byte bigram.
   assert(bytes("\xC3\xA9", 2, 2).size() == 1);
-  assert(chars("\xC3\xA9", 2, 2).empty());
-  assert(chars("\xC3\xA9", 1, 1).size() == 1);
-  // Character n-grams count code points: "日本語" has 3 characters (9 bytes).
+  // "日本語" is 9 bytes.
   const std::string nihongo = "\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E";
-  assert(chars(nihongo, 1, 3).size() == 6); // 3 + 2 + 1
   assert(bytes(nihongo, 1, 3).size() == 24); // 9 + 8 + 7
   // Same n-gram text, same hash, independent of its position.
   const auto ab = bytes("ab", 2, 2);
   const auto xab = bytes("xab", 2, 2);
   assert(ab.size() == 1 && xab.size() == 2 && xab[1] == ab[0]);
-  // Byte and character features of identical text hash differently.
-  assert(bytes("ab", 2, 2)[0] != chars("ab", 2, 2)[0]);
   // Hashes differ across lengths and are spread over buckets.
   std::set<uint32_t> buckets;
   for (uint32_t h : bytes(" the quick brown fox jumps over the lazy dog ", 1, 5)) {
     buckets.insert(h % 1024);
   }
   assert(buckets.size() > 150);
-  // Byte and character n-grams use different seeds.
-  assert(text::hashBytes("a", text::kByteSeed) !=
-         text::hashBytes("a", text::kCharSeed));
-
-  // Positions: start offsets are reported, and position hashes differ by bin.
-  std::vector<size_t> starts;
-  text::byteNgrams("abc", 2, 2, [&](uint32_t, size_t i) { starts.push_back(i); });
-  assert((starts == std::vector<size_t>{0, 1}));
-  starts.clear();
-  text::charNgrams(nihongo, 1, 1, [&](uint32_t, size_t i) { starts.push_back(i); });
-  assert((starts == std::vector<size_t>{0, 3, 6}));
 
   // Lowercasing (used by the CommonLID-style normalization).
   assert(lowered("Hello WORLD") == "hello world");

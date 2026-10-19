@@ -356,11 +356,4 @@ void DenseMatrix::load(SafeTensorsReader& in, const std::string& name) {
   in.read(name, "F32", data_.data(), m_ * n_ * sizeof(real));
 }
 
-void DenseMatrix::load(std::istream& in) {
-  in.read((char*)&m_, sizeof(int64_t));
-  in.read((char*)&n_, sizeof(int64_t));
-  data_ = intgemm::AlignedVector<real>(m_ * n_);
-  in.read((char*)data_.data(), m_ * n_ * sizeof(real));
-}
-
 } // namespace bytefast

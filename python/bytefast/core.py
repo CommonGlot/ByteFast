@@ -33,16 +33,12 @@ DEFAULTS = {
     "seed": 0,
     "minb": 0,
     "maxb": 0,
-    "minc": 0,
-    "maxc": 0,
     "maxBytes": 0,
     "wordlist": "",
     "maxVocab": 0,
-    "inputModel": "",
     "cropProb": 0.0,
     "cropMin": 1,
     "cropMax": 0,
-    "cropUnit": "char",
     "normProb": 0.0,
     "stripProb": 0.0,
     "saveEpochs": False,
@@ -57,11 +53,9 @@ ALIASES = {
     "label_prefix": "label",
     "max_bytes": "maxBytes",
     "max_vocab": "maxVocab",
-    "input_model": "inputModel",
     "crop_prob": "cropProb",
     "crop_min": "cropMin",
     "crop_max": "cropMax",
-    "crop_unit": "cropUnit",
     "norm_prob": "normProb",
     "strip_prob": "stripProb",
     "save_epochs": "saveEpochs",
@@ -106,20 +100,6 @@ class _Model:
     def save_model(self, path):
         self.f.saveModel(path)
 
-    def quantize(self, input=None, qout=False, cutoff=0, retrain=False,
-                 epoch=None, lr=None, thread=None, verbose=None, dsub=2,
-                 qnorm=False):
-        """Compress the model with product quantization."""
-        a = self.f.getArgs()
-        if retrain and not input:
-            raise ValueError("Need input file path if retraining")
-        self.f.quantize(input or "", qout, cutoff, retrain, epoch or a.epoch,
-                        lr or a.lr, thread or a.thread, verbose or a.verbose,
-                        dsub, qnorm)
-
-    def is_quantized(self):
-        return self.f.isQuant()
-
     def get_dimension(self):
         return self.f.getArgs().dim
 
@@ -161,13 +141,12 @@ def train_supervised(**kwargs):
     - words (minCount, wordlist, maxVocab)
     - minn/maxn: character n-grams inside each word
     - wordNgrams: hashed word n-grams
-    - minb/maxb: byte n-grams over the whole text
-    - minc/maxc: character n-grams over the whole text; maxBytes limits how
-      much of the text the text n-grams read
+    - minb/maxb: byte n-grams over the whole text; maxBytes limits how much
+      of the text they read
 
-    crop_prob/crop_min/crop_max/crop_unit train on random spans of lines,
-    norm_prob on normalized lines, and input_model continues training a saved
-    model.
+    crop_prob/crop_min/crop_max train on random character spans of lines,
+    norm_prob on normalized lines and strip_prob on lines without optional
+    diacritics.
     """
     args = dict(DEFAULTS)
     for name, value in kwargs.items():
@@ -182,7 +161,7 @@ def train_supervised(**kwargs):
     for name, value in args.items():
         setattr(a, name, value)
     # Without hashed features the bucket table is unused; keep it empty.
-    if a.wordNgrams <= 1 and a.maxn == 0 and a.maxb == 0 and a.maxc == 0:
+    if a.wordNgrams <= 1 and a.maxn == 0 and a.maxb == 0:
         a.bucket = 0
     f = _core.bytefast()
     _core.train(f, a)

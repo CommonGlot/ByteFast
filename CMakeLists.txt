@@ -31,8 +31,6 @@ set(HEADER_FILES
     src/meter.h
     src/model.h
     src/norm_table.h
-    src/productquantizer.h
-    src/quantmatrix.h
     src/real.h
     src/textnorm.h
     src/unicode_fold.h
@@ -50,8 +48,6 @@ set(SOURCE_FILES
     src/matrix.cc
     src/meter.cc
     src/model.cc
-    src/productquantizer.cc
-    src/quantmatrix.cc
     src/utils.cc
     src/vector.cc)
 

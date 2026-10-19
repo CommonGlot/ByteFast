@@ -37,7 +37,7 @@ jobs:
           PY
       - name: Build the bytefast CLI
         run: make -j2 opt
-      - name: Train, test, quantize and reload every feature family
+      - name: Train, test and reload every feature family
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -57,13 +57,11 @@ jobs:
           PY
           set -e
           for cfg in "-minn 2 -maxn 5" "-minb 2 -maxb 5 -minCount 1000000000 -bucket 100000" \
-                     "-minc 1 -maxc 4 -minCount 1000000000 -bucket 100000" \
+                     "-minb 2 -maxb 5 -wordNgrams 2 -bucket 100000" \
                      "-minb 2 -maxb 5 -maxBytes 64 -bucket 100000"; do
             ./bytefast supervised -input /tmp/core-train.txt -output /tmp/core -dim 16 -epoch 10 -lr 0.5 -thread 2 -verbose 0 $cfg
             ./bytefast test /tmp/core.safetensors /tmp/core-test.txt | tee /tmp/core-result.txt
             python3 -c "import sys; p=float(open('/tmp/core-result.txt').read().split()[3]); print('cfg=$cfg P@1=%s' % p); sys.exit(p < 0.95)"
-            ./bytefast quantize -input /tmp/core-train.txt -output /tmp/core -cutoff 2000 -retrain -epoch 2 -verbose 0
-            ./bytefast test /tmp/core.quant.safetensors /tmp/core-test.txt
           done
           python3 -c "d=open('/tmp/core.safetensors','rb').read(9); assert d[8:9]==b'{', d"
       - name: C API
@@ -81,16 +79,13 @@ jobs:
           make wasm
           node bindings/js/test.mjs /tmp/core.safetensors "violin piano cello harp" __label__gamma
           cd bindings/js && npm pack --dry-run
-      - name: Span cropping and continued training
+      - name: Training on character spans, normalized and stripped lines
         run: |
           set -e
-          ./bytefast supervised -input /tmp/core-train.txt -output /tmp/base -minb 2 -maxb 5 -bucket 100000 \
-            -dim 16 -epoch 5 -lr 0.5 -thread 2 -verbose 0 -cropProb 0.5 -cropMin 1 -cropMax 3 -cropUnit word
-          ./bytefast supervised -input /tmp/core-train.txt -output /tmp/base-char -minc 1 -maxc 4 -bucket 100000 \
-            -minCount 1000000000 -dim 16 -epoch 5 -lr 0.5 -thread 2 -verbose 0 -cropProb 0.5 -cropMin 3 -cropMax 20
-          ./bytefast supervised -input /tmp/core-test.txt -output /tmp/continued -inputModel /tmp/base.safetensors \
-            -epoch 2 -lr 0.05 -thread 2 -verbose 1 -cropProb 0.7 -cropMax 2 -cropUnit word
-          ./bytefast test /tmp/continued.safetensors /tmp/core-test.txt
+          ./bytefast supervised -input /tmp/core-train.txt -output /tmp/augmented -minb 2 -maxb 5 -bucket 100000 \
+            -dim 16 -epoch 5 -lr 0.5 -thread 2 -verbose 0 -cropProb 0.5 -cropMin 3 -cropMax 20 \
+            -normProb 0.3 -stripProb 0.3 -saveEpochs -validation /tmp/core-test.txt
+          ./bytefast test /tmp/augmented.safetensors /tmp/core-test.txt
       - name: Build Python package
         run: |
           python -m pip install --upgrade pip
@@ -102,7 +97,7 @@ jobs:
           python -m pip install safetensors
           python - <<'PY'
           from safetensors import safe_open
-          for path in ["/tmp/core.safetensors", "/tmp/core.quant.safetensors", "/tmp/continued.safetensors"]:
+          for path in ["/tmp/core.safetensors", "/tmp/augmented.safetensors"]:
               with safe_open(path, "np") as f:
                   meta = f.metadata()
                   assert meta["format"] == "bytefast", meta

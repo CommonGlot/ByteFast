@@ -63,16 +63,12 @@ PYBIND11_MODULE(_core_pybind, m) {
       .def_readwrite("maxn", &bytefast::Args::maxn)
       .def_readwrite("minb", &bytefast::Args::minb)
       .def_readwrite("maxb", &bytefast::Args::maxb)
-      .def_readwrite("minc", &bytefast::Args::minc)
-      .def_readwrite("maxc", &bytefast::Args::maxc)
       .def_readwrite("maxBytes", &bytefast::Args::maxBytes)
       .def_readwrite("wordlist", &bytefast::Args::wordlist)
       .def_readwrite("maxVocab", &bytefast::Args::maxVocab)
-      .def_readwrite("inputModel", &bytefast::Args::inputModel)
       .def_readwrite("cropProb", &bytefast::Args::cropProb)
       .def_readwrite("cropMin", &bytefast::Args::cropMin)
       .def_readwrite("cropMax", &bytefast::Args::cropMax)
-      .def_readwrite("cropUnit", &bytefast::Args::cropUnit)
       .def_readwrite("normProb", &bytefast::Args::normProb)
       .def_readwrite("stripProb", &bytefast::Args::stripProb)
       .def_readwrite("saveEpochs", &bytefast::Args::saveEpochs)
@@ -80,16 +76,7 @@ PYBIND11_MODULE(_core_pybind, m) {
       .def_readwrite("thread", &bytefast::Args::thread)
       .def_readwrite("label", &bytefast::Args::label)
       .def_readwrite("verbose", &bytefast::Args::verbose)
-      .def_readwrite("seed", &bytefast::Args::seed)
-
-      .def_readwrite("qout", &bytefast::Args::qout)
-      .def_readwrite("retrain", &bytefast::Args::retrain)
-      .def_readwrite("qnorm", &bytefast::Args::qnorm)
-      .def_readwrite("cutoff", &bytefast::Args::cutoff)
-      .def_readwrite("dsub", &bytefast::Args::dsub)
-      .def("setManual", [](bytefast::Args& m, const std::string& argName) {
-        m.setManual(argName);
-      });
+      .def_readwrite("seed", &bytefast::Args::seed);
 
   py::enum_<bytefast::loss_name>(m, "loss_name", py::module_local())
       .value("softmax", bytefast::loss_name::softmax)
@@ -153,32 +140,6 @@ PYBIND11_MODULE(_core_pybind, m) {
             }
             return std::pair<std::vector<py::str>, std::vector<int64_t>>(
                 labels_list, labels_freq);
-          })
-      .def(
-          "quantize",
-          [](bytefast::ByteFast& m,
-             const std::string input,
-             bool qout,
-             int32_t cutoff,
-             bool retrain,
-             int epoch,
-             double lr,
-             int thread,
-             int verbose,
-             int32_t dsub,
-             bool qnorm) {
-            bytefast::Args qa = bytefast::Args();
-            qa.input = input;
-            qa.qout = qout;
-            qa.cutoff = cutoff;
-            qa.retrain = retrain;
-            qa.epoch = epoch;
-            qa.lr = lr;
-            qa.thread = thread;
-            qa.verbose = verbose;
-            qa.dsub = dsub;
-            qa.qnorm = qnorm;
-            m.quantize(qa);
           })
       .def(
           "predict",
@@ -249,6 +210,5 @@ PYBIND11_MODULE(_core_pybind, m) {
             }
 
             return returnedValue;
-          })
-      .def("isQuant", [](bytefast::ByteFast& m) { return m.isQuant(); });
+          });
 }

@@ -239,11 +239,10 @@ inline void normalizeToken(std::string& s) {
 // Feature hashing for text n-grams: 32-bit FNV-1a over
 // unsigned bytes with a per-feature seed, then the murmur3 finalizer so that
 // power-of-two bucket counts get well-mixed low bits. Independent of the
-// fastText word hash, which must stay unchanged for model compatibility.
+// word hash used for words, subwords and word n-grams.
 constexpr uint32_t kFnvOffset = 2166136261u;
 constexpr uint32_t kFnvPrime = 16777619u;
 constexpr uint32_t kByteSeed = 0x9E3779B9u;
-constexpr uint32_t kCharSeed = 0x85EBCA6Bu;
 
 inline uint32_t fmix32(uint32_t h) {
   h ^= h >> 16;
@@ -263,7 +262,7 @@ inline uint32_t hashBytes(std::string_view s, uint32_t seed) {
   return fmix32(h);
 }
 
-// Calls emit(hash, start) for every byte n-gram of length [minN, maxN].
+// Calls emit(hash) for every byte n-gram of length [minN, maxN].
 template <typename Emit>
 void byteNgrams(std::string_view s, int minN, int maxN, Emit emit) {
   for (size_t i = 0; i < s.size(); i++) {
@@ -272,30 +271,7 @@ void byteNgrams(std::string_view s, int minN, int maxN, Emit emit) {
       h ^= static_cast<uint8_t>(s[i + n - 1]);
       h *= kFnvPrime;
       if (n >= minN) {
-        emit(fmix32(h ^ static_cast<uint32_t>(n)), i);
-      }
-    }
-  }
-}
-
-// Calls emit(hash, start) for every n-gram of [minN, maxN] UTF-8 characters.
-// A character is a lead byte plus its continuation bytes, so n-grams never
-// start or end inside a multi-byte character.
-template <typename Emit>
-void charNgrams(std::string_view s, int minN, int maxN, Emit emit) {
-  for (size_t i = 0; i < s.size(); i++) {
-    if (isContinuation(static_cast<uint8_t>(s[i]))) {
-      continue;
-    }
-    uint32_t h = kFnvOffset ^ kCharSeed;
-    size_t j = i;
-    for (int n = 1; n <= maxN && j < s.size(); n++) {
-      do {
-        h ^= static_cast<uint8_t>(s[j++]);
-        h *= kFnvPrime;
-      } while (j < s.size() && isContinuation(static_cast<uint8_t>(s[j])));
-      if (n >= minN) {
-        emit(fmix32(h ^ static_cast<uint32_t>(n)), i);
+        emit(fmix32(h ^ static_cast<uint32_t>(n)));
       }
     }
   }

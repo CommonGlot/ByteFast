@@ -44,14 +44,10 @@ class ByteFast {
   std::atomic<int64_t> tokenCount_{};
   std::atomic<real> loss_{};
   std::chrono::steady_clock::time_point start_;
-  bool quant_;
-  int32_t version;
-  bool textFeatures_ = false;
   // Tokens per epoch of the current training input.
   int64_t trainTokens_ = 0;
   std::exception_ptr trainException_;
 
-  bool checkModel(std::istream&);
   void startThreads(const TrainCallback& callback = {});
   void epochCheckpoint(int32_t epoch);
   void trainThread(int32_t, const TrainCallback& callback);
@@ -65,7 +61,6 @@ class ByteFast {
       real lr,
       const std::vector<int32_t>& line,
       const std::vector<int32_t>& labels);
-  std::vector<int32_t> selectEmbeddings(int32_t cutoff) const;
   bool keepTraining(const int64_t ntokens) const;
   void buildModel();
   std::tuple<int64_t, double, double> progressInfo(real progress);
@@ -81,11 +76,7 @@ class ByteFast {
 
   void saveModel(const std::string& filename);
 
-  void loadModel(std::istream& in);
-
   void loadModel(const std::string& filename);
-
-  void quantize(const Args& qargs, const TrainCallback& callback = {});
 
   std::tuple<int64_t, double, double>
   test(std::istream& in, int32_t k, real threshold = 0.0);
@@ -105,13 +96,10 @@ class ByteFast {
       real threshold) const;
 
   void train(const Args& args, const TrainCallback& callback = {});
-  void continueTraining(const Args& args, const TrainCallback& callback = {});
 
   void abort();
 
   int getDimension() const;
-
-  bool isQuant() const;
 
   class AbortError : public std::runtime_error {
    public:

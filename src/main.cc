@@ -22,35 +22,13 @@ void printUsage() {
       << "usage: bytefast <command> <args>\n\n"
       << "The commands supported by bytefast are:\n\n"
       << "  supervised              train a supervised classifier\n"
-      << "  quantize                quantize a model to reduce the memory "
-         "usage\n"
       << "  test                    evaluate a supervised classifier\n"
       << "  test-label              print labels with precision and recall "
          "scores\n"
       << "  predict                 predict most likely labels\n"
       << "  predict-prob            predict most likely labels with "
          "probabilities\n"
-      << "  convert                 rewrite an older .bin/.ftz model as "
-         "safetensors\n"
       << std::endl;
-}
-
-void printQuantizeUsage() {
-  std::cerr << "usage: bytefast quantize <args>\n\n"
-            << "  reads OUTPUT.safetensors and writes OUTPUT.quant.safetensors"
-            << std::endl;
-}
-
-void convert(const std::vector<std::string>& args) {
-  if (args.size() != 4) {
-    std::cerr << "usage: bytefast convert <old model> <new.safetensors>"
-              << std::endl;
-    exit(EXIT_FAILURE);
-  }
-  ByteFast model;
-  model.loadModel(args[2]);
-  model.saveModel(args[3]);
-  exit(0);
 }
 
 void printTestUsage() {
@@ -82,22 +60,6 @@ void printTestLabelUsage() {
       << "  <k>          (optional; 1 by default) predict top k labels\n"
       << "  <th>         (optional; 0.0 by default) probability threshold\n"
       << std::endl;
-}
-
-void quantize(const std::vector<std::string>& args) {
-  Args a = Args();
-  if (args.size() < 3) {
-    printQuantizeUsage();
-    a.printHelp();
-    exit(EXIT_FAILURE);
-  }
-  a.parseArgs(args);
-  ByteFast fasttext;
-  // parseArgs checks if a->output is given.
-  fasttext.loadModel(a.output + ".safetensors");
-  fasttext.quantize(a);
-  fasttext.saveModel(a.output + ".quant.safetensors");
-  exit(0);
 }
 
 void test(const std::vector<std::string>& args) {
@@ -309,12 +271,8 @@ int main(int argc, char** argv) {
     train(args);
   } else if (command == "test" || command == "test-label") {
     test(args);
-  } else if (command == "quantize") {
-    quantize(args);
   } else if (command == "predict" || command == "predict-prob") {
     predict(args);
-  } else if (command == "convert") {
-    convert(args);
   } else {
     printUsage();
     exit(EXIT_FAILURE);

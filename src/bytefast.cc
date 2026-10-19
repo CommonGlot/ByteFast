@@ -8,7 +8,6 @@
 
 #include "bytefast.h"
 #include "loss.h"
-#include "quantmatrix.h"
 #include "safetensors.h"
 
 #include <algorithm>
@@ -24,14 +23,9 @@
 namespace bytefast {
 
 // Models are safetensors files with this format name and version in their
-// metadata. Older model files (fastText's layout, and "BFCM" for models with
-// text features) can still be read.
+// metadata.
 const char* const kFormat = "bytefast";
 const char* const kFormatVersion = "1";
-constexpr int32_t FASTTEXT_VERSION = 12;
-constexpr int32_t FASTTEXT_FILEFORMAT_MAGIC_INT32 = 793712314;
-constexpr int32_t BYTEFAST_FILEFORMAT_MAGIC_INT32 = 0x4D434642;
-constexpr int32_t BYTEFAST_VERSION = 1;
 
 std::shared_ptr<Loss> ByteFast::createLoss(std::shared_ptr<Matrix>& output) {
   loss_name lossName = args_->loss;
@@ -43,7 +37,7 @@ std::shared_ptr<Loss> ByteFast::createLoss(std::shared_ptr<Matrix>& output) {
   }
 }
 
-ByteFast::ByteFast() : quant_(false), trainException_(nullptr) {}
+ByteFast::ByteFast() : trainException_(nullptr) {}
 
 std::shared_ptr<const Dictionary> ByteFast::getDictionary() const {
   return dict_;
@@ -61,30 +55,6 @@ int32_t ByteFast::getLabelId(const std::string& label) const {
   return labelId;
 }
 
-bool ByteFast::checkModel(std::istream& in) {
-  int32_t magic;
-  in.read((char*)&(magic), sizeof(int32_t));
-  if (magic == BYTEFAST_FILEFORMAT_MAGIC_INT32) {
-    int32_t bytefastVersion;
-    in.read((char*)&(bytefastVersion), sizeof(int32_t));
-    if (!in || bytefastVersion != BYTEFAST_VERSION) {
-      return false;
-    }
-    version = FASTTEXT_VERSION;
-    textFeatures_ = true;
-    return true;
-  }
-  if (magic != FASTTEXT_FILEFORMAT_MAGIC_INT32) {
-    return false;
-  }
-  in.read((char*)&(version), sizeof(int32_t));
-  if (version > FASTTEXT_VERSION) {
-    return false;
-  }
-  textFeatures_ = false;
-  return true;
-}
-
 void ByteFast::saveModel(const std::string& filename) {
   if (!input_ || !output_) {
     throw std::runtime_error("Model never trained");
@@ -100,36 +70,22 @@ void ByteFast::saveModel(const std::string& filename) {
 }
 
 void ByteFast::loadModel(const std::string& filename) {
-  if (SafeTensorsReader::isSafeTensors(filename)) {
-    SafeTensorsReader in(filename);
-    if (in.metadata("format") != kFormat ||
-        in.metadata("format_version") != kFormatVersion) {
-      throw std::invalid_argument(filename + " is not a ByteFast model");
-    }
-    args_ = std::make_shared<Args>();
-    args_->load(in);
-    dict_ = std::make_shared<Dictionary>(args_, in);
-    quant_ = in.has("input.codes");
-    args_->qout = in.has("output.codes");
-    input_ = quant_ ? std::shared_ptr<Matrix>(std::make_shared<QuantMatrix>())
-                    : std::make_shared<DenseMatrix>();
-    output_ = args_->qout
-        ? std::shared_ptr<Matrix>(std::make_shared<QuantMatrix>())
-        : std::make_shared<DenseMatrix>();
-    input_->load(in, "input");
-    output_->load(in, "output");
-    buildModel();
-    return;
+  if (!SafeTensorsReader::isSafeTensors(filename)) {
+    throw std::invalid_argument(filename + " is not a safetensors model");
   }
-  std::ifstream ifs(filename, std::ifstream::binary);
-  if (!ifs.is_open()) {
-    throw std::invalid_argument(filename + " cannot be opened for loading!");
+  SafeTensorsReader in(filename);
+  if (!in.hasMetadata("format") || in.metadata("format") != kFormat ||
+      in.metadata("format_version") != kFormatVersion) {
+    throw std::invalid_argument(filename + " is not a ByteFast model");
   }
-  if (!checkModel(ifs)) {
-    throw std::invalid_argument(filename + " has wrong file format!");
-  }
-  loadModel(ifs);
-  ifs.close();
+  args_ = std::make_shared<Args>();
+  args_->load(in);
+  dict_ = std::make_shared<Dictionary>(args_, in);
+  input_ = std::make_shared<DenseMatrix>();
+  output_ = std::make_shared<DenseMatrix>();
+  input_->load(in, "input");
+  output_->load(in, "output");
+  buildModel();
 }
 
 std::vector<int64_t> ByteFast::getTargetCounts() const {
@@ -139,40 +95,6 @@ std::vector<int64_t> ByteFast::getTargetCounts() const {
 void ByteFast::buildModel() {
   auto loss = createLoss(output_);
   model_ = std::make_shared<Model>(input_, output_, loss, true);
-}
-
-void ByteFast::loadModel(std::istream& in) {
-  args_ = std::make_shared<Args>();
-  input_ = std::make_shared<DenseMatrix>();
-  output_ = std::make_shared<DenseMatrix>();
-  args_->load(in);
-  if (textFeatures_) {
-    args_->loadTextFeatures(in);
-  }
-  dict_ = std::make_shared<Dictionary>(args_, in);
-
-  bool quant_input;
-  in.read((char*)&quant_input, sizeof(bool));
-  if (quant_input) {
-    quant_ = true;
-    input_ = std::make_shared<QuantMatrix>();
-  }
-  input_->load(in);
-
-  if (!quant_input && dict_->isPruned()) {
-    throw std::invalid_argument(
-        "Invalid model file.\n"
-        "Please download the updated model from www.fasttext.cc.\n"
-        "See issue #332 on Github for more information.\n");
-  }
-
-  in.read((char*)&args_->qout, sizeof(bool));
-  if (quant_ && args_->qout) {
-    output_ = std::make_shared<QuantMatrix>();
-  }
-  output_->load(in);
-
-  buildModel();
 }
 
 std::tuple<int64_t, double, double> ByteFast::progressInfo(real progress) {
@@ -204,66 +126,6 @@ void ByteFast::printInfo(real progress, real loss, std::ostream& log_stream) {
   log_stream << " avg.loss: " << std::setw(9) << std::setprecision(6) << loss;
   log_stream << " ETA: " << utils::ClockPrint(eta);
   log_stream << std::flush;
-}
-
-std::vector<int32_t> ByteFast::selectEmbeddings(int32_t cutoff) const {
-  std::shared_ptr<DenseMatrix> input =
-      std::dynamic_pointer_cast<DenseMatrix>(input_);
-  Vector norms(input->size(0));
-  input->l2NormRow(norms);
-  std::vector<int32_t> idx(input->size(0), 0);
-  std::iota(idx.begin(), idx.end(), 0);
-  auto eosid = dict_->getId(Dictionary::EOS);
-  std::sort(idx.begin(), idx.end(), [&norms, eosid](size_t i1, size_t i2) {
-    if (i1 == eosid && i2 == eosid) { // satisfy strict weak ordering
-      return false;
-    }
-    return eosid == i1 || (eosid != i2 && norms[i1] > norms[i2]);
-  });
-  idx.erase(idx.begin() + cutoff, idx.end());
-  return idx;
-}
-
-void ByteFast::quantize(const Args& qargs, const TrainCallback& callback) {
-  args_->input = qargs.input;
-  args_->qout = qargs.qout;
-  args_->output = qargs.output;
-  std::shared_ptr<DenseMatrix> input =
-      std::dynamic_pointer_cast<DenseMatrix>(input_);
-  std::shared_ptr<DenseMatrix> output =
-      std::dynamic_pointer_cast<DenseMatrix>(output_);
-  if (qargs.cutoff > 0 && qargs.cutoff < input->size(0)) {
-    auto idx = selectEmbeddings(qargs.cutoff);
-    dict_->prune(idx);
-    std::shared_ptr<DenseMatrix> ninput =
-        std::make_shared<DenseMatrix>(idx.size(), args_->dim);
-    for (auto i = 0; i < idx.size(); i++) {
-      for (auto j = 0; j < args_->dim; j++) {
-        ninput->at(i, j) = input->at(idx[i], j);
-      }
-    }
-    input = ninput;
-    if (qargs.retrain) {
-      args_->epoch = qargs.epoch;
-      args_->lr = qargs.lr;
-      args_->thread = qargs.thread;
-      args_->verbose = qargs.verbose;
-      auto loss = createLoss(output_);
-      model_ = std::make_shared<Model>(input, output, loss, true);
-      trainTokens_ = dict_->ntokens();
-      startThreads(callback);
-    }
-  }
-  input_ = std::make_shared<QuantMatrix>(
-      std::move(*(input.get())), qargs.dsub, qargs.qnorm);
-
-  if (args_->qout) {
-    output_ = std::make_shared<QuantMatrix>(
-        std::move(*(output.get())), 2, qargs.qnorm);
-  }
-  quant_ = true;
-  auto loss = createLoss(output_);
-  model_ = std::make_shared<Model>(input_, output_, loss, true);
 }
 
 void ByteFast::supervised(
@@ -407,10 +269,6 @@ std::shared_ptr<Matrix> ByteFast::createTrainOutputMatrix() const {
 
 void ByteFast::train(const Args& args, const TrainCallback& callback) {
   args.validate();
-  if (!args.inputModel.empty()) {
-    continueTraining(args, callback);
-    return;
-  }
   args_ = std::make_shared<Args>(args);
   dict_ = std::make_shared<Dictionary>(args_);
   if (args_->input == "-") {
@@ -428,55 +286,7 @@ void ByteFast::train(const Args& args, const TrainCallback& callback) {
 
   input_ = createRandomMatrix();
   output_ = createTrainOutputMatrix();
-  quant_ = false;
   buildModel();
-  startThreads(callback);
-}
-
-// Continue training a saved supervised model on args.input. The model's
-// dictionary, features and architecture are kept; the training schedule
-// (input, lr, epoch, threads, seed, cropping) comes from args. Lines whose
-// labels the model does not know are skipped.
-void ByteFast::continueTraining(const Args& args, const TrainCallback& callback) {
-  loadModel(args.inputModel);
-  if (quant_) {
-    throw std::invalid_argument("-inputModel cannot be a quantized model");
-  }
-  // The dictionary shares args_, so update it in place.
-  args_->input = args.input;
-  args_->output = args.output;
-  args_->lr = args.lr;
-  args_->lrUpdateRate = args.lrUpdateRate;
-  args_->epoch = args.epoch;
-  args_->thread = args.thread;
-  args_->seed = args.seed;
-  args_->verbose = args.verbose;
-  args_->inputModel = args.inputModel;
-  args_->cropProb = args.cropProb;
-  args_->cropMin = args.cropMin;
-  args_->cropMax = args.cropMax;
-  args_->cropUnit = args.cropUnit;
-  args_->normProb = args.normProb;
-  args_->stripProb = args.stripProb;
-  args_->saveEpochs = args.saveEpochs;
-  args_->validation = args.validation;
-  if (args_->input == "-") {
-    throw std::invalid_argument("Cannot use stdin for training!");
-  }
-  std::ifstream ifs(args_->input);
-  if (!ifs.is_open()) {
-    throw std::invalid_argument(
-        args_->input + " cannot be opened for training!");
-  }
-  trainTokens_ = dict_->countTokens(ifs);
-  ifs.close();
-  if (trainTokens_ == 0) {
-    throw std::invalid_argument(args_->input + " is empty");
-  }
-  if (args_->verbose > 0) {
-    std::cerr << "Continuing " << args_->inputModel << " on "
-              << trainTokens_ / 1000000 << "M tokens" << std::endl;
-  }
   startThreads(callback);
 }
 
@@ -565,10 +375,6 @@ void ByteFast::epochCheckpoint(int32_t epoch) {
 
 int ByteFast::getDimension() const {
   return args_->dim;
-}
-
-bool ByteFast::isQuant() const {
-  return quant_;
 }
 
 } // namespace bytefast

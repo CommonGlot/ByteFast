@@ -45,8 +45,6 @@ class Matrix {
   virtual void averageRowsToVector(Vector& x, const std::vector<int32_t>& rows) const = 0;
   virtual void save(SafeTensorsWriter&, const std::string& name) const = 0;
   virtual void load(SafeTensorsReader&, const std::string& name) = 0;
-  // Reads the matrix of a model file from before safetensors.
-  virtual void load(std::istream&) = 0;
 };
 
 } // namespace bytefast

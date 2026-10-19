@@ -75,7 +75,6 @@ class DenseMatrix : public Matrix {
   void averageRowsToVector(Vector& x, const std::vector<int32_t>& rows) const override;
   void save(SafeTensorsWriter&, const std::string& name) const override;
   void load(SafeTensorsReader&, const std::string& name) override;
-  void load(std::istream&) override;
 
   class EncounteredNaNError : public std::runtime_error {
    public:
