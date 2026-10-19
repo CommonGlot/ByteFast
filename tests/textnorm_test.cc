@@ -61,9 +61,7 @@ int main() {
     buckets.insert(h % 1024);
   }
   assert(buckets.size() > 150);
-  // Hash values are part of the model format and must not change.
-  assert(text::hashBytes("bytefast", text::kWordSeed) ==
-         text::hashBytes("bytefast", text::kWordSeed));
+  // Byte and character n-grams use different seeds.
   assert(text::hashBytes("a", text::kByteSeed) !=
          text::hashBytes("a", text::kCharSeed));
 

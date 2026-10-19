@@ -52,6 +52,7 @@ class SafeTensorsReader {
   static bool isSafeTensors(const std::string& path);
 
   bool has(const std::string& name) const;
+  bool hasMetadata(const std::string& key) const;
   const std::string& metadata(const std::string& key) const;
   int64_t metadataInt(const std::string& key) const;
   const std::vector<int64_t>& shape(const std::string& name) const;

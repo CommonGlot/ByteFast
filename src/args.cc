@@ -24,7 +24,6 @@ Args::Args() {
   epoch = 5;
   minCount = 1;
   minCountLabel = 0;
-  neg = 5;
   wordNgrams = 1;
   loss = loss_name::softmax;
   bucket = 2000000;
@@ -35,7 +34,6 @@ Args::Args() {
   minc = 0;
   maxc = 0;
   maxBytes = 0;
-  hashWords = false;
   wordlist = "";
   maxVocab = 0;
   inputModel = "";
@@ -60,28 +58,17 @@ Args::Args() {
 }
 
 std::string Args::lossToString(loss_name ln) const {
-  switch (ln) {
-    case loss_name::hs:
-      return "hs";
-    case loss_name::ns:
-      return "ns";
-    case loss_name::softmax:
-      return "softmax";
-    case loss_name::ova:
-      return "one-vs-all";
-  }
-  return "Unknown loss!"; // should never happen
+  return ln == loss_name::ova ? "one-vs-all" : "softmax";
 }
 
 loss_name Args::lossFromString(const std::string& name) {
-  if (name == "hs") {
-    return loss_name::hs;
-  } else if (name == "ns") {
-    return loss_name::ns;
-  } else if (name == "softmax") {
+  if (name == "softmax") {
     return loss_name::softmax;
   } else if (name == "one-vs-all" || name == "ova") {
     return loss_name::ova;
+  } else if (name == "hs" || name == "ns") {
+    throw std::invalid_argument(
+        "-loss " + name + " is no longer supported (softmax or ova)");
   }
   throw std::invalid_argument("Unknown loss: " + name);
 }
@@ -124,8 +111,6 @@ void Args::parseArgs(const std::vector<std::string>& args) {
         minCount = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-minCountLabel") {
         minCountLabel = std::stoi(args.at(ai + 1));
-      } else if (args[ai] == "-neg") {
-        neg = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-wordNgrams") {
         wordNgrams = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-loss") {
@@ -146,9 +131,6 @@ void Args::parseArgs(const std::vector<std::string>& args) {
         maxc = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-maxBytes") {
         maxBytes = std::stoi(args.at(ai + 1));
-      } else if (args[ai] == "-hashWords") {
-        hashWords = true;
-        ai--;
       } else if (args[ai] == "-wordlist") {
         wordlist = std::string(args.at(ai + 1));
       } else if (args[ai] == "-maxVocab") {
@@ -225,11 +207,11 @@ void Args::parseArgs(const std::vector<std::string>& args) {
 }
 
 bool Args::usesTextFeatures() const {
-  return maxb > 0 || maxc > 0 || maxBytes > 0 || hashWords;
+  return maxb > 0 || maxc > 0 || maxBytes > 0;
 }
 
 bool Args::usesHashedFeatures() const {
-  return wordNgrams > 1 || maxn > 0 || maxb > 0 || maxc > 0 || hashWords;
+  return wordNgrams > 1 || maxn > 0 || maxb > 0 || maxc > 0;
 }
 
 void Args::validate() const {
@@ -245,9 +227,8 @@ void Args::validate() const {
   if (maxVocab < 0) {
     throw std::invalid_argument("-maxVocab must be >= 0 (0 = no limit)");
   }
-  if ((maxb > 0 || maxc > 0 || hashWords) && bucket <= 0) {
-    throw std::invalid_argument(
-        "-minb/-maxb, -minc/-maxc and -hashWords need -bucket > 0");
+  if ((maxb > 0 || maxc > 0) && bucket <= 0) {
+    throw std::invalid_argument("-minb/-maxb and -minc/-maxc need -bucket > 0");
   }
   if (!(normProb >= 0.0 && normProb <= 1.0)) {
     throw std::invalid_argument("-normProb must be in [0, 1]");
@@ -301,8 +282,6 @@ void Args::printDictionaryHelp() {
             << maxc << "]\n"
             << "  -maxBytes           bytes of text used for text ngrams, 0 = all ["
             << maxBytes << "]\n"
-            << "  -hashWords          hash words that are not in the vocabulary ["
-            << boolToString(hashWords) << "]\n"
             << "  -wordlist           file with the allowed vocabulary, one word per line ["
             << wordlist << "]\n"
             << "  -maxVocab           keep at most this many words, 0 = no limit ["
@@ -327,8 +306,7 @@ void Args::printTrainingHelp() {
       << lrUpdateRate << "]\n"
       << "  -dim                size of word vectors [" << dim << "]\n"
       << "  -epoch              number of epochs [" << epoch << "]\n"
-      << "  -neg                number of negatives sampled [" << neg << "]\n"
-      << "  -loss               loss function {ns, hs, softmax, one-vs-all} ["
+      << "  -loss               loss function {softmax, one-vs-all} ["
       << lossToString(loss) << "]\n"
       << "  -thread             number of threads (set to 1 to ensure "
          "reproducible results) ["
@@ -369,7 +347,6 @@ void Args::save(SafeTensorsWriter& out) const {
       {"dim", std::to_string(dim)},
       {"epoch", std::to_string(epoch)},
       {"minCount", std::to_string(minCount)},
-      {"neg", std::to_string(neg)},
       {"wordNgrams", std::to_string(wordNgrams)},
       {"loss", lossToString(loss)},
       {"bucket", std::to_string(bucket)},
@@ -380,7 +357,6 @@ void Args::save(SafeTensorsWriter& out) const {
       {"minc", std::to_string(minc)},
       {"maxc", std::to_string(maxc)},
       {"maxBytes", std::to_string(maxBytes)},
-      {"hashWords", hashWords ? "1" : "0"},
       {"maxVocab", std::to_string(maxVocab)},
       {"label", label},
       {"lrUpdateRate", std::to_string(lrUpdateRate)}};
@@ -396,7 +372,6 @@ void Args::load(SafeTensorsReader& in) {
   dim = get("dim");
   epoch = get("epoch");
   minCount = get("minCount");
-  neg = get("neg");
   wordNgrams = get("wordNgrams");
   loss = lossFromString(in.metadata("args.loss"));
   bucket = get("bucket");
@@ -407,7 +382,9 @@ void Args::load(SafeTensorsReader& in) {
   minc = get("minc");
   maxc = get("maxc");
   maxBytes = get("maxBytes");
-  hashWords = get("hashWords") != 0;
+  if (in.hasMetadata("args.hashWords") && get("hashWords") != 0) {
+    throw std::invalid_argument("-hashWords is no longer supported");
+  }
   maxVocab = get("maxVocab");
   label = in.metadata("args.label");
   lrUpdateRate = get("lrUpdateRate");
@@ -418,13 +395,14 @@ void Args::load(SafeTensorsReader& in) {
 // model type and subsampling threshold only applied to word vectors), then
 // the text-feature block in BFCM files.
 void Args::load(std::istream& in) {
-  int ws, model;
+  int ws, model, neg;
   double t;
   in.read((char*)&(dim), sizeof(int));
   in.read((char*)&(ws), sizeof(int));
   in.read((char*)&(epoch), sizeof(int));
   in.read((char*)&(minCount), sizeof(int));
   in.read((char*)&(neg), sizeof(int));
+  (void)neg;
   in.read((char*)&(wordNgrams), sizeof(int));
   in.read((char*)&(loss), sizeof(loss_name));
   in.read((char*)&(model), sizeof(int));
@@ -466,7 +444,9 @@ void Args::loadTextFeatures(std::istream& in) {
         "This model uses -fold, -posBins or -textScope word, which ByteFast no "
         "longer supports");
   }
-  hashWords = hashWordsValue != 0;
+  if (hashWordsValue != 0) {
+    throw std::invalid_argument("-hashWords is no longer supported");
+  }
   validate();
 }
 

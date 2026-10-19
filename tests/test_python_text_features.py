@@ -43,8 +43,7 @@ def main():
             "subwords": dict(minn=2, maxn=5),
             "bytes": dict(minb=2, maxb=5, bucket=50000, minCount=10 ** 9),
             "chars": dict(minc=1, maxc=4, bucket=50000, minCount=10 ** 9),
-            "bytes+words": dict(minb=2, maxb=5, bucket=50000, hash_words=True,
-                                max_bytes=64),
+            "bytes+words": dict(minb=2, maxb=5, bucket=50000, max_bytes=64),
         }
         for name, cfg in configs.items():
             model = train(data, **cfg)
@@ -57,7 +56,7 @@ def main():
             assert loaded.predict(query)[0] == model.predict(query)[0], name
             args = loaded.f.getArgs()
             for key, value in cfg.items():
-                attr = {"hash_words": "hashWords", "max_bytes": "maxBytes"}.get(key, key)
+                attr = {"max_bytes": "maxBytes"}.get(key, key)
                 if attr == "minCount":
                     continue  # a training-time setting
                 got = getattr(args, attr)

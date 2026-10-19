@@ -84,7 +84,6 @@ layer maps that average to the labels.
 | Feature | Options | Default (supervised) |
 | --- | --- | --- |
 | Word vectors | `-minCount N`, `-wordlist FILE`, `-maxVocab N` | on, `minCount 1` |
-| Hashed out-of-vocabulary words | `-hashWords` | off |
 | Character n-grams inside words | `-minn N -maxn N` | off (`maxn 0`) |
 | Word n-grams | `-wordNgrams N` | 1 (off) |
 | Byte n-grams over the text | `-minb N -maxb N` | off (`maxb 0`) |
@@ -97,10 +96,10 @@ layer maps that average to the labels.
   n-grams as the others.
 - **`-wordlist FILE`** restricts the vocabulary to the first field of each line
   in `FILE`; entries match words exactly. Words outside it can still contribute
-  through `-hashWords`, subwords or text n-grams.
+  through subwords or text n-grams.
 - **Disabling word vectors:** set `-minCount` above the corpus size.
-- **Hashed features** (`-hashWords`, subwords, word n-grams and text n-grams)
-  share the `-bucket` table.
+- **Hashed features** (subwords, word n-grams and text n-grams) share the
+  `-bucket` table.
 
 These training options help with inputs shorter or noisier than the training
 data and with staged training:
@@ -128,7 +127,7 @@ data and with staged training:
 
 `./bytefast supervised -h` lists every option. In Python the same names are
 keyword arguments of `bytefast.train_supervised`, with snake_case aliases
-such as `hash_words`, `max_bytes` and `max_vocab`.
+such as `max_bytes` and `max_vocab`.
 
 ## Model files
 

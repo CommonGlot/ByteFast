@@ -36,12 +36,6 @@ constexpr int32_t BYTEFAST_VERSION = 1;
 std::shared_ptr<Loss> ByteFast::createLoss(std::shared_ptr<Matrix>& output) {
   loss_name lossName = args_->loss;
   switch (lossName) {
-    case loss_name::hs:
-      return std::make_shared<HierarchicalSoftmaxLoss>(
-          output, getTargetCounts());
-    case loss_name::ns:
-      return std::make_shared<NegativeSamplingLoss>(
-          output, args_->neg, getTargetCounts());
     case loss_name::softmax:
       return std::make_shared<SoftmaxLoss>(output);
     case loss_name::ova:

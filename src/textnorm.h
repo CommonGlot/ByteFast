@@ -177,7 +177,7 @@ inline void normalizeToken(std::string& s) {
   s.swap(out);
 }
 
-// Feature hashing for text n-grams and hashed words: 32-bit FNV-1a over
+// Feature hashing for text n-grams: 32-bit FNV-1a over
 // unsigned bytes with a per-feature seed, then the murmur3 finalizer so that
 // power-of-two bucket counts get well-mixed low bits. Independent of the
 // fastText word hash, which must stay unchanged for model compatibility.
@@ -185,7 +185,6 @@ constexpr uint32_t kFnvOffset = 2166136261u;
 constexpr uint32_t kFnvPrime = 16777619u;
 constexpr uint32_t kByteSeed = 0x9E3779B9u;
 constexpr uint32_t kCharSeed = 0x85EBCA6Bu;
-constexpr uint32_t kWordSeed = 0xC2B2AE35u;
 
 inline uint32_t fmix32(uint32_t h) {
   h ^= h >> 16;

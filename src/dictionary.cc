@@ -372,15 +372,6 @@ void Dictionary::addSubwords(
   }
 }
 
-void Dictionary::addHashedWord(
-    std::vector<int32_t>& line,
-    const std::string_view token) const {
-  if (args_->hashWords && token != EOS) {
-    const uint32_t h = text::hashBytes(token, text::kWordSeed);
-    pushHash(line, h % static_cast<uint32_t>(args_->bucket));
-  }
-}
-
 // Byte and character n-grams over the words of the line joined by single
 // spaces, so n-grams cross word boundaries. The text is padded with a space
 // on each side, which makes the first and last words look like the others.
@@ -468,9 +459,6 @@ void Dictionary::addFeatures(
     uint32_t h = hash(token);
     int32_t wid = getId(token, h);
     addSubwords(words, token, wid);
-    if (wid < 0) {
-      addHashedWord(words, token);
-    }
     word_hashes.push_back(h);
   }
   addWordNgrams(words, word_hashes, args_->wordNgrams);

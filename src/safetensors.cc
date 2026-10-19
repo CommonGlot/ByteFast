@@ -335,6 +335,10 @@ bool SafeTensorsReader::has(const std::string& name) const {
   return tensors_.count(name) != 0;
 }
 
+bool SafeTensorsReader::hasMetadata(const std::string& key) const {
+  return metadata_.count(key) != 0;
+}
+
 const std::string& SafeTensorsReader::metadata(const std::string& key) const {
   auto it = metadata_.find(key);
   if (it == metadata_.end()) {

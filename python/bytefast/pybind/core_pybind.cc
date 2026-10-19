@@ -56,7 +56,6 @@ PYBIND11_MODULE(_core_pybind, m) {
       .def_readwrite("epoch", &bytefast::Args::epoch)
       .def_readwrite("minCount", &bytefast::Args::minCount)
       .def_readwrite("minCountLabel", &bytefast::Args::minCountLabel)
-      .def_readwrite("neg", &bytefast::Args::neg)
       .def_readwrite("wordNgrams", &bytefast::Args::wordNgrams)
       .def_readwrite("loss", &bytefast::Args::loss)
       .def_readwrite("bucket", &bytefast::Args::bucket)
@@ -67,7 +66,6 @@ PYBIND11_MODULE(_core_pybind, m) {
       .def_readwrite("minc", &bytefast::Args::minc)
       .def_readwrite("maxc", &bytefast::Args::maxc)
       .def_readwrite("maxBytes", &bytefast::Args::maxBytes)
-      .def_readwrite("hashWords", &bytefast::Args::hashWords)
       .def_readwrite("wordlist", &bytefast::Args::wordlist)
       .def_readwrite("maxVocab", &bytefast::Args::maxVocab)
       .def_readwrite("inputModel", &bytefast::Args::inputModel)
@@ -93,8 +91,6 @@ PYBIND11_MODULE(_core_pybind, m) {
       });
 
   py::enum_<bytefast::loss_name>(m, "loss_name", py::module_local())
-      .value("hs", bytefast::loss_name::hs)
-      .value("ns", bytefast::loss_name::ns)
       .value("softmax", bytefast::loss_name::softmax)
       .value("ova", bytefast::loss_name::ova)
       .export_values();

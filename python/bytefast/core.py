@@ -11,8 +11,6 @@ from . import _core_pybind as _core
 LOSSES = {
     "softmax": _core.loss_name.softmax,
     "ova": _core.loss_name.ova,
-    "hs": _core.loss_name.hs,
-    "ns": _core.loss_name.ns,
 }
 
 # Training arguments and their defaults. The snake_case aliases below are
@@ -26,7 +24,6 @@ DEFAULTS = {
     "minCountLabel": 0,
     "minn": 0,
     "maxn": 0,
-    "neg": 5,
     "wordNgrams": 1,
     "loss": "softmax",
     "bucket": 2000000,
@@ -40,7 +37,6 @@ DEFAULTS = {
     "minc": 0,
     "maxc": 0,
     "maxBytes": 0,
-    "hashWords": False,
     "wordlist": "",
     "maxVocab": 0,
     "inputModel": "",
@@ -60,7 +56,6 @@ ALIASES = {
     "lr_update_rate": "lrUpdateRate",
     "label_prefix": "label",
     "max_bytes": "maxBytes",
-    "hash_words": "hashWords",
     "max_vocab": "maxVocab",
     "input_model": "inputModel",
     "crop_prob": "cropProb",
@@ -162,8 +157,7 @@ def train_supervised(**kwargs):
     (``__label__NAME`` by default) per line. Each example is represented by
     the average of its feature vectors, and the features combine freely:
 
-    - words (minCount, wordlist, maxVocab; hashWords gives words outside the
-      vocabulary a hashed vector)
+    - words (minCount, wordlist, maxVocab)
     - minn/maxn: character n-grams inside each word
     - wordNgrams: hashed word n-grams
     - minb/maxb: byte n-grams over the whole text
@@ -183,13 +177,11 @@ def train_supervised(**kwargs):
     if args["loss"] not in LOSSES:
         raise ValueError("Unrecognized loss name: %s" % args["loss"])
     args["loss"] = LOSSES[args["loss"]]
-    args["hashWords"] = bool(args["hashWords"])
     a = _core.args()
     for name, value in args.items():
         setattr(a, name, value)
     # Without hashed features the bucket table is unused; keep it empty.
-    if (a.wordNgrams <= 1 and a.maxn == 0 and a.maxb == 0 and a.maxc == 0
-            and not a.hashWords):
+    if a.wordNgrams <= 1 and a.maxn == 0 and a.maxb == 0 and a.maxc == 0:
         a.bucket = 0
     f = _core.bytefast()
     _core.train(f, a)

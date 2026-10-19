@@ -13,7 +13,6 @@ changes which features go into the average.
 
 ```
 text ──► fold ──► tokens ──┬─► word ids (vocabulary)                 ─┐
-                           ├─► hashed OOV words      (-hashWords)     │
                            ├─► subword n-grams       (-minn/-maxn)    ├─► mean ─► linear ─► loss
                            ├─► word n-grams          (-wordNgrams)    │
                            └─► " w1 w2 … wn " ──┬─► byte n-grams (-minb/-maxb)  │
@@ -45,9 +44,7 @@ word and subword hashes are unchanged, so fastText models keep working.
   boundary. Word features always see the whole line.
 - **Vocabulary control.** `-minCount` (frequency), `-wordlist` (a given
   vocabulary) and `-maxVocab` (top-N by frequency, ties broken by the word)
-  can be combined. `-hashWords` gives every other word a hashed vector, so
-  the vocabulary decides which words get their own row, not which words are
-  seen.
+  can be combined.
 - **Training-only options.** `-cropProb/-cropMin/-cropMax/-cropUnit` and
   `-normProb` change
   what a training step sees, never prediction. `-inputModel` reloads the
@@ -68,11 +65,11 @@ Each axis is a set of flags; nothing else changes between runs.
 | Axis | Variants |
 | --- | --- |
 | A. Input units | words; subwords (`-minn 2 -maxn 5`); text bytes (`-minb 1..2 -maxb 4..6`); text characters (`-minc 1..2 -maxc 3..5`); combinations |
-| B. Word vectors | none (`-minCount` > corpus); `-minCount` 1 / 5 / 100 / 1000; `-maxVocab` 50k / 200k / 1M; `-wordlist` (frequency or class-discriminative lists); with and without `-hashWords` |
+| B. Word vectors | none (`-minCount` > corpus); `-minCount` 1 / 5 / 100 / 1000; `-maxVocab` 50k / 200k / 1M; `-wordlist` (frequency or class-discriminative lists) |
 | C. Word context | `-wordNgrams` 1 / 2 |
 | D. Normalization | `-normProb` 0 / 0.3; `-maxBytes` 0 / 256 / 512 |
 | E. Capacity | `-bucket` 2^18 / 2^20 / 2^22 × `-dim` 32 / 64 / 128 / 256 |
-| F. Loss | `softmax` / `one-vs-all` / `hs` |
+| F. Loss | `softmax` / `one-vs-all` |
 | G. Compression | `quantize` with `-cutoff`, `-qnorm`, `-qout`; accuracy against model size |
 | I. Short inputs | `-cropProb` 0 / 0.3 / 0.7 with `-cropUnit char` (`-cropMax` 20) or `word` (`-cropMax` 5); from scratch, or as a second stage with `-inputModel` |
 

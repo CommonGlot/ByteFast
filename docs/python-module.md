@@ -20,12 +20,11 @@ model.save_model("model.safetensors")
 `train_supervised` takes keyword arguments only. Every option of
 `bytefast supervised -h` is accepted under the same name, and these
 snake_case aliases also work: `min_count`, `min_count_label`,
-`word_ngrams`, `lr_update_rate`, `label_prefix`, `max_bytes`, `hash_words`,
-`max_vocab`, `input_model`, `crop_prob`, `crop_min`, `crop_max`,
+`word_ngrams`, `lr_update_rate`, `label_prefix`, `max_bytes`, `max_vocab`, `input_model`, `crop_prob`, `crop_min`, `crop_max`,
 `crop_unit`, `norm_prob` and `save_epochs`.
 
-`loss` is one of `"softmax"` (default), `"ova"` (one-vs-all, for
-multi-label data), `"hs"` and `"ns"`.
+`loss` is `"softmax"` (default) or `"ova"` (one-vs-all, which also handles
+multi-label data).
 
 ## Prediction and evaluation
 

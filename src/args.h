@@ -19,7 +19,8 @@ namespace bytefast {
 class SafeTensorsReader;
 class SafeTensorsWriter;
 
-enum class loss_name : int { hs = 1, ns, softmax, ova };
+// The values match the loss field of model files from before safetensors.
+enum class loss_name : int { softmax = 3, ova = 4 };
 
 class Args {
  protected:
@@ -36,7 +37,6 @@ class Args {
   int epoch;
   int minCount;
   int minCountLabel;
-  int neg;
   int wordNgrams;
   loss_name loss;
   int bucket;
@@ -48,7 +48,6 @@ class Args {
   int minc;
   int maxc;
   int maxBytes;
-  bool hashWords;
   std::string wordlist;
   int maxVocab;
   // Training only (not stored in models).
