@@ -31,13 +31,13 @@ make opt                      # builds ./bytefast
 python -m pip install .       # Python package "bytefast"
 ```
 
-The Python API is described in [docs/python-module.md](docs/python-module.md).
+The Python API is described in [docs/python-module.md](bindings/python/README.md).
 Prediction is also available from other languages, all through one C API
 ([src/bytefast_c.h](src/bytefast_c.h); `make lib` builds `libbytefast.a`):
 
 | Language | Package | Source |
 | --- | --- | --- |
-| Python | `pip install bytefast` (training too) | [python/](python/) |
+| Python | `pip install bytefast` (training too) | [bindings/python](bindings/python/README.md) |
 | Rust | `bytefast` crate | [bindings/rust](bindings/rust/README.md) |
 | JavaScript (Node, browsers) | `npm install bytefast` | [bindings/js](bindings/js/README.md) |
 | C / C++ | `libbytefast.a` + `bytefast_c.h` | [src/bytefast_c.h](src/bytefast_c.h) |

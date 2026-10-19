@@ -1,4 +1,4 @@
-# Python module
+# bytefast (Python)
 
 ```bash
 python -m pip install .       # from a clone of this repository

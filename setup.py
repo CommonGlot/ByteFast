@@ -69,7 +69,7 @@ ext_modules = [
     Extension(
         str("bytefast._core_pybind"),
         [
-            str("python/bytefast/pybind/core_pybind.cc"),
+            str("bindings/python/bytefast/pybind/core_pybind.cc"),
         ]
         + core_src_cc,
         include_dirs=[
@@ -202,6 +202,6 @@ setup(
     install_requires=["numpy"],
     cmdclass={"build_ext": BuildExt},
     packages=["bytefast"],
-    package_dir={"bytefast": "python/bytefast"},
+    package_dir={"bytefast": "bindings/python/bytefast"},
     zip_safe=False,
 )
