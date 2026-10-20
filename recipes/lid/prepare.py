@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build train/dev/test files from the GlotLID corpus, following the GlotLID paper.
 
-For every label (merged across the version folders given with --versions):
+For every label (in the folders given with --versions, data/ by default):
   1. read all source files, collapse whitespace, drop empty and duplicate lines;
   2. shuffle deterministically and hold out --holdout (15%) of the lines;
      test and dev are each min(--max-eval, half the hold-out) lines of it;
@@ -146,7 +146,7 @@ def main():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--corpus", type=Path, required=True)
     p.add_argument("--out", type=Path, required=True)
-    p.add_argument("--versions", nargs="+", default=["v3.1", "v3.2-ext", "v4.0-ext", "zxx"])
+    p.add_argument("--versions", nargs="+", default=["data"])
     p.add_argument("--holdout", type=float, default=0.15)
     p.add_argument("--max-eval", type=int, default=1000)
     p.add_argument("--alpha", type=float, default=0.3)

@@ -124,7 +124,7 @@ def main():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--corpus", type=Path, required=True)
     p.add_argument("--out", type=Path, required=True)
-    p.add_argument("--versions", nargs="+", default=["v3.1", "v3.2-ext", "v4.0-ext", "zxx"])
+    p.add_argument("--versions", nargs="+", default=["data"])
     p.add_argument("--holdout", type=float, default=0.15)
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--max-lines", type=int, default=300000)

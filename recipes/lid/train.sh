@@ -3,7 +3,7 @@
 #
 #   recipes/lid/train.sh CORPUS OUT [lid|lid-accurate] [experts]
 #
-# CORPUS is a GlotLID-style corpus (VERSION/LABEL/LABEL_SOURCE.txt). Writes
+# CORPUS is a GlotLID-style corpus (data/LABEL/LABEL_SOURCE.txt). Writes
 # OUT/model.safetensors: the PRESET model trained with per-label weights
 # (fitted bias, confused pairs) and a lexicon built from its training
 # split; with "experts", also an expert for each group of expert_groups.tsv.

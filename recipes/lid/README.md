@@ -1,7 +1,7 @@
 # Language identification recipe (GlotLID-Byte)
 
 `train.sh` builds a language-ID model from a GlotLID-style corpus
-(`VERSION/LABEL/LABEL_SOURCE.txt`) with the settings chosen in
+(`data/LABEL/LABEL_SOURCE.txt`) with the settings chosen in
 [docs/architecture.md](../../docs/architecture.md):
 
 ```bash
