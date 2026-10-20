@@ -71,7 +71,7 @@ void Args::applyPreset(const std::string& name) {
     throw std::invalid_argument("Unknown preset: " + name + " (lid, lid-accurate)");
   }
   dim = 64;
-  epoch = 3;
+  epoch = 1;
   lr = 0.8;
   minCount = 1;
   maxVocab = 20000;

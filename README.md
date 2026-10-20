@@ -123,7 +123,7 @@ data:
 
 - `-preset lid` / `-preset lid-accurate`: the language-ID settings of
   [docs/architecture.md](docs/architecture.md) (bytes 2-5, the 20k most
-  frequent words, crops, normalized and stripped lines, 3 epochs at lr 0.8;
+  frequent words, crops, normalized and stripped lines, 1 epoch at lr 0.8;
   `lid-accurate` adds subwords). Options given with a preset override it.
   [recipes/lid](recipes/lid) builds the whole model from a corpus.
 

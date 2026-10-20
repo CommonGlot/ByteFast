@@ -19,8 +19,7 @@ ones (labels are filled from the smallest up).
 --sampling upsample is GlotLID's own rule (assets/train/upsample.py): each label
 gets max(pool, temperature target at the full corpus size), i.e. small labels
 are upsampled and large ones keep all their lines. With --total the resulting
-mixture is scaled to that budget (same shares); --max-repeat caps any label at
-that many passes over its pool.
+mixture is scaled to that budget (same shares).
 
 --variants writes several samplings from one pass over the corpus, e.g.
 "temp0.3=temperature:0.3 unimax5=unimax:5": OUT/train.NAME.txt and
@@ -114,7 +113,7 @@ def temperature_targets(pools, total, alpha):
     return {l: max(1, round(total * w / norm)) for l, w in weights.items()}
 
 
-def upsample_targets(pools, total, alpha, max_repeat=0):
+def upsample_targets(pools, total, alpha):
     """GlotLID's rule: max(pool, temperature target); scaled to `total` lines if given."""
     full = sum(pools.values())
     temp = temperature_targets(pools, full, alpha)
@@ -122,8 +121,6 @@ def upsample_targets(pools, total, alpha, max_repeat=0):
     if total:
         scale = total / sum(targets.values())
         targets = {l: max(1, round(t * scale)) for l, t in targets.items()}
-    if max_repeat:
-        targets = {l: min(t, max(1, round(pools[l] * max_repeat))) for l, t in targets.items()}
     return targets
 
 
@@ -176,10 +173,9 @@ def main():
     p.add_argument("--max-eval", type=int, default=1000)
     p.add_argument("--alpha", type=float, default=0.3)
     p.add_argument("--sampling", choices=["temperature", "unimax", "upsample"], default="temperature")
-    p.add_argument("--max-repeat", type=float, default=0, help="upsample: cap on passes over a pool")
     p.add_argument("--epochs", type=float, default=5.0, help="UniMax: max passes over a label's pool")
     p.add_argument("--variants", nargs="*", default=[],
-                   help="NAME=temperature:ALPHA, NAME=unimax:EPOCHS or NAME=upsample:ALPHA[:MAX_REPEAT]; "
+                   help="NAME=temperature:ALPHA, NAME=unimax:EPOCHS or NAME=upsample:ALPHA; "
                         "one train file per variant")
     p.add_argument("--total", type=int, default=0, help="training lines (0 = pool size)")
     p.add_argument("--max-train-per-label", type=int, default=0)
@@ -217,15 +213,15 @@ def main():
     if not specs:
         specs[""] = {"temperature": ("temperature", str(ARGS.alpha)),
                      "unimax": ("unimax", str(ARGS.epochs)),
-                     "upsample": ("upsample", str(ARGS.alpha), str(ARGS.max_repeat))}[ARGS.sampling]
+                     "upsample": ("upsample", str(ARGS.alpha))}[ARGS.sampling]
     plans = {}
-    for name, (kind, value, *rest) in specs.items():
+    for name, (kind, value) in specs.items():
         if kind == "temperature":
             targets = temperature_targets(pools, total, float(value))
         elif kind == "unimax":
             targets = unimax_targets(pools, total, float(value))
         else:
-            targets = upsample_targets(pools, ARGS.total, float(value), float(rest[0]) if rest else 0)
+            targets = upsample_targets(pools, ARGS.total, float(value))
         if ARGS.max_train_per_label:
             targets = {l: min(t, ARGS.max_train_per_label) for l, t in targets.items()}
         plans[name] = targets

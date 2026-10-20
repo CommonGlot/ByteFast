@@ -89,4 +89,4 @@ FLORES+ devtest and the GlotLID test split.
 | `-fold`, `-posBins`, `-textScope` | no gain in earlier ablations |
 | word n-grams (`-wordNgrams`), `-minCountLabel` | not part of the chosen language-ID settings (word bigrams helped only AG News and Yelp) |
 | per-label bias at prediction | FLORES +2.1 but CommonLID -2.5: it trades false positives of big languages for recall of small ones |
-| `-saveEpochs`, `-validation`, `-lrUpdateRate`, `test-label` | tooling outside the chosen settings; the epoch count is fixed at 3 |
+| `-saveEpochs`, `-validation`, `-lrUpdateRate`, `test-label` | tooling outside the chosen settings; the epoch count is fixed at 1 |

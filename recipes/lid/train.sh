@@ -6,8 +6,9 @@
 # CORPUS is a GlotLID-style corpus (data/LABEL/LABEL_SOURCE.txt). Writes
 # OUT/model.safetensors: the PRESET model with a lexicon built from its
 # training split.
-# BYTEFAST (./bytefast), THREADS (32), TOTAL (training lines, 20000000; 0 = the
-# full upsampled pool) and CAP (at most this many lines per label) can be set.
+# BYTEFAST (./bytefast), THREADS (32), TOTAL (training lines; 0, the default,
+# keeps GlotLID's full upsampled pool) and CAP (at most this many lines per
+# label) can be set.
 set -euo pipefail
 CORPUS=$1
 OUT=$2
@@ -20,7 +21,7 @@ mkdir -p "$D"
 
 # 1. Train/dev/test split with GlotLID's upsampling.
 [ -f "$D/train.txt" ] || python3 "$HERE/prepare.py" --corpus "$CORPUS" --out "$D" \
-  --sampling upsample --alpha 0.3 --max-repeat 20 --total "${TOTAL:-20000000}" --workers "$T" \
+  --sampling upsample --alpha 0.3 --total "${TOTAL:-0}" --workers "$T" \
   ${CAP:+--max-train-per-label "$CAP"}
 # 2. Per-label lexicons from the training split.
 [ -f "$OUT/lexicon/lexicon.train.tsv" ] || python3 "$HERE/build_lexicon.py" --corpus "$CORPUS" \

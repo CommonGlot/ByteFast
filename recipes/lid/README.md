@@ -15,22 +15,24 @@ recipes/lid/train.sh data/glotlid-corpus out/accurate lid-accurate  # + subwords
 | `lid` (default) | bytes 2-5 (262k buckets), the 20k most frequent words, dim 64, `-maxBytes 512` | 12.0k lines/s | 84 MB |
 | `lid-accurate` | `lid` + subwords 2-5, 1M buckets | 8.8k lines/s | 285 MB |
 
-GlotLID-Byte v4 (20M lines, 2,088 labels), macro F1:
+GlotLID-Byte v4 (20M sampled lines, 3 epochs, label weights; 2,088 labels), macro F1:
 
 | | CommonLID | 5 words | 20 chars | UDHR | SmolSent | FLORES+ devtest | test split |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `lid` | 0.6126 | 0.5511 | 0.4884 | 0.7579 | 0.7390 | 0.9428 | 0.9839 |
 | `lid-accurate` | 0.6136 | 0.5575 | 0.4952 | 0.7637 | 0.7386 | 0.9472 | 0.9858 |
 
-Both presets train for 3 epochs at lr 0.8 on random 5-20 character spans
+Both presets train for 1 epoch at lr 0.8, as GlotLID did, on random 5-20 character spans
 (30% of lines), CommonLID-normalized lines (30%) and lines without optional
 diacritics (10%).
 
 Steps (each is skipped if its output exists):
 
 1. `prepare.py`: per-label 15% hold-out for dev and test, then GlotLID's
-   upsampling to `TOTAL` (20M; 0 keeps the full upsampled pool) training
-   lines, at most `CAP` per label when set. Balance between labels comes
+   upsampling (`assets/train/upsample.py`): each label gets the larger of its
+   pool and its temperature share (alpha 0.3) of the full corpus. `TOTAL`
+   scales that to a line budget (0, the default, keeps it all) and `CAP`
+   limits lines per label when set. Balance between labels comes
    from this sampling only; there are no per-label training weights.
 2. `build_lexicon.py`: per-label lists of correct words from the training
    split only (at least 3 lines, the label's script, at least 2 sources when
