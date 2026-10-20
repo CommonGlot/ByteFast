@@ -139,15 +139,20 @@ percent-threshold check of [Caswell et al. (2020)](https://aclanthology.org/2020
 prefix is optional). At prediction, a line's words are normalized like
 `-normProb` does, and the top label is kept only if at least `-lexThreshold`
 (0.5) of them are in its list. Otherwise the first of the top `-lexTopK` (5)
-labels that passes comes first, and if none passes the order is unchanged.
-Lines with fewer than `-lexMinWords` (2) words, and labels without a list,
-always pass. The lists are a Bloom filter (10 bits per word, about 1% of
-unknown words counted as known), so 8.4M words take about 10 MB. The check
-only changes prediction; `bytefast predict` takes a threshold after the
-thread count (0 turns the check off), and Python has
-`model.set_lexicon_threshold`. On a 2,000-label language-ID model with lists
-built from its training data, it raised CommonLID macro F1 from 0.601 to
-0.607 and its 5-word view from 0.535 to 0.547.
+labels that has a list and passes comes first, and if none passes the order
+is unchanged. A top label without a list is not checked, and a label without
+a list is never moved up; lines with fewer than `-lexMinWords` (2) words are
+not checked. The lists are a Bloom filter (10 bits per word, about 1% of
+unknown words counted as known), so 8M words take about 10 MB. The check
+only changes prediction: `bytefast set-lexicon MODEL FILE OUTPUT` replaces
+the lists of a trained model (`-` removes them), `bytefast predict` takes a
+threshold after the thread count (0 turns the check off), and Python has
+`model.set_lexicon_threshold`. On the 2,088-label GlotLID-Byte v4 model, with
+lists built from its training data that pass a self-check on held-out lines
+(recipes/lid/build_lexicon.py), it raised CommonLID macro F1 from 0.609 to
+0.613, its 5-word view from 0.542 to 0.551, SmolSent's 5-word view from
+0.669 to 0.681 and FLORES+ devtest from 0.940 to 0.943, without lowering the
+in-domain test split (0.983 to 0.984).
 
 ### Experts
 

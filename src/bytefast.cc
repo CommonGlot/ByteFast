@@ -318,17 +318,23 @@ void ByteFast::predict(
   }
   model_->predict(features, check ? std::max(k, args_->lexTopK) : k, 0.0,
       predictions, state);
-  // The first of the top -lexTopK labels that passes the lexicon check goes
-  // first; if none passes, the order is kept.
-  if (check) {
+  // If the top label has a lexicon and fails its check, the first of the top
+  // -lexTopK labels that has a lexicon and passes goes first; a label without
+  // a lexicon is never moved up. If none passes, the order is kept.
+  if (check && !predictions.empty()) {
     const std::vector<uint64_t> words = Lexicon::words(tokens);
-    const size_t tried = std::min<size_t>(args_->lexTopK, predictions.size());
-    for (size_t i = 0; i < tried; i++) {
-      if (lexicon_.passes(predictions[i].second, words, args_->lexThreshold,
-              args_->lexMinWords)) {
-        std::rotate(predictions.begin(), predictions.begin() + i,
-            predictions.begin() + i + 1);
-        break;
+    const int32_t top = predictions[0].second;
+    if (lexicon_.checks(top, words.size(), args_->lexMinWords) &&
+        !lexicon_.passes(top, words, args_->lexThreshold, args_->lexMinWords)) {
+      const size_t tried = std::min<size_t>(args_->lexTopK, predictions.size());
+      for (size_t i = 1; i < tried; i++) {
+        const int32_t label = predictions[i].second;
+        if (lexicon_.checks(label, words.size(), args_->lexMinWords) &&
+            lexicon_.passes(label, words, args_->lexThreshold, args_->lexMinWords)) {
+          std::rotate(predictions.begin(), predictions.begin() + i,
+              predictions.begin() + i + 1);
+          break;
+        }
       }
     }
   }
@@ -362,6 +368,13 @@ void ByteFast::predict(
 
 void ByteFast::setLexiconThreshold(real threshold) {
   args_->lexThreshold = threshold;
+}
+
+void ByteFast::setLexicon(const std::string& path) {
+  lexicon_ = Lexicon();
+  if (!path.empty()) {
+    lexicon_.build(path, *dict_, args_->label, args_->verbose);
+  }
 }
 
 bool ByteFast::predictLine(

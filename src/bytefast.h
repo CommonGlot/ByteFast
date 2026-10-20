@@ -123,6 +123,10 @@ class ByteFast {
 
   // Share of words for the lexicon check; 0 turns it off.
   void setLexiconThreshold(real threshold);
+  // Replaces the lexicon with the LABEL<TAB>WORD lines of `path` (the
+  // lexicon only changes prediction, so no retraining is needed); an empty
+  // path removes it.
+  void setLexicon(const std::string& path);
 
   // Stores `expert` in this model (saved with it): lines whose top label is
   // one of the expert's labels, with a probability below `gate`, get the

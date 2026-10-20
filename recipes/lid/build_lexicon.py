@@ -11,21 +11,29 @@ never enter a lexicon. A word is kept for a label when
    normalization: lowercase, no digits or punctuation);
 2. at least --min-script of its letters are in the label's script;
 3. it is in at least two sources when the label has two or more sources with
-   --min-source-lines lines (one source's boilerplate is not the language);
+   at least --min-source-lines lines and --min-source-share of its lines (one
+   source's boilerplate is not the language);
 4. it is among the most frequent words that cover --coverage of the label's
    word occurrences (at most --max-words);
 5. it is not a stray of a big language: for each of the --big labels with the
    most lines, the word is dropped if it is --stray-ratio times more frequent
    (per line) in that big label than in this one.
 
+Self-check: a lexicon is used only if at least --min-dev-pass of the label's
+dev lines (held out, with at least --check-min-words words) have
+--check-threshold of their words in it, the check the model applies; a
+lexicon that rejects its own label's text would move correct predictions.
+
 Writes OUT/lexicon.tsv (label, word, lines, sources), OUT/stats.tsv, and
 OUT/lexicon.train.tsv for ByteFast's -lexicon: the same lines without the
 labels written without spaces between words (a median of one word or fewer
-per line), whose lines cannot be checked word by word.
+per line), whose lines cannot be checked word by word, and without the labels
+that fail the self-check.
 
   python recipes/lid/build_lexicon.py --corpus data/glotlid-corpus --out data/lexicon --workers 44
 """
 import argparse
+import math
 import random
 import sys
 import zlib
@@ -61,8 +69,8 @@ def script_pattern(code):
         return None
 
 
-def train_lines(label, paths):
-    """prepare.split's training lines, each with its source name."""
+def split_lines(label, paths):
+    """prepare.split's training lines (each with its source name) and dev lines."""
     seen, lines = set(), []
     prefix = label + "_"
     for path in paths:
@@ -72,12 +80,15 @@ def train_lines(label, paths):
     rng.shuffle(lines)
     n = len(lines)
     hold = min(round(n * ARGS.holdout), n - 1) if n > 1 else 0
-    return lines[hold:]
+    n_test = min(ARGS.max_eval, math.ceil(hold / 2))
+    n_dev = min(ARGS.max_eval, hold - n_test)
+    return lines[hold:], [t for t, _ in lines[n_test:n_test + n_dev]]
 
 
 def count_label(item):
     label, paths = item
-    lines = train_lines(label, paths)[:ARGS.max_lines]
+    lines, dev = split_lines(label, paths)
+    lines = lines[:ARGS.max_lines]
     pattern = script_pattern(label.rsplit("_", 1)[-1])
     df, sources, per_source, tokens = Counter(), defaultdict(set), Counter(), []
     occurrences = Counter()
@@ -91,26 +102,28 @@ def count_label(item):
             if len(sources[w]) < 2:
                 sources[w].add(source)
     n = max(len(lines), 1)
-    multi = sum(1 for c in per_source.values() if c >= ARGS.min_source_lines) >= 2
+    # The two-source rule needs a second source of real size.
+    floor = max(ARGS.min_source_lines, ARGS.min_source_share * n)
+    multi = sum(1 for c in per_source.values() if c >= floor) >= 2
     total = sum(occurrences.values()) or 1
     kept, covered = [], 0
     for w, c in occurrences.most_common():
         if covered / total >= ARGS.coverage or len(kept) >= ARGS.max_words:
             break
-        covered += c
         if df[w] < ARGS.min_lines or (multi and len(sources[w]) < 2):
             continue
         if pattern is not None:
             letters = LETTER.findall(w)
             if not letters or sum(1 for ch in letters if pattern.match(ch)) < ARGS.min_script * len(letters):
                 continue
+        covered += c
         kept.append((w, df[w], len(sources[w])))
     tokens.sort()
     stats = dict(lines=len(lines), sources=len(per_source), multi=multi,
                  median_tokens=tokens[len(tokens) // 2] if tokens else 0)
     # Per-line rates of the big labels' words, for the stray check.
     rates = {w: c / n for w, c in df.most_common(ARGS.big_words)} if label in ARGS.big_labels else {}
-    return label, kept, stats, n, rates
+    return label, kept, stats, n, rates, dev
 
 
 def main():
@@ -127,6 +140,11 @@ def main():
     p.add_argument("--min-lines", type=int, default=3)
     p.add_argument("--min-script", type=float, default=0.5)
     p.add_argument("--min-source-lines", type=int, default=50)
+    p.add_argument("--min-source-share", type=float, default=0.05)
+    p.add_argument("--max-eval", type=int, default=1000, help="as in prepare.py")
+    p.add_argument("--check-threshold", type=float, default=0.5)
+    p.add_argument("--check-min-words", type=int, default=2)
+    p.add_argument("--min-dev-pass", type=float, default=0.9)
     p.add_argument("--coverage", type=float, default=0.97)
     p.add_argument("--max-words", type=int, default=10000)
     p.add_argument("--big", type=int, default=40)
@@ -142,11 +160,11 @@ def main():
     # Big labels by bytes on disk (close enough to lines for the top few).
     disk = {label: sum(p.stat().st_size for p in paths) for label, paths in files.items()}
     ARGS.big_labels = set(sorted(disk, key=disk.get, reverse=True)[:ARGS.big])
-    lexicon, stats, size, rates = {}, {}, {}, {}
+    lexicon, stats, size, rates, devs = {}, {}, {}, {}, {}
     with Pool(ARGS.workers, init_worker, (ARGS,)) as pool:
-        for i, (label, kept, st, n, r) in enumerate(
+        for i, (label, kept, st, n, r, dev) in enumerate(
                 pool.imap_unordered(count_label, sorted(files.items()), chunksize=1)):
-            lexicon[label], stats[label], size[label], rates[label] = kept, st, n, r
+            lexicon[label], stats[label], size[label], rates[label], devs[label] = kept, st, n, r, dev
             if (i + 1) % 200 == 0:
                 print("%d/%d labels" % (i + 1, len(files)), file=sys.stderr, flush=True)
     big = sorted(ARGS.big_labels)
@@ -155,7 +173,7 @@ def main():
     with open(ARGS.out / "lexicon.tsv", "w", encoding="utf-8") as out, \
             open(ARGS.out / "lexicon.train.tsv", "w", encoding="utf-8") as train_out, \
             open(ARGS.out / "stats.tsv", "w", encoding="utf-8") as st_out:
-        st_out.write("label\tlines\tsources\tmulti_source\tmedian_tokens\twords\tstrays\n")
+        st_out.write("label\tlines\tsources\tmulti_source\tmedian_tokens\twords\tstrays\tdev_pass\tused\n")
         for label in sorted(lexicon):
             n = max(size[label], 1)
             words, strays = [], 0
@@ -166,13 +184,21 @@ def main():
                     strays += 1
                     continue
                 words.append((w, df, src))
+            known = {w for w, _, _ in words}
+            checked = [ws for ws in (NONWORD.sub("", t.lower()).split() for t in devs[label])
+                       if len(ws) >= ARGS.check_min_words]
+            passed = sum(sum(w in known for w in ws) >= ARGS.check_threshold * len(ws) for ws in checked)
+            dev_pass = passed / len(checked) if checked else 1.0
+            used = bool(words) and stats[label]["median_tokens"] > 1 and dev_pass >= ARGS.min_dev_pass
+            for w, df, src in words:
                 row = "%s\t%s\t%d\t%d\n" % (label, w, df, src)
                 out.write(row)
-                if stats[label]["median_tokens"] > 1:
+                if used:
                     train_out.write(row)
             s = stats[label]
-            st_out.write("%s\t%d\t%d\t%d\t%d\t%d\t%d\n" % (
-                label, s["lines"], s["sources"], s["multi"], s["median_tokens"], len(words), strays))
+            st_out.write("%s\t%d\t%d\t%d\t%d\t%d\t%d\t%.3f\t%d\n" % (
+                label, s["lines"], s["sources"], s["multi"], s["median_tokens"], len(words), strays,
+                dev_pass, used))
     print("big labels:", " ".join(big), file=sys.stderr)
 
 

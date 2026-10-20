@@ -140,10 +140,14 @@ std::vector<uint64_t> Lexicon::words(const std::vector<std::string>& tokens) {
   return out;
 }
 
+bool Lexicon::checks(int32_t label, size_t nwords, int32_t minWords) const {
+  return !empty() && label >= 0 && label < int32_t(hasLexicon_.size()) &&
+      hasLexicon_[label] && int32_t(nwords) >= minWords;
+}
+
 bool Lexicon::passes(int32_t label, const std::vector<uint64_t>& words,
     double threshold, int32_t minWords) const {
-  if (empty() || label < 0 || label >= int32_t(hasLexicon_.size()) ||
-      !hasLexicon_[label] || int32_t(words.size()) < minWords) {
+  if (!checks(label, words.size(), minWords)) {
     return true;
   }
   // Stop as soon as the answer is known.

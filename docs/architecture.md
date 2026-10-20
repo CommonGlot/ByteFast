@@ -44,8 +44,10 @@ counts still use well-mixed bits.
 - **Lexicon check.** `-lexicon` stores per-label word lists as a Bloom
   filter over (label, word) pairs. At prediction the top label must have at
   least `-lexThreshold` of the line's normalized words in its list, else the
-  first of the top `-lexTopK` that does moves first (Caswell et al. 2020's
-  percent-threshold filter, used as a re-ranker).
+  first of the top `-lexTopK` that has a list and passes moves first
+  (Caswell et al. 2020's percent-threshold filter, used as a re-ranker).
+  Labels without a list are never moved up; `set-lexicon` swaps the lists
+  of a trained model.
 - **Training-only options.** `-cropProb/-cropMin/-cropMax` (random character
   spans), `-normProb` (CommonLID-style normalization: lowercase, no digits or
   punctuation) and `-stripProb` (no optional diacritics) change what a
@@ -80,7 +82,7 @@ FLORES+ devtest and the GlotLID test split.
 | `-stripProb` | UDHR 0.815 -> 0.824 (2M lines, 0.3); Ewe and Fon gain, Yoruba loses |
 | `-labelWeights` | confused-pair upweighting: CommonLID +0.25, 5-word +0.66, FLORES +0.54 (as duplicated lines); bias-fitted resampling exp(b/2): FLORES +1.1, UDHR +0.4, CommonLID -0.7, so the recipe uses exp(b/4) |
 | experts (`add-expert`) | FLORES 0.930 -> 0.939 on the reweighted 20M model; +1.2 GB for five groups, 7% slower on CommonLID |
-| `-lexicon` (threshold 0.5, top 5, 2+ words) | CommonLID 0.601 -> 0.607, 5-word 0.535 -> 0.547, SmolSent 0.738 -> 0.745, UDHR 0.755 -> 0.753; thresholds 0.6-0.8 and returning no label are worse |
+| `-lexicon` (threshold 0.5, top 5, 2+ words) | v4 model: CommonLID 0.609 -> 0.613, 5-word 0.542 -> 0.551, SmolSent 5-word 0.669 -> 0.681, FLORES+ 0.940 -> 0.943, test split 0.983 -> 0.984; promoting labels without a list, or lists that fail their own held-out lines, made the test split drop to 0.972-0.977; thresholds 0.6-0.8 and returning no label are worse |
 
 **Removed**
 

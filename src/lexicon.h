@@ -32,9 +32,11 @@ class Lexicon {
   // Hashes of the normalized words of a line's tokens (the end-of-line
   // token excluded).
   static std::vector<uint64_t> words(const std::vector<std::string>& tokens);
+  // Whether the check applies: the label has a lexicon and the line has at
+  // least minWords words.
+  bool checks(int32_t label, size_t nwords, int32_t minWords) const;
   // Whether at least `threshold` of the words are in the lexicon of the
-  // label. Labels without a lexicon and lines of fewer than minWords words
-  // always pass.
+  // label (true when the check does not apply).
   bool passes(int32_t label, const std::vector<uint64_t>& words,
       double threshold, int32_t minWords) const;
 

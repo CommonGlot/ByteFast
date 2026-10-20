@@ -27,6 +27,7 @@ void printUsage() {
          "probabilities\n"
       << "  add-expert              store an expert model for a group of labels "
          "in a model\n"
+      << "  set-lexicon             replace or remove the lexicon of a model\n"
       << std::endl;
 }
 
@@ -39,6 +40,27 @@ void printAddExpertUsage() {
       << "  <gate>       (optional; 0.8 by default) the expert picks the label when\n"
       << "               the top label is in its group with a probability below this\n"
       << std::endl;
+}
+
+void printSetLexiconUsage() {
+  std::cerr
+      << "usage: bytefast set-lexicon <model> <lexicon> <output>\n\n"
+      << "  <model>      model filename\n"
+      << "  <lexicon>    LABEL<TAB>WORD file (as for -lexicon); - removes the lexicon\n"
+      << "  <output>     model filename to write\n"
+      << std::endl;
+}
+
+void setLexicon(const std::vector<std::string>& args) {
+  if (args.size() != 5) {
+    printSetLexiconUsage();
+    exit(EXIT_FAILURE);
+  }
+  ByteFast model;
+  model.loadModel(args[2]);
+  model.setLexicon(args[3] == "-" ? "" : args[3]);
+  model.saveModel(args[4]);
+  exit(0);
 }
 
 void addExpert(const std::vector<std::string>& args) {
@@ -272,6 +294,8 @@ int main(int argc, char** argv) {
     predict(args);
   } else if (command == "add-expert") {
     addExpert(args);
+  } else if (command == "set-lexicon") {
+    setLexicon(args);
   } else {
     printUsage();
     exit(EXIT_FAILURE);

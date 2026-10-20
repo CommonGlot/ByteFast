@@ -89,6 +89,11 @@ def main():
         assert loaded.predict(query)[0] == ("__label__finance",)
         loaded.set_lexicon_threshold(0.0)
         assert loaded.predict(query)[0] == ("__label__sports",)
+        # A label without a lexicon (science here) is never moved up.
+        lexicon.write_text("sports\tzzz\n" + "".join(
+            "__label__finance\t%s\n" % w for w in query.split()), encoding="utf-8")
+        partial = train(data, minb=2, maxb=5, bucket=50000, lexicon=str(lexicon))
+        assert partial.predict(query)[0] == ("__label__finance",)
 
         # Presets: the language-ID settings, overridable.
         lid = train(data, preset="lid", minCount=1, bucket=50000, epoch=15, lr=0.5)
