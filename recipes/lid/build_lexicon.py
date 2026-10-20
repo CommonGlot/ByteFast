@@ -35,7 +35,7 @@ from pathlib import Path
 
 import regex
 
-from prepare import label_files
+from prepare import label_files, new_lines, read_caps
 
 NONWORD = regex.compile(r"[^\p{Word}\p{Zs}]|\d")
 LETTER = regex.compile(r"\p{L}")
@@ -67,12 +67,7 @@ def train_lines(label, paths):
     prefix = label + "_"
     for path in paths:
         source = path.stem[len(prefix):] if path.stem.startswith(prefix) else path.stem
-        with open(path, encoding="utf-8", errors="replace") as f:
-            for line in f:
-                text = " ".join(line.split())
-                if text and text not in seen:
-                    seen.add(text)
-                    lines.append((text, source))
+        lines += [(t, source) for t in new_lines(path, seen, ARGS.caps_map, ARGS.seed)]
     rng = random.Random(ARGS.seed ^ zlib.crc32(label.encode()))
     rng.shuffle(lines)
     n = len(lines)
@@ -127,6 +122,7 @@ def main():
     p.add_argument("--versions", nargs="+", default=["data"])
     p.add_argument("--holdout", type=float, default=0.15)
     p.add_argument("--seed", type=int, default=1)
+    p.add_argument("--caps", type=Path, default=None, help="the --caps file given to prepare.py")
     p.add_argument("--max-lines", type=int, default=300000)
     p.add_argument("--min-lines", type=int, default=3)
     p.add_argument("--min-script", type=float, default=0.5)
@@ -138,6 +134,7 @@ def main():
     p.add_argument("--stray-ratio", type=float, default=20.0)
     p.add_argument("--workers", type=int, default=24)
     ARGS = p.parse_args()
+    ARGS.caps_map = read_caps(ARGS.caps)
     ARGS.out.mkdir(parents=True, exist_ok=True)
 
     files = label_files(ARGS.corpus, ARGS.versions)

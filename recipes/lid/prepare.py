@@ -63,16 +63,41 @@ def label_files(corpus, versions):
     return files
 
 
+def read_caps(path):
+    """FILE_NAME<TAB>MAX_LINES lines (--caps): source files that keep at most
+    MAX_LINES of their unique lines."""
+    caps = {}
+    if path:
+        for line in open(path, encoding="utf-8"):
+            if line.strip() and not line.startswith("#"):
+                name, n = line.split("\t")[:2]
+                caps[name.strip()] = int(n)
+    return caps
+
+
+def new_lines(path, seen, caps, seed):
+    """Whitespace-collapsed lines of path that are not in seen (seen is
+    updated). A file in caps keeps a deterministic random subset of its new
+    lines, in file order."""
+    new = []
+    with open(path, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            text = " ".join(line.split())
+            if text and text not in seen:
+                seen.add(text)
+                new.append(text)
+    cap = caps.get(path.name)
+    if cap is not None and len(new) > cap:
+        rng = random.Random(seed ^ zlib.crc32(path.name.encode()))
+        new = [new[i] for i in sorted(rng.sample(range(len(new)), cap))]
+    return new
+
+
 def split(label, paths):
     """Deterministic (train, dev, test) lists for one label."""
     seen, lines = set(), []
     for path in paths:
-        with open(path, encoding="utf-8", errors="replace") as f:
-            for line in f:
-                text = " ".join(line.split())
-                if text and text not in seen:
-                    seen.add(text)
-                    lines.append(text)
+        lines += new_lines(path, seen, ARGS.caps_map, ARGS.seed)
     rng = random.Random(ARGS.seed ^ zlib.crc32(label.encode()))
     rng.shuffle(lines)
     n = len(lines)
@@ -158,12 +183,15 @@ def main():
                         "one train file per variant")
     p.add_argument("--total", type=int, default=0, help="training lines (0 = pool size)")
     p.add_argument("--max-train-per-label", type=int, default=0)
+    p.add_argument("--caps", type=Path, default=None,
+                   help="FILE_NAME<TAB>MAX_LINES: cap these source files (see new_lines)")
     p.add_argument("--min-train", type=int, default=1,
                    help="drop labels with fewer training lines than this")
     p.add_argument("--shards", type=int, default=64)
     p.add_argument("--workers", type=int, default=24)
     p.add_argument("--seed", type=int, default=1)
     ARGS = p.parse_args()
+    ARGS.caps_map = read_caps(ARGS.caps)
     ARGS.out.mkdir(parents=True, exist_ok=True)
 
     files = label_files(ARGS.corpus, ARGS.versions)

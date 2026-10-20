@@ -24,7 +24,10 @@ diacritics (10%).
 Steps (each is skipped if its output exists):
 
 1. `prepare.py`: per-label 15% hold-out for dev and test, then GlotLID's
-   upsampling to `TOTAL` (20M) training lines.
+   upsampling to `TOTAL` (20M) training lines. `source_caps.tsv` caps a few
+   source files that would otherwise dominate their label (the Dyula religious
+   text in bam_Latn); `build_lexicon.py` applies the same caps so its training
+   split matches.
 2. `build_lexicon.py`: per-label lists of correct words from the training
    split only (at least 3 lines, the label's script, at least 2 sources,
    97% coverage up to 10k words, no strays of the 40 biggest labels). The

@@ -1,0 +1,6 @@
+# FILE_NAME<TAB>MAX_LINES: source files that keep at most MAX_LINES unique lines (prepare.py and
+# build_lexicon.py --caps). bam_Latn holds Dyula's religious text (+dyu, merged from dyu_Latn), about
+# 235k lines against 25k of Bambara; these caps keep both varieties without the Bible and JW genre dominating.
+bam_Latn_jw+dyu.txt	20000
+bam_Latn_pbc+dyu.txt	10000
+bam_Latn_cbc+dyu.txt	10000

@@ -19,12 +19,14 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 D=$OUT/data
 mkdir -p "$D"
 
-# 1. Train/dev/test split and GlotLID's upsampling.
+# 1. Train/dev/test split, with the source caps of source_caps.tsv, and
+# GlotLID's upsampling.
 [ -f "$D/train.txt" ] || python3 "$HERE/prepare.py" --corpus "$CORPUS" --out "$D" \
-  --sampling upsample --alpha 0.3 --max-repeat 20 --total "${TOTAL:-20000000}" --workers "$T"
-# 2. Per-label lexicons from the training split.
+  --sampling upsample --alpha 0.3 --max-repeat 20 --total "${TOTAL:-20000000}" --workers "$T" \
+  --caps "$HERE/source_caps.tsv"
+# 2. Per-label lexicons from the training split (same caps, so the split matches).
 [ -f "$OUT/lexicon/lexicon.train.tsv" ] || python3 "$HERE/build_lexicon.py" --corpus "$CORPUS" \
-  --out "$OUT/lexicon" --workers "$T"
+  --out "$OUT/lexicon" --workers "$T" --caps "$HERE/source_caps.tsv"
 # 3. A first model, to fit the label weights on dev.
 [ -f "$OUT/base.safetensors" ] || "$BF" supervised -preset "$PRESET" -input "$D/train.txt" \
   -output "$OUT/base" -thread "$T" -verbose 1
