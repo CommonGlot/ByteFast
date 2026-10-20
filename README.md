@@ -121,10 +121,6 @@ data:
   `tools/gen_strip_table.py`. On UDHR it raised macro F1 from 0.815 to 0.824
   (2M GlotLID lines, `-stripProb 0.3`).
 
-- `-labelWeights FILE`: `LABEL<TAB>WEIGHT` lines; each line of a label is
-  trained `WEIGHT` times in expectation (`floor(WEIGHT)` times, plus once
-  more with the remaining fraction as probability), which resamples labels
-  without rewriting the data. Labels not in the file keep weight 1.
 - `-preset lid` / `-preset lid-accurate`: the language-ID settings of
   [docs/architecture.md](docs/architecture.md) (bytes 2-5, the 20k most
   frequent words, crops, normalized and stripped lines, 3 epochs at lr 0.8;
@@ -156,7 +152,7 @@ in-domain test split (0.983 to 0.984).
 
 `./bytefast supervised -h` lists every option. In Python the same names are
 keyword arguments of `bytefast.train_supervised`, with snake_case aliases
-such as `max_bytes`, `max_vocab`, `label_weights` and `lex_threshold`, and
+such as `max_bytes`, `max_vocab` and `lex_threshold`, and
 `preset=` selects a preset.
 
 ## Model files

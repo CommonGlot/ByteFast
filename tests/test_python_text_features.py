@@ -104,12 +104,6 @@ def main():
         assert (accurate.f.getArgs().minn, accurate.f.getArgs().maxn) == (2, 5)
         assert lid.predict(query)[0] == ("__label__sports",)
 
-        # Label weights: a label of weight 0 is never trained.
-        weights = root / "weights.tsv"
-        weights.write_text("sports\t0\n__label__science\t2.5\n", encoding="utf-8")
-        weighted = train(data, minb=2, maxb=5, bucket=50000, label_weights=str(weights))
-        assert weighted.predict(query)[0] != ("__label__sports",)
-
         # Training on random character spans, normalized and stripped lines.
         cropped = train(data, minb=2, maxb=5, bucket=50000, minCount=10 ** 9,
                         crop_prob=0.5, crop_min=5, crop_max=30, norm_prob=0.3,

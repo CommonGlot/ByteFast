@@ -75,7 +75,6 @@ PYBIND11_MODULE(_core_pybind, m) {
       .def_readwrite("label", &bytefast::Args::label)
       .def_readwrite("verbose", &bytefast::Args::verbose)
       .def_readwrite("seed", &bytefast::Args::seed)
-      .def_readwrite("labelWeights", &bytefast::Args::labelWeights)
       .def("applyPreset", &bytefast::Args::applyPreset);
 
   py::enum_<bytefast::loss_name>(m, "loss_name", py::module_local())

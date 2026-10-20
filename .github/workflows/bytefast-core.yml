@@ -66,12 +66,11 @@ jobs:
             python3 -c "import sys; p=float(open('/tmp/core-result.txt').read().split()[3]); print('cfg=$cfg P@1=%s' % p); sys.exit(p < 0.95)"
           done
           python3 -c "d=open('/tmp/core.safetensors','rb').read(9); assert d[8:9]==b'{', d"
-      - name: Presets, label weights and set-lexicon
+      - name: Presets and set-lexicon
         run: |
           set -e
-          printf "alpha\t0.5\n__label__gamma\t2\n" > /tmp/core-weights.tsv
           ./bytefast supervised -input /tmp/core-train.txt -output /tmp/preset -preset lid -minCount 1 \
-            -bucket 100000 -epoch 10 -lr 0.5 -thread 2 -verbose 0 -labelWeights /tmp/core-weights.tsv
+            -bucket 100000 -epoch 10 -lr 0.5 -thread 2 -verbose 0
           ./bytefast set-lexicon /tmp/preset.safetensors /tmp/core-lexicon.tsv /tmp/lexicon.safetensors
           ./bytefast test /tmp/lexicon.safetensors /tmp/core-test.txt | tee /tmp/preset-result.txt
           python3 -c "import sys; p=float(open('/tmp/preset-result.txt').read().split()[3]); sys.exit(p < 0.95)"

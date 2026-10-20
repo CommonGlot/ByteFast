@@ -19,7 +19,6 @@ NAMES = {
     "bucket", "thread", "label", "verbose", "seed", "minb", "maxb",
     "maxBytes", "wordlist", "maxVocab", "lexicon", "lexThreshold", "lexMinWords",
     "lexTopK", "cropProb", "cropMin", "cropMax", "normProb", "stripProb",
-    "labelWeights",
 }
 
 ALIASES = {
@@ -35,7 +34,6 @@ ALIASES = {
     "lex_threshold": "lexThreshold",
     "lex_min_words": "lexMinWords",
     "lex_top_k": "lexTopK",
-    "label_weights": "labelWeights",
 }
 
 
@@ -130,8 +128,7 @@ def train_supervised(preset=None, **kwargs):
     lexicon is a file of LABEL<TAB>WORD lines kept in the model: at
     prediction, a label is kept only if its words cover lex_threshold of the
     line (lines of at least lex_min_words words), else the next of the top
-    lex_top_k labels that does. label_weights is a file of LABEL<TAB>WEIGHT
-    lines: each line of a label is trained WEIGHT times in expectation.
+    lex_top_k labels that does.
     """
     args = {"thread": max(1, multiprocessing.cpu_count() - 1)}
     for name, value in kwargs.items():

@@ -145,60 +145,10 @@ void ByteFast::supervised(
   if (labels.size() == 0 || line.size() == 0) {
     return;
   }
-  // A line with several labels trains on one of them, chosen at random. A
-  // label of weight w trains floor(w) times, plus once more with
-  // probability w - floor(w).
+  // A line with several labels trains on one of them, chosen at random.
   std::uniform_int_distribution<> uniform(0, labels.size() - 1);
   int32_t i = uniform(state.rng);
-  int32_t repeats = 1;
-  if (!labelWeights_.empty()) {
-    const real w = labelWeights_[labels[i]];
-    repeats = int32_t(w);
-    if (std::uniform_real_distribution<real>(0, 1)(state.rng) < w - repeats) {
-      repeats++;
-    }
-  }
-  for (int32_t r = 0; r < repeats; r++) {
-    model_->update(line, labels, i, lr, state);
-  }
-}
-
-// -labelWeights: LABEL<TAB>WEIGHT lines; the label prefix is optional and
-// labels that are not in the training data are skipped.
-void ByteFast::readLabelWeights() {
-  labelWeights_.clear();
-  if (args_->labelWeights.empty()) {
-    return;
-  }
-  std::ifstream ifs(args_->labelWeights);
-  if (!ifs.is_open()) {
-    throw std::invalid_argument(args_->labelWeights + " cannot be opened!");
-  }
-  labelWeights_.assign(dict_->nlabels(), 1.0);
-  std::string line;
-  int32_t n = 0;
-  while (std::getline(ifs, line)) {
-    const size_t tab = line.find('\t');
-    if (tab == std::string::npos) {
-      continue;
-    }
-    std::string label = line.substr(0, tab);
-    int32_t id = getLabelId(label);
-    if (id < 0) {
-      id = getLabelId(args_->label + label);
-    }
-    const real w = std::stof(line.substr(tab + 1));
-    if (!(w >= 0)) {
-      throw std::invalid_argument("Label weights must be >= 0: " + line);
-    }
-    if (id >= 0) {
-      labelWeights_[id] = w;
-      n++;
-    }
-  }
-  if (args_->verbose > 0) {
-    std::cerr << "Label weights: " << n << " labels" << std::endl;
-  }
+  model_->update(line, labels, i, lr, state);
 }
 
 std::tuple<int64_t, double, double>
@@ -391,7 +341,6 @@ void ByteFast::train(const Args& args, const TrainCallback& callback) {
   if (!args_->lexicon.empty()) {
     lexicon_.build(args_->lexicon, *dict_, args_->label, args_->verbose);
   }
-  readLabelWeights();
 
   input_ = createRandomMatrix();
   output_ = createTrainOutputMatrix();

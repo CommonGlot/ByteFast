@@ -29,24 +29,19 @@ diacritics (10%).
 Steps (each is skipped if its output exists):
 
 1. `prepare.py`: per-label 15% hold-out for dev and test, then GlotLID's
-   upsampling to `TOTAL` (20M) training lines. `source_caps.tsv` caps a few
-   source files that would otherwise dominate their label (the Dyula religious
-   text in bam_Latn); `build_lexicon.py` applies the same caps so its training
-   split matches.
+   upsampling to `TOTAL` (20M; 0 keeps the full upsampled pool) training
+   lines, at most `CAP` per label when set. Balance between labels comes
+   from this sampling only; there are no per-label training weights.
 2. `build_lexicon.py`: per-label lists of correct words from the training
    split only (at least 3 lines, the label's script, at least 2 sources when
    a second source holds 5% of the lines, 97% coverage up to 10k words, no
    strays of the 40 biggest labels), kept only if a list accepts at least 90%
    of its label's held-out dev lines. The model keeps them for the lexicon
    check (`-lexicon`; `bytefast set-lexicon` swaps them later).
-3. A first model and `fit_weights.py`: a per-label bias fitted on dev,
-   turned into training weights exp(b/4) (x0.25-x4, at most 20 passes over
-   a label's lines), and x2 for labels the first model confuses
-   (`-labelWeights`).
-4. The model, with the weights and the lexicon.
+3. The model, with the lexicon.
 
-`BYTEFAST`, `THREADS` and `TOTAL` set the binary, the thread count and the
-number of training lines. The scripts need Python 3 with `numpy` and
+`BYTEFAST`, `THREADS`, `TOTAL` and `CAP` set the binary, the thread count, the
+number of training lines and the per-label cap. The scripts need Python 3 with `numpy` and
 `regex`.
 
 The numbers above are for models trained before the corpus's vote-based

@@ -40,8 +40,6 @@ class ByteFast {
   std::shared_ptr<Args> args_;
   std::shared_ptr<Dictionary> dict_;
   Lexicon lexicon_;
-  // Training weight of every label (-labelWeights).
-  std::vector<real> labelWeights_;
   std::shared_ptr<Matrix> input_;
   std::shared_ptr<Matrix> output_;
   std::shared_ptr<Model> model_;
@@ -66,7 +64,6 @@ class ByteFast {
       const std::vector<int32_t>& labels);
   bool keepTraining(const int64_t ntokens) const;
   void buildModel();
-  void readLabelWeights();
   std::tuple<int64_t, double, double> progressInfo(real progress);
 
  public:

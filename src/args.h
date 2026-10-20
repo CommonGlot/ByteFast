@@ -53,7 +53,6 @@ class Args {
   double normProb;
   double stripProb;
   // LABEL<TAB>WEIGHT lines: a line is trained WEIGHT times in expectation.
-  std::string labelWeights;
   int thread;
   std::string label;
   int verbose;

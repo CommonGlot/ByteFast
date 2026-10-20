@@ -41,7 +41,6 @@ Args::Args() {
   cropMax = 0;
   normProb = 0.0;
   stripProb = 0.0;
-  labelWeights = "";
   thread = 12;
   label = "__label__";
   verbose = 2;
@@ -165,8 +164,6 @@ void Args::parseArgs(const std::vector<std::string>& args) {
         normProb = std::stod(args.at(ai + 1));
       } else if (args[ai] == "-stripProb") {
         stripProb = std::stod(args.at(ai + 1));
-      } else if (args[ai] == "-labelWeights") {
-        labelWeights = std::string(args.at(ai + 1));
       } else if (args[ai] == "-thread") {
         thread = std::stoi(args.at(ai + 1));
       } else if (args[ai] == "-label") {
@@ -305,9 +302,6 @@ void Args::printDictionaryHelp() {
             << "                      diacritics (tones, accents, Arabic/Hebrew "
                "vowel marks) ["
             << stripProb << "]\n"
-            << "  -labelWeights       file of LABEL<TAB>WEIGHT lines: each line of a label is\n"
-            << "                      trained WEIGHT times in expectation (1 by default) ["
-            << labelWeights << "]\n"
             << "  -label              labels prefix [" << label << "]\n";
 }
 

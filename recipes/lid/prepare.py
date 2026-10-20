@@ -9,7 +9,7 @@ For every label (in the folders given with --versions, data/ by default):
 Training lines are then resampled with temperature: label l gets
 N * p_l**alpha / sum(p**alpha) lines (alpha = 1/T = 0.3), repeating lines of
 small labels and subsampling large ones; N is the pool size (or --total).
---max-train-per-label caps that number for quick proxy runs.
+--max-train-per-label caps that number, so the biggest labels do not dominate.
 
 --sampling unimax uses UniMax (Chung et al., 2023) instead: the budget N is
 spread as evenly as possible over the labels, but no label gets more than

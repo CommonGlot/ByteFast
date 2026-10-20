@@ -32,12 +32,8 @@ counts still use well-mixed bits.
 - **Vocabulary control.** `-minCount` (frequency), `-wordlist` (a given
   vocabulary) and `-maxVocab` (top-N by frequency, ties broken by the word)
   can be combined.
-- **Label weights.** `-labelWeights` trains each line of a label `w` times
-  in expectation, so resampling (fitted from a per-label bias) and
-  upweighting confused labels need no rewritten training file.
 - **Presets.** `-preset lid` and `-preset lid-accurate` set the language-ID
-  settings below; `recipes/lid` builds the data, lexicon, weights and
-  model.
+  settings below; `recipes/lid` builds the data, lexicon and model.
 - **Lexicon check.** `-lexicon` stores per-label word lists as a Bloom
   filter over (label, word) pairs. At prediction the top label must have at
   least `-lexThreshold` of the line's normalized words in its list, else the
@@ -77,7 +73,6 @@ FLORES+ devtest and the GlotLID test split.
 | `-cropProb` (character spans) | the short-text views of the GlotLID recipe |
 | `-normProb` | CommonLID's normalized input |
 | `-stripProb` | UDHR 0.815 -> 0.824 (2M lines, 0.3); Ewe and Fon gain, Yoruba loses |
-| `-labelWeights` | confused-pair upweighting: CommonLID +0.25, 5-word +0.66, FLORES +0.54 (as duplicated lines); bias-fitted resampling exp(b/2): FLORES +1.1, UDHR +0.4, CommonLID -0.7, so the recipe uses exp(b/4) |
 | `-lexicon` (threshold 0.5, top 5, 2+ words) | v4 model: CommonLID 0.609 -> 0.613, 5-word 0.542 -> 0.551, SmolSent 5-word 0.669 -> 0.681, FLORES+ 0.940 -> 0.943, test split 0.983 -> 0.984; promoting labels without a list, or lists that fail their own held-out lines, made the test split drop to 0.972-0.977; thresholds 0.6-0.8 and returning no label are worse |
 
 **Removed**
@@ -95,4 +90,5 @@ FLORES+ devtest and the GlotLID test split.
 | word n-grams (`-wordNgrams`), `-minCountLabel` | not part of the chosen language-ID settings (word bigrams helped only AG News and Yelp) |
 | per-label bias at prediction | FLORES +2.1 but CommonLID -2.5: it trades false positives of big languages for recall of small ones |
 | experts (`add-expert`) | v4 lid: FLORES+ 0.9428 -> 0.9466, CommonLID 0.6126 -> 0.6167; v4 accurate: FLORES+ 0.9472 -> 0.9477, CommonLID 0.6136 -> 0.6172; each +1.1 GB, so two models (lid and lid-accurate) are kept instead |
+| label weights (`-labelWeights`) | confused-pair upweighting: CommonLID +0.25, 5-word +0.66, FLORES +0.54 (as duplicated lines); bias-fitted resampling exp(b/2): FLORES +1.1, UDHR +0.4, CommonLID -0.7; on the v4 disagreements small weighted labels absorbed lines of their neighbours (kab, bew, Arabic dialects), so balance is left to the sampling of the training split |
 | `-saveEpochs`, `-validation`, `-lrUpdateRate`, `test-label` | tooling outside the chosen settings; the epoch count is fixed at 3 |
