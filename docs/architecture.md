@@ -89,6 +89,4 @@ FLORES+ devtest and the GlotLID test split.
 | `-fold`, `-posBins`, `-textScope` | no gain in earlier ablations |
 | word n-grams (`-wordNgrams`), `-minCountLabel` | not part of the chosen language-ID settings (word bigrams helped only AG News and Yelp) |
 | per-label bias at prediction | FLORES +2.1 but CommonLID -2.5: it trades false positives of big languages for recall of small ones |
-| experts (`add-expert`) | v4 lid: FLORES+ 0.9428 -> 0.9466, CommonLID 0.6126 -> 0.6167; v4 accurate: FLORES+ 0.9472 -> 0.9477, CommonLID 0.6136 -> 0.6172; each +1.1 GB, so two models (lid and lid-accurate) are kept instead |
-| label weights (`-labelWeights`) | confused-pair upweighting: CommonLID +0.25, 5-word +0.66, FLORES +0.54 (as duplicated lines); bias-fitted resampling exp(b/2): FLORES +1.1, UDHR +0.4, CommonLID -0.7; on the v4 disagreements small weighted labels absorbed lines of their neighbours (kab, bew, Arabic dialects), so balance is left to the sampling of the training split |
 | `-saveEpochs`, `-validation`, `-lrUpdateRate`, `test-label` | tooling outside the chosen settings; the epoch count is fixed at 3 |

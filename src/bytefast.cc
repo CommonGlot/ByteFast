@@ -92,9 +92,6 @@ void ByteFast::loadModel(const std::string& filename) {
   input_->load(in, "input");
   output_->load(in, "output");
   buildModel();
-  if (in.hasMetadata("experts")) {
-    throw std::invalid_argument("This model has experts, which ByteFast no longer supports");
-  }
 }
 
 std::vector<int64_t> ByteFast::getTargetCounts() const {
