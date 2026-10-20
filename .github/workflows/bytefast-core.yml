@@ -66,19 +66,15 @@ jobs:
             python3 -c "import sys; p=float(open('/tmp/core-result.txt').read().split()[3]); print('cfg=$cfg P@1=%s' % p); sys.exit(p < 0.95)"
           done
           python3 -c "d=open('/tmp/core.safetensors','rb').read(9); assert d[8:9]==b'{', d"
-      - name: Presets, label weights and experts
+      - name: Presets, label weights and set-lexicon
         run: |
           set -e
           printf "alpha\t0.5\n__label__gamma\t2\n" > /tmp/core-weights.tsv
           ./bytefast supervised -input /tmp/core-train.txt -output /tmp/preset -preset lid -minCount 1 \
             -bucket 100000 -epoch 10 -lr 0.5 -thread 2 -verbose 0 -labelWeights /tmp/core-weights.tsv
-          ./bytefast test /tmp/preset.safetensors /tmp/core-test.txt
-          grep -v __label__alpha /tmp/core-train.txt > /tmp/core-expert.txt
-          ./bytefast supervised -input /tmp/core-expert.txt -output /tmp/expert -minb 2 -maxb 5 \
-            -bucket 100000 -dim 16 -epoch 10 -lr 0.5 -thread 2 -verbose 0
-          ./bytefast add-expert /tmp/preset.safetensors /tmp/expert.safetensors /tmp/experts.safetensors 0.9
-          ./bytefast test /tmp/experts.safetensors /tmp/core-test.txt | tee /tmp/expert-result.txt
-          python3 -c "import sys; p=float(open('/tmp/expert-result.txt').read().split()[3]); sys.exit(p < 0.95)"
+          ./bytefast set-lexicon /tmp/preset.safetensors /tmp/core-lexicon.tsv /tmp/lexicon.safetensors
+          ./bytefast test /tmp/lexicon.safetensors /tmp/core-test.txt | tee /tmp/preset-result.txt
+          python3 -c "import sys; p=float(open('/tmp/preset-result.txt').read().split()[3]); sys.exit(p < 0.95)"
       - name: C API
         run: |
           make -j2 c_api_test
@@ -112,7 +108,7 @@ jobs:
           python -m pip install safetensors
           python - <<'PY'
           from safetensors import safe_open
-          for path in ["/tmp/core.safetensors", "/tmp/augmented.safetensors", "/tmp/experts.safetensors"]:
+          for path in ["/tmp/core.safetensors", "/tmp/augmented.safetensors", "/tmp/lexicon.safetensors"]:
               with safe_open(path, "np") as f:
                   meta = f.metadata()
                   assert meta["format"] == "bytefast", meta

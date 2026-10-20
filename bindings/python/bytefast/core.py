@@ -74,15 +74,6 @@ class _Model:
         """Share of a line's words for the lexicon check; 0 turns it off."""
         self.f.setLexiconThreshold(threshold)
 
-    def add_expert(self, expert_path, gate=0.8):
-        """Store the model at expert_path in this model, for its labels.
-
-        When the top label of a line is one of the expert's labels and its
-        probability is below gate, the expert picks the label. Saved with
-        the model.
-        """
-        self.f.addExpert(str(expert_path), gate)
-
     def save_model(self, path):
         self.f.saveModel(path)
 

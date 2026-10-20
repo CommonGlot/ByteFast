@@ -154,18 +154,6 @@ lists built from its training data that pass a self-check on held-out lines
 0.669 to 0.681 and FLORES+ devtest from 0.940 to 0.943, without lowering the
 in-domain test split (0.983 to 0.984).
 
-### Experts
-
-`bytefast add-expert MODEL EXPERT OUTPUT [GATE]` stores `EXPERT`, a model
-trained on the lines of a group of close labels, inside `MODEL`. When the top
-label of a line is one of the expert's labels and its probability is below
-`GATE` (0.8), the expert picks the label, which keeps the main model's
-probability for it. Several experts can be added (their labels must not
-overlap); they are saved as `expertN.*` tensors in the same file, and the C
-API, Python, Rust and JS use them. In Python: `model.add_expert(path,
-gate=0.8)`. On FLORES the five language-ID experts raised macro F1 from 0.930
-to 0.939.
-
 `./bytefast supervised -h` lists every option. In Python the same names are
 keyword arguments of `bytefast.train_supervised`, with snake_case aliases
 such as `max_bytes`, `max_vocab`, `label_weights` and `lex_threshold`, and

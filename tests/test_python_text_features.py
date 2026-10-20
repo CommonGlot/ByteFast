@@ -110,27 +110,6 @@ def main():
         weighted = train(data, minb=2, maxb=5, bucket=50000, label_weights=str(weights))
         assert weighted.predict(query)[0] != ("__label__sports",)
 
-        # An expert for finance and science, stored in the model file.
-        expert_data = root / "expert.txt"
-        expert_data.write_text("".join(
-            l for l in data.read_text(encoding="utf-8").splitlines(True)
-            if not l.startswith("__label__sports")), encoding="utf-8")
-        expert = train(expert_data, minb=2, maxb=5, bucket=50000)
-        expert.save_model(str(root / "expert.safetensors"))
-        main = train(data, minb=2, maxb=5, bucket=50000)
-        main.add_expert(root / "expert.safetensors", gate=1.0)
-        main.save_model(str(root / "experts.safetensors"))
-        with_expert = bytefast.load_model(str(root / "experts.safetensors"))
-        line = "Researchers sequenced the genome of a rare plant."
-        assert with_expert.predict(line)[0] == expert.predict(line)[0]
-        assert with_expert.predict(query)[0] == ("__label__sports",)
-        try:
-            main.add_expert(root / "expert.safetensors")
-        except ValueError:
-            pass  # its labels already belong to an expert
-        else:
-            raise AssertionError("accepted a second expert for the same labels")
-
         # Training on random character spans, normalized and stripped lines.
         cropped = train(data, minb=2, maxb=5, bucket=50000, minCount=10 ** 9,
                         crop_prob=0.5, crop_min=5, crop_max=30, norm_prob=0.3,

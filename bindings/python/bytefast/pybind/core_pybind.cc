@@ -113,11 +113,6 @@ PYBIND11_MODULE(_core_pybind, m) {
                 meter.nexamples(), meter.precision(), meter.recall());
           })
       .def(
-          "addExpert",
-          [](bytefast::ByteFast& m, const std::string& path, bytefast::real gate) {
-            m.addExpert(path, gate);
-          })
-      .def(
           "setLexiconThreshold",
           [](bytefast::ByteFast& m, bytefast::real threshold) {
             m.setLexiconThreshold(threshold);

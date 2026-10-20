@@ -18,11 +18,6 @@ namespace bytefast {
 
 class SafeTensorsWriter {
  public:
-  // Prepended to the names of the tensors and metadata that follow (for
-  // models stored inside a model, such as experts).
-  void setPrefix(const std::string& prefix) {
-    prefix_ = prefix;
-  }
   void metadata(const std::string& key, const std::string& value);
   // The data must stay valid until write().
   void tensor(
@@ -46,7 +41,6 @@ class SafeTensorsWriter {
     const void* data;
     size_t bytes;
   };
-  std::string prefix_;
   std::map<std::string, std::string> metadata_;
   std::vector<Entry> tensors_;
   std::vector<std::unique_ptr<std::string>> owned_;
@@ -56,10 +50,6 @@ class SafeTensorsReader {
  public:
   explicit SafeTensorsReader(const std::string& path);
   static bool isSafeTensors(const std::string& path);
-  // Prepended to the names looked up from now on.
-  void setPrefix(const std::string& prefix) {
-    prefix_ = prefix;
-  }
 
   bool has(const std::string& name) const;
   bool hasMetadata(const std::string& key) const;
@@ -82,7 +72,6 @@ class SafeTensorsReader {
   };
   const Entry& entry(const std::string& name) const;
   std::string path_;
-  std::string prefix_;
   std::ifstream in_;
   uint64_t dataStart_;
   std::map<std::string, std::string> metadata_;

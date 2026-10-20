@@ -1,6 +1,0 @@
-# group<TAB>labels: close languages the main model confuses (FLORES and test losses)
-arabic	arb_Arab apc_Arab acm_Arab aeb_Arab arz_Arab ary_Arab ars_Arab
-hindi	hin_Deva awa_Deva bho_Deva mag_Deva mai_Deva hne_Deva
-malay	zsm_Latn ind_Latn
-chinese	cmn_Hani yue_Hani wuu_Hani lzh_Hani
-tibetan	bod_Tibt xsr_Tibt
